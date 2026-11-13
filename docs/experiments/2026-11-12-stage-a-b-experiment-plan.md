@@ -12,7 +12,7 @@ summary: Proposed Stage A/B pilot with 36 maximum review slots, three model-free
 
 This revision explicitly replaces the earlier, unexecuted proposal of 39 review runs with **24 Stage A review slots plus 12 conditional Stage B slots: at most 36 scheduled reviewer attempts, with no automatic harness inference retries**. These comprise 12 managed OCR sessions and 24 single `/llm` calls if Stage B proceeds. The three freshness/applicability controls move to the model-free substrate; they need no inference. Underlying model/API requests inside OCR remain separately counted and unmeasured for this experiment. Historical fake-provider OCR probes in S7 are separate compatibility evidence, not any of these planned review slots.
 
-The revision incorporates the 2026-11-13 critical audit and exact managed-binary evidence (S6/S7), corrects the oracle/scorer and resource accounting, and defines a bounded model-free Milestone 2. It does not adopt a production architecture, authorize live spending, or settle the pending licence for new research documents.
+The revision incorporates the 2026-11-13 critical audit and exact managed-binary evidence (S6/S7), corrects the oracle/scorer and resource accounting, and defines a bounded model-free Milestone 2. It does not adopt a production architecture or authorize live spending. The owner confirmed the documentation/code licence split on 2026-11-14; D8 below records that agreement.
 
 Source classes used below are marked inline as `[A]` accepted decision, `[I]` implemented source inspected by this milestone, `[T]` test inspected but not executed, `[P]` executed model-free probe, `[C]` existing CI receipt inspected, `[E]` experimental model evaluation, `[U]` unverified assumption. **No `[E]` item exists yet**; that absence is the reason for the experiment.
 
@@ -612,7 +612,7 @@ Do not commit credentials or compiled OCR assets. Keep sealed artifacts out of a
 
 ## 17. Decisions and their status after owner review
 
-Technical choices below resolve the plan for the next model-free work; they do not authorize live calls, a production implementation or a licence grant.
+Technical choices below resolve the plan for the next model-free work; they do not authorize live calls or a production implementation. D8 separately records the owner's confirmed licence decision.
 
 | ID | Decision | Status / selected direction |
 | --- | --- | --- |
@@ -623,9 +623,9 @@ Technical choices below resolve the plan for the next model-free work; they do n
 | D5 | Truth and anonymization | **Selected:** reviewed bounded oracle, sealed labels/map, sanitized reviewer materialization and explicit overlap/coverage limits |
 | D6 | Stage B and stops | **Selected:** §8 and §14, all four B candidates, deterministic baseline, no automatic harness inference retries, three offline controls |
 | D7 | Docs/tooling bootstrap | **Included in Milestone 2:** minimal supported Docs Protocol setup and maintained strict TypeScript tooling under the org standard; not implemented by this docs-only revision |
-| D8 | New research documents and results licence | **Still requires explicit agreement.** Recommended: CC BY 4.0 for original research/planning prose and report narrative/tables; retain Apache 2.0 for original code, tests and tooling. Alternative: agree Apache 2.0 also for new original docs. Do not infer either grant |
+| D8 | New research documents and results licence | **Confirmed by the owner on 2026-11-14:** CC BY 4.0 for original research/planning documents, experiment reports and original research results; Apache 2.0 for original code, tests and tooling. See [documentation licence notice](../../LICENSE-DOCS) |
 
-The original Phase 0 report already has its agreed CC BY 4.0 attribution and remains unchanged. This does not settle new documents. Specify the boundary for fixture/test data and retained third-party/provider artifacts when recording D8; do not imply that a repository licence overrides their own rights or terms. Until the new-document grant is recorded, preserve the README's pending status.
+The original Phase 0 report retains its agreed CC BY 4.0 attribution and remains unchanged. Original fixture implementations and test data forming part of the tests follow the code/tests licence; original research prose, explanatory tables and authored experiment results follow the documentation licence. Retained third-party sources and provider artifacts keep any applicable original notices and terms. Contributors retain copyright in their contributions; this agreement does not transfer authorship or relicense third-party material.
 
 ## 18. Next milestone: model-free experimental substrate
 

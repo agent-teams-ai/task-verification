@@ -32,7 +32,7 @@ Every material claim in the research documents is expected to carry a source cla
 
 - **Code, tests and tooling:** Apache License 2.0 (see [LICENSE](LICENSE)). Contributors retain copyright in their contributions. Apache 2.0 covers original code, tests and tooling only.
 - **Original Phase 0 report (external):** CC BY 4.0, with the agreed attribution. It is referenced, not reproduced here, and remains unchanged.
-- **Research and planning documents in this repository:** these are **not** covered by Apache 2.0 by implication. The licence for the Markdown research and planning documents, and for the experiment results report, is an open owner decision; until it is recorded, do not redistribute them under any licence, including Apache 2.0 or CC BY 4.0.
+- **Original research and planning documents, experiment reports and original research results:** Creative Commons Attribution 4.0 International (**CC BY 4.0**), as confirmed by the owner on 2026-11-14. See [LICENSE-DOCS](LICENSE-DOCS) for the scope, attribution notice and full licence link. Contributors retain copyright; third-party material keeps its own terms.
 
 ## Contributing
 

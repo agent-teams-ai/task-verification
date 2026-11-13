@@ -1,0 +1,25 @@
+Research documentation licence
+
+Original research and planning documents, experiment reports, and original
+research results in this repository are licensed under the Creative Commons
+Attribution 4.0 International Public License (CC BY 4.0).
+
+SPDX-License-Identifier: CC-BY-4.0
+Full legal terms: https://creativecommons.org/licenses/by/4.0/legalcode.en
+Licence overview: https://creativecommons.org/licenses/by/4.0/
+
+Copyright remains with the respective authors, identified in the documents
+and Git history. When sharing or adapting the licensed material, give the
+appropriate credit, retain the supplied notices as required by the licence,
+link to the material and licence, and indicate changes. This notice applies
+the linked public licence; it does not add restrictions to its terms.
+
+Original code, tests, fixture implementations and tooling are covered by the
+Apache License 2.0 in LICENSE. Original test data forming part of the tests
+follow that code/tests licence. Third-party material, imported sources and
+provider artifacts retain any applicable original notices and terms.
+
+The external original Phase 0 report retains its previously agreed CC BY 4.0
+attribution and is not modified by this notice.
+
+Licence split confirmed by the repository owner on 2026-11-14 (Europe/Kyiv).
