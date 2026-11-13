@@ -246,7 +246,7 @@ A resolvable but irrelevant reference is a separate support failure (§13). Dupl
 
 ## 5. Reviewer profile comparison
 
-Both profiles receive the same candidate application trees, criteria text and PR title/description. This parity must be verified on **materialized model inputs**, not inferred from harness arguments. For A, the pinned production runner combines the PR title and cleaned description into OCR background text `[I]`; the managed CLI has no separate magical PR-description channel.
+Both profiles use the same captured base/head application basis, criteria text, PR title and cleaned description. Verify the shared source inventory and change information in each profile's materialization, and the task/criteria text in its actual model input; identical available information does not require identical wire requests or identical file reads. For A, the pinned production runner combines the PR title and cleaned description into OCR background text `[I]`; the managed CLI has no separate PR-description channel.
 
 ### Profile A — Ordinary Code Review
 
@@ -273,13 +273,15 @@ Score the chosen consumer-visible normalized result as Profile A's delivered fin
 | --- | --- |
 | Interface | `@agent-teams/account-gateway/llm` → `createLlmClient(...).generate(...)` |
 | Shape | one bounded generation per planned invocation; record execution cleanup as closed or pending, not automatically successful |
-| Input | complete captured `crit-v1` IDs/text, whole reviewer-visible application tree, PR description and instruction to assess every expected ID |
+| Input | complete captured `crit-v1` IDs/text; pinned base/head identities; the full head application tree including unchanged files; the complete base-to-head diff with deleted/renamed-path information and changed content; the same PR title and cleaned description as A; instruction to assess every expected ID |
 | Requested output | `output: { mode: "json_schema", schema }` with `assessments: [{ criterionId, outcome, evidenceRefs, explanation }]` |
 | Decode/admission | bounded structural parsing returns valid records plus diagnostics; inventory completeness, duplicate/unknown IDs and references are checked separately |
 | Inventory authority | expected IDs come from the captured authored snapshot, never model output |
 | Outcomes | `satisfied` / `violated` / `inconclusive`; presence, reported claim and admitted conclusion remain distinguishable |
 | Retrieval | no tools, repository search, second turn or conversation state |
 | Retry | no automatic harness inference retry; failed attempts remain in the ledger |
+
+For this text-only fixture, the full head files plus the complete diff must retain enough information to reconstruct the declared base application tree. Verify that against its recorded identity before live registration. A bare head tree or a base commit ID without its content is insufficient for the declared shared-context comparison. Include the whole rendered bundle in the existing byte/model-context preflight (§6.2); no additional model turn is introduced.
 
 **Decoder boundary.** At the pinned SDK revision, JSON parsing or a throwing `decode` produces `output_invalid`; `LlmFailure` exposes no raw `text`/`value`. Therefore a decoder that throws for a missing expected ID cannot also promise to preserve the other records. Use a bounded admission report for parseable data, preserving valid entries while marking the whole inventory incomplete. Syntax failures/truncation remain SDK failures; set `raw_unavailable` when the SDK supplies no bytes. A new raw-stream capture adapter is not required for this milestone. If schema normalization helpers are used, check their interaction with this boundary rather than assuming they preserve partial records.
 
@@ -394,12 +396,12 @@ Stage B adds **12 scheduled slots** = the same 4 candidates × 3 isolated repeti
 
 | Trigger | Condition |
 | --- | --- |
-| `B-1` | an inconclusive/absent assessment for which the predefined packet contains sufficient applicable observations |
+| `B-1` | an inconclusive/absent assessment, or a definite claim that fails the §13 reference/support checks, for which the predefined packet contains sufficient applicable observations |
 | `B-2` | a reported `violated` claim on any truth-satisfied criterion |
 | `B-3` | a candidate/criterion's reported outcome varies across repetitions |
 | `B-4` | a reported false `satisfied` or a known violation not detected |
 
-A consistently all-satisfied reviewer triggers B-4; stability alone is not safety. Technical failures are retained separately and are not evidence that supplying facts fixes a broken route. Resolve systemic capability problems before conducting a semantic comparison; any protocol/configuration change requires a newly recorded experiment revision.
+A consistently all-satisfied reviewer triggers B-4; stability alone is not safety. Stable oracle-correct labels with resolvable but irrelevant references trigger B-1 when the predefined evidence is sufficient: label agreement cannot conceal missing support. Technical failures are retained separately and are not evidence that supplying facts fixes a broken route. Resolve systemic capability problems before conducting a semantic comparison; any protocol/configuration change requires a newly recorded experiment revision.
 
 If no trigger occurs, skip B and report that the conditional rule was not met. This does not establish that machine evidence is generally unnecessary.
 
@@ -441,7 +443,7 @@ Milestone 2 checks the actual experimental consumer boundaries with fixed respon
 
 | Case | Required check | Evidence boundary |
 | --- | --- | --- |
-| A input and artifact identity | exact release/hash/configuration; complete PR/criteria background reaches the fake provider without truncation; intended rule shape reaches it | tests this materializer/binary input, not model attention |
+| Shared input and A artifact identity | compare base/head identities, source inventory, complete diff, PR title, cleaned description and criteria digest across both materializations; verify B's head-plus-diff reconstructs the base; verify A's exact release/hash/configuration and complete background/rule input at the fake provider | checks the common basis and each materializer's delivery; actual file reads and model attention remain profile-dependent |
 | A result path | normal completion, unchanged-file tool read and representative partial/cancel result; distinguish raw, normalized and skipped findings | reuse S7 where applicable; check the chosen consumer adapter's missing boundary |
 | B success and partial inventory | exact packed SDK with injected ports; valid result/receipt; missing, duplicate and unknown IDs preserve diagnostics and individually usable entries | SDK success is distinct from complete inventory admission |
 | B failures | malformed JSON, truncation, refusal, unknown effect and pending cleanup retain their actual SDK outcomes; missing raw text is explicit | no invented raw artifact or semantic verdict |
