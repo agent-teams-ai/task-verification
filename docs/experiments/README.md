@@ -12,6 +12,6 @@ Dated plans and, once they exist, dated results. A plan is not an execution: the
 
 ## Documents
 
-- [Task Verification — Stage A/B Experiment Plan, 2026-11-12](2026-11-12-stage-a-b-experiment-plan.md) — Proposed 39-review-run pilot comparison (12 managed OCR sessions, 27 single `/llm` calls) of ordinary code review against criteria-focused verification, with four sealed candidates, a conditional evidence stage, three freshness controls, and 0 of the proposed review runs executed.
+- [Task Verification — Stage A/B Experiment Plan, 2026-11-12](2026-11-12-stage-a-b-experiment-plan.md) — Owner-review revision 2026-11-14: up to 36 scheduled review attempts (12 managed OCR sessions, 24 single `/llm` calls), four sealed candidates, conditional recorded-evidence comparison with a deterministic baseline, three separate model-free admission controls, and zero live reviewer executions. The earlier 39-run proposal is explicitly superseded.
 
 [Documentation map](../README.md)

@@ -16,7 +16,9 @@ Descriptions of future work in the documents are proposals for review, not commi
 
 ## Current milestone
 
-Milestone 1 is a planning and documentation milestone only: the [Stage A/B experiment plan](docs/experiments/2026-11-12-stage-a-b-experiment-plan.md). It specifies a proposed 39-review-run reviewer experiment (12 managed OCR review sessions and 27 single `/llm` calls); **none of those review runs has been executed**, and no model/API request has been made. There is no verification kernel, harness or transport qualification in this repository.
+Milestone 1 is a planning and documentation milestone only: the [Stage A/B experiment plan](docs/experiments/2026-11-12-stage-a-b-experiment-plan.md). The 2026-11-14 owner-review revision specifies up to 36 scheduled reviewer attempts (12 managed OCR sessions and 24 single `/llm` calls if conditional Stage B proceeds), plus three model-free admission controls and a deterministic evidence baseline. This explicitly revises the earlier unexecuted 39-run proposal. **None of these live review slots has been executed.** There is no verification kernel, harness or transport qualification in this repository.
+
+The next milestone is a **model-free experimental substrate**: fixture, reviewed oracle, sealed truth, scorer, ledger, deterministic controls and bounded SDK/OCR compatibility checks. Live route/model/budget choices are gates for later live execution, not prerequisites for completing that substrate. The profiles compare experimental approaches; they do not adopt a production architecture.
 
 ## Reading
 
