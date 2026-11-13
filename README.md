@@ -16,7 +16,7 @@ Descriptions of future work in the documents are proposals for review, not commi
 
 ## Current milestone
 
-Milestone 1 is a planning and documentation milestone only: the [Stage A/B experiment plan](docs/experiments/2026-11-12-stage-a-b-experiment-plan.md). It specifies a proposed 39-invocation reviewer experiment; **none of those invocations has been executed**. There is no verification kernel, harness or transport qualification in this repository.
+Milestone 1 is a planning and documentation milestone only: the [Stage A/B experiment plan](docs/experiments/2026-11-12-stage-a-b-experiment-plan.md). It specifies a proposed 39-review-run reviewer experiment (12 managed OCR review sessions and 27 single `/llm` calls); **none of those review runs has been executed**, and no model/API request has been made. There is no verification kernel, harness or transport qualification in this repository.
 
 ## Reading
 
@@ -28,9 +28,9 @@ Every material claim in the research documents is expected to carry a source cla
 
 ## Licensing
 
-- **Code, tests and tooling:** Apache License 2.0 (see [LICENSE](LICENSE)). Contributors retain copyright in their contributions.
+- **Code, tests and tooling:** Apache License 2.0 (see [LICENSE](LICENSE)). Contributors retain copyright in their contributions. Apache 2.0 covers original code, tests and tooling only.
 - **Original Phase 0 report (external):** CC BY 4.0, with the agreed attribution. It is referenced, not reproduced here, and remains unchanged.
-- **Research and planning documents in this repository:** the licensing of the evaluation results report is an open owner decision; until it is recorded, do not redistribute these documents under a different licence.
+- **Research and planning documents in this repository:** these are **not** covered by Apache 2.0 by implication. The licence for the Markdown research and planning documents, and for the experiment results report, is an open owner decision; until it is recorded, do not redistribute them under any licence, including Apache 2.0 or CC BY 4.0.
 
 ## Contributing
 

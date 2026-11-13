@@ -3,12 +3,12 @@ id: experiments.stage-a-b-plan-2026-11-12
 type: research
 status: active
 owner: research/maintainers
-summary: Proposed 39-invocation Stage A/B reviewer experiment for Task Verification, with four sealed candidates, two reviewer profiles and explicit open decisions.
+summary: Proposed 39-review-run Stage A/B pilot experiment for Task Verification, with four sealed candidates, two reviewer profiles and explicit open decisions.
 ---
 
 # Task Verification — Stage A/B Experiment Plan
 
-**Recorded 2026-11-12 (Europe/Kiev). Source identities re-verified 2026-11-13.** Milestone 1 of the owner-approved Task Verification research programme. This is a **planning artifact**: no verification kernel, harness, transport qualification, live OCR run, model call or production integration exists. The experiment described here proposes **39 model invocations; 0 have been executed**.
+**Recorded 2026-11-12 (Europe/Kiev). Source identities re-verified 2026-11-13.** Milestone 1 of the owner-approved Task Verification research programme. This is a **planning artifact**: no verification kernel, harness, transport qualification, live OCR run, model call or production integration exists. The experiment described here proposes **39 review-run executions; 0 have been executed**. Of those, 12 are managed OCR review sessions (Profile A) and 27 are single `/llm` calls (Stage A Profile B, conditional Stage B, controls). The number of underlying model/API requests inside one OCR session is **not established** by this plan and may exceed one per session.
 
 Source classes used below are marked inline as `[A]` accepted decision, `[I]` implemented source inspected by this milestone, `[T]` test inspected but not executed, `[P]` executed model-free probe, `[C]` existing CI receipt inspected, `[E]` experimental model evaluation, `[U]` unverified assumption. **No `[E]` item exists yet**; that absence is the reason for the experiment.
 
@@ -24,6 +24,8 @@ Source classes used below are marked inline as `[A]` accepted decision, `[I]` im
 6. **The binding dependency is authorization, not design.** No model route is configured for a standalone consumer, and this milestone created no account or subscription `[U]`. Reusing the existing ReviewRouter test route is the cheapest path but is an owner decision (§17, D1).
 
 **What would change this recommendation, stated in advance.** If Profile A detects the omission candidate (§4 C4) in the same repetitions as Profile B without any criteria inventory, the criteria inventory adds little for this candidate class and the simplest viable path (TV-O3-style single invocation) should be preferred over building a criteria channel. If Profile B cannot return *justified* `satisfied` outcomes because the criteria need runtime facts it cannot obtain, the correct next step is machine evidence (TV-O1) earlier than planned, not a better prompt.
+
+**This is a narrow pilot, and it should be described as one.** One synthetic HTTP fixture, four candidate snapshots and five primarily machine-observable criteria can evaluate criterion coverage, detection of the selected behavioural violations, false-positive behaviour on the selected correct candidates, reviewer consistency across repeated executions, and the effect of supplying the defined recorded evidence. It cannot establish general pull-request review accuracy, broad semantic acceptance-criteria verification, performance on arbitrary repositories, production reliability, statistical significance, or the general effectiveness of a reusable evidence platform. The 60 per-profile criterion observations are **clustered within four candidate snapshots**; they are not 60 independent candidate samples, and no count in this plan should be read that way.
 
 ## 2. Scope and decision questions
 
@@ -111,7 +113,7 @@ These are **inspected receipts for their own controlled scopes**. They were not 
 
 ### 3.7 Recorded limitations
 
-- The original Phase 0 report is unavailable. S1/S2 record a 57,524-byte partial import with SHA-256 `e5ca71d6e57bcf34103e0b80f28550553c365b43a357da05ab2019725ff5ddfd`; **this milestone did not re-verify that byte count or digest**, and the missing continuation is not reconstructed.
+- The full canonical Phase 0 report was not available in the source set inspected by this milestone. Only the partial imported copy was available: S1/S2 record a 57,524-byte import with SHA-256 `e5ca71d6e57bcf34103e0b80f28550553c365b43a357da05ab2019725ff5ddfd`; **this milestone did not re-verify that byte count or digest**, and no missing content was reconstructed. The limitation can be revisited if the owner supplies the complete canonical report; nothing here treats it as permanent.
 - The upstream Sub2API tests and OCR result model were not re-read by this milestone; those claims are carried from S1 with their `[I]/[T]` status intact.
 - No model call, OCR execution, package publication or Gateway deployment was performed.
 
@@ -321,9 +323,9 @@ Everything in the "verified" column of this document is source inspection, recei
 
 ### 7.1 Matrix
 
-4 candidates × 2 profiles × 3 independent repetitions = **24 invocations**.
+4 candidates × 2 profiles × 3 independent repetitions = **24 review-run executions**: 12 managed OCR review sessions (Profile A) and 12 single `/llm` calls (Profile B).
 
-| Block | Invocations |
+| Block | Review runs |
 | --- | --- |
 | `S1-C1` × {A,B} × 3 | 6 |
 | `S1-C2` × {A,B} × 3 | 6 |
@@ -352,7 +354,7 @@ Attempted runs, completed runs, and abandoned runs are all reported. A run that 
 
 ## 8. Conditional Stage B and its decision rule
 
-Stage B adds **12 invocations** = 4 candidates × 3 repetitions, Profile B plus a recorded evidence bundle, same anonymization and order rules.
+Stage B adds **12 review-run executions** = 4 candidates × 3 repetitions, each a single `/llm` call, Profile B plus a recorded evidence bundle, same anonymization and order rules.
 
 **Evidence bundle (recorded, not ingested live).** For each candidate, the artifacts the oracle already produced: producer identity, candidate snapshot digest, check definition digest, test scope, execution environment (runtime and fixture version), actual outcome, completeness, execution timestamp, artifact references, and the explicit criterion applicability mapping. A digest alone binds bytes and does not establish a trusted producer; a model statement that "tests passed" is never evidence; a genuine passing check establishes only the behaviour its approved oracle actually covers `[A/I]`.
 
@@ -378,7 +380,7 @@ Three single-repetition control invocations, Profile B, reported separately and 
 | `CT-2` | `S1-C2` head snapshot + evidence produced for baseline `B0` where the revocation helper differed | Evidence bound to a different tree must not satisfy a criterion | evidence applicability `stale`; AC-3 not `satisfied` on evidence alone |
 | `CT-3` | `S1-C1` snapshot + `crit-v1` removed and re-added with identical bytes as revision `crit-v3` | A new revision forces a fresh assessment; a cancelled or superseded result must not be resurrected | fresh assessment under `crit-v3`, outcome vector consistent with the Stage A `C1`/B runs |
 
-Each control is one invocation; it tests the *admission protocol plus model boundary*, not reviewer accuracy. If the Milestone 2 harness cannot represent "prior assessment artifact supplied with new criteria" (`CT-1`) or "evidence with mismatched tree identity" (`CT-2`), the control is recorded as a **contract gap** rather than deleted.
+Each control is one review run; it tests the *admission protocol plus model boundary*, not reviewer accuracy. If the Milestone 2 harness cannot represent "prior assessment artifact supplied with new criteria" (`CT-1`) or "evidence with mismatched tree identity" (`CT-2`), the control is recorded as a **contract gap** rather than deleted.
 
 **Total accounting.**
 
@@ -387,10 +389,13 @@ Each control is one invocation; it tests the *admission protocol plus model boun
 | Stage A | 24 | 0 |
 | Stage B (conditional) | 12 | 0 |
 | Controls | 3 | 0 |
-| **Total model invocations** | **39** | **0** |
+| **Total review-run executions** | **39** | **0** |
+| — of which managed OCR review sessions (Profile A) | 12 | 0 |
+| — of which single `/llm` calls (Profile B, Stage B, controls) | 27 | 0 |
+| Underlying model/API requests inside an OCR session | **not established** (may exceed one per session) | 0 |
 | Capability qualification (separate) | not counted | 0 |
 
-None of these invocations has been executed. Capability qualification — transport checks, OCR build qualification, model admission checks — is accounted separately and is not part of the 39.
+None of these review runs has been executed. A review run is the experimental unit; it is not the same thing as an underlying model/API request, and this plan can count the latter only for the 27 single-call executions. Capability qualification — transport checks, OCR build qualification, model admission checks — is accounted separately and is not part of the 39.
 
 ## 10. Model-free transport qualification proposal
 
@@ -452,7 +457,9 @@ Machine evidence may remain reusable across a criteria edit; **sufficiency for t
 
 ### 13.1 Observation space
 
-Per profile: 4 candidates × 5 criteria × 3 repetitions = **60 criterion-observations**, of which **54** are truth-`satisfied` and **6** are truth-`violated`. Both profiles: 120 observations. Runs: 24 attempted.
+Per profile: 4 candidates × 5 criteria × 3 repetitions = **60 criterion-observations**, of which **54** are truth-`satisfied` and **6** are truth-`violated`. Both profiles: 120 observations. Review runs: 24 attempted.
+
+These 60 observations are **clustered within four candidate snapshots** (5 criteria × 3 repetitions each). They are not 60 independent candidate samples, and no aggregate below should be read as if they were.
 
 ### 13.2 Formulas
 
@@ -482,7 +489,7 @@ Per profile: 4 candidates × 5 criteria × 3 repetitions = **60 criterion-observ
 
 ### 13.4 What this design cannot establish
 
-With 24 runs over one fixture, every rate above has a wide uncertainty range. Results are reported as counts and per-cell detail, with descriptive intervals only where useful and always labelled as such. **No statistical significance, no production-wide accuracy, and no ranking of models is claimed.** A `0/6` miss rate at n=6 is consistent with a large true miss rate.
+With 24 review runs over one fixture, the effective independent sample is **four candidates in one task class**, and every rate above has a wide uncertainty range. Results are reported as counts and per-cell detail, with descriptive intervals only where useful and always labelled as such. **No statistical significance, no production-wide accuracy, and no ranking of models is claimed.** A `0/6` miss rate at n=6 is consistent with a large true miss rate.
 
 ## 14. Resource budgets and stopping conditions
 
@@ -491,7 +498,8 @@ With 24 runs over one fixture, every rate above has a wide uncertainty range. Re
 | Limit | Value | Basis |
 | --- | --- | --- |
 | Gateway units per `/llm` call | ~5 (execution 3 + prepare 1 + close 1) | `[I]` documented accounting |
-| Stage A Profile B / Stage B / controls | 12 + 12 + 3 = 27 `/llm` calls ≈ 135 units | arithmetic on the above |
+| Known `/llm` executions only: Stage A Profile B / Stage B / controls | 12 + 12 + 3 = 27 single calls ≈ 135 units | arithmetic on the above; **excludes managed OCR usage entirely** |
+| Managed OCR session usage (12 sessions) | **unmeasured; unresolved** | no OCR session has been executed, and its internal model-request count is not established |
 | Share of default per-account limit (10,000 units ≈ 2,000 calls) | ≈ 1.4% | `[I]` documented defaults |
 | Share of default consumer limit (100,000 units) | ≈ 0.14% | `[I]` |
 | Request body | ≤ 1 MiB (fixture ≈ tens of KB) | `[I]` |
@@ -507,7 +515,8 @@ With 24 runs over one fixture, every rate above has a wide uncertainty range. Re
 | OCR per-run token budget and subtask timeout | the engine accepts `--max-tokens-budget`/`--timeout`, but the authorized profile's approved values are an owner decision (D2) |
 | Currency cost | no authorized unit price; subscription access is not free or unlimited `[U]` |
 | Total spend ceiling in currency | depends on D1/D2 |
-| Profile A's internal model call count | engine-owned; bounded only by the token budget |
+| Profile A's internal model call count and token usage | engine-owned; bounded only by the token budget; unmeasured, so no per-session figure is offered |
+| Managed OCR gateway units | no OCR execution exists to measure them; the 135-unit estimate covers only the 27 `/llm` calls |
 
 ### 14.3 Retry versus reassessment
 
@@ -523,7 +532,7 @@ An inference whose dispatch status is unknown is never automatically replayed un
 | --- | --- |
 | `S1` | infrastructure failure reaches 25% of attempted runs (6 of 24), or 2 consecutive runs fail for the same technical cause |
 | `S2` | authorization, credential or policy error occurs — no retry, no workaround |
-| `S3` | total gateway usage would exceed 6,000 units (60× the planned 135, leaving room for retries) |
+| `S3` | gateway usage attributable to the 27 `/llm` executions would exceed 6,000 units (about 44× the planned 135). This threshold does **not** bound managed OCR usage, which is unmeasured; OCR budget exhaustion is a separate owner decision (§14.2) |
 | `S4` | the oracle disagrees with itself between the two pre-run executions on any candidate, or truth cannot be established for a criterion |
 | `S5` | the sealed truth or anonymization map is exposed to a reviewer — the affected runs are void and re-planned |
 | `S6` | the fixture or harness cannot represent a control input (`CT-1`/`CT-2`), which converts that control into a recorded contract gap |
@@ -548,7 +557,7 @@ An inference whose dispatch status is unknown is never automatically replayed un
 | R1 | No authorized model route for a standalone experiment | **blocking** (D1) |
 | R2 | OCR inspected revision ≠ built revision (`6386895…` vs `8eb83340…`) | **open**; must close before Profile A is described precisely |
 | R3 | Fixture repository not created; criteria text not yet owner-reviewed | planned for Milestone 2 |
-| R4 | Phase 0 original report unavailable; only a partial import is retained | permanent limitation for this programme |
+| R4 | Full canonical Phase 0 report not available in the inspected source set; only a partial import is retained | revisitable if the owner supplies the complete report; nothing is reconstructed in the meantime |
 | R5 | Four research inputs are unmerged drafts | nothing in them can be cited as an accepted decision |
 | R6 | Provider schema enforcement is not guaranteed for every profile | consumer-side validation is mandatory; recorded per run |
 | R7 | Criteria inventory would exceed the 8,000-character OCR background cap in any OCR-based profile | not triggered by the fixture; blocks reusing this design for long criteria |
@@ -569,7 +578,7 @@ An inference whose dispatch status is unknown is never automatically replayed un
 | D5 | Approve the sealed-truth procedure and the anonymization scheme | approve; a reviewer who sees truth voids the run |
 | D6 | Approve the pre-registered Stage B trigger and the stop conditions | approve before execution, not after |
 | D7 | Whether the repository should run the Docs Protocol CLI bootstrap (this milestone authored protocol-shaped Markdown without initializing the CLI authority) | decide in Milestone 2; the bootstrap is POSIX-first and was out of this milestone's scope |
-| D8 | Publication terms for the results report (CC BY 4.0 for the Phase 0 report is already agreed; this repository's evaluation report is not yet specified) | confirm CC BY 4.0 for the results report, Apache 2.0 for code |
+| D8 | Licensing of this repository's research and planning documents and of the experiment results report. Already agreed: the original Phase 0 report is CC BY 4.0 with the agreed attribution, and Apache 2.0 covers original code, tests and tooling. Not yet agreed: the licence for the Markdown research documents and the results report | confirm the document/report licence explicitly; do not treat Apache 2.0 as covering Markdown by implication |
 
 ## 18. Recommended next milestone
 
