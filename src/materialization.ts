@@ -74,9 +74,26 @@ function assertCandidate(candidateId: string): void {
 
 /**
  * Resolve and validate an output directory so that it is strictly inside
- * MATERIALIZATION_ROOT. Rejects traversal, absolute paths outside the root,
- * protected directories (repo root, candidates/, oracle/, source dirs), and
- * symlink escapes. Returns the resolved real path.
+ * MATERIALIZATION_ROOT, defeating symlinks/junctions/reparse points at any
+ * level (including non-existing trailing segments following an existing link).
+ *
+ * Strategy:
+ *  1. Ensure MATERIALIZATION_ROOT exists and resolve it canonically. If the
+ *     root itself is a symlink/junction, realpathSync reveals its true target;
+ *     we require that target to remain the dedicated root location (basename
+ *     preserved) — a root that has been replaced by a link to elsewhere is
+ *     rejected by the containment check below.
+ *  2. Resolve the absolute requested path.
+ *  3. Walk upward until the deepest existing ancestor is found.
+ *  4. Canonicalize that ancestor via realpathSync (resolves symlinks/junctions/
+ *     reparse points on both POSIX and Windows).
+ *  5. Append the remaining non-existing segments to the canonical ancestor.
+ *  6. Verify strict containment below the canonical root (defense in depth,
+ *     checked twice).
+ *  7. Reject protected directories.
+ *
+ * No recursive deletion of arbitrary caller paths is performed; deletion
+ * happens only after this validation, on the validated canonical path.
  */
 function resolveSafeOutDir(outDir: string): string {
   if (typeof outDir !== "string" || outDir.trim() === "") {
@@ -86,46 +103,100 @@ function resolveSafeOutDir(outDir: string): string {
   // Ensure the dedicated root exists (only this root is ever created here).
   fs.mkdirSync(MATERIALIZATION_ROOT, { recursive: true });
   const rootReal = fs.realpathSync(MATERIALIZATION_ROOT);
+  // Reject if the root itself is a symlink/junction/reparse point pointing
+  // elsewhere (case-insensitive comparison to tolerate Windows casing).
+  const rootLexical = path.resolve(MATERIALIZATION_ROOT);
+  if (rootLexical.toLowerCase() !== rootReal.toLowerCase()) {
+    throw new Error(`unsafe materialization root (must not be a symlink/junction): ${MATERIALIZATION_ROOT}`);
+  }
+  // Also reject explicit symbolic links (covers POSIX and Windows symlinks).
+  try {
+    if (fs.lstatSync(MATERIALIZATION_ROOT).isSymbolicLink()) {
+      throw new Error(`unsafe materialization root (symlink): ${MATERIALIZATION_ROOT}`);
+    }
+  } catch (e) {
+    if (e instanceof Error && /unsafe materialization root/.test(e.message)) throw e;
+  }
 
   const resolved = path.resolve(outDir);
 
-  // Resolve symlinks for the deepest existing ancestor to defeat escapes.
-  let real = resolved;
-  if (fs.existsSync(resolved)) {
-    real = fs.realpathSync(resolved);
-  } else {
-    const parent = path.dirname(resolved);
-    if (fs.existsSync(parent)) {
-      real = path.join(fs.realpathSync(parent), path.basename(resolved));
+  // Walk upward until the deepest existing ancestor is found. While walking,
+  // reject any existing ancestor that is itself a symlink/junction/reparse
+  // point (this covers broken links and multi-level escapes).
+  const segments: string[] = [];
+  let cur = resolved;
+  while (cur && cur !== path.dirname(cur) && !fs.existsSync(cur)) {
+    segments.unshift(path.basename(cur));
+    cur = path.dirname(cur);
+  }
+  // Check every existing ancestor from root down for symlink/junction.
+  {
+    // Check components of `resolved` relative to root's parent.
+    const relResolved = path.relative(path.dirname(MATERIALIZATION_ROOT), resolved);
+    const parts = relResolved.split(path.sep).filter(Boolean);
+    let acc = path.dirname(MATERIALIZATION_ROOT);
+    for (const part of parts) {
+      acc = path.join(acc, part);
+      if (!fs.existsSync(acc)) break;
+      let isLink = false;
+      try {
+        const st = fs.lstatSync(acc);
+        isLink = st.isSymbolicLink();
+        // On Windows, junctions/reparse points: detect via realpath mismatch.
+        const rp = fs.realpathSync(acc);
+        if (rp.toLowerCase() !== path.resolve(acc).toLowerCase()) {
+          isLink = true;
+        }
+      } catch {
+        /* ignore */
+      }
+      if (isLink) {
+        // Allow the root itself (already validated) but reject anything below.
+        if (path.resolve(acc).toLowerCase() !== rootLexical.toLowerCase()) {
+          throw new Error(`unsafe materialization path (symlink/junction in path): ${outDir}`);
+        }
+      }
     }
   }
+  let canonical: string;
+  if (fs.existsSync(cur)) {
+    canonical = path.join(fs.realpathSync(cur), ...segments);
+  } else {
+    canonical = resolved;
+  }
 
-  const rel = path.relative(rootReal, real);
+  // Strict containment check (1).
+  const rel = path.relative(rootReal, canonical);
   if (rel === "" || rel.startsWith("..") || path.isAbsolute(rel)) {
     throw new Error(`unsafe materialization path (must be strictly inside ${MATERIALIZATION_ROOT}): ${outDir}`);
   }
-  // Extra guard: reject any path whose resolved form equals/escapes protected roots.
-  // Protected directories: reject repo root itself (but allow its .materialization subdir,
-  // handled by the root-containment check above) and any path under candidates/,
-  // oracle/, fixture/, src/.
+
+  // Protected directories.
   const protectedDirs = [CANDIDATES_DIR, path.join(ROOT, "oracle"), path.join(ROOT, "fixture"), path.join(ROOT, "src")];
-  if (real === path.resolve(ROOT)) {
+  if (canonical === path.resolve(ROOT)) {
     throw new Error(`unsafe materialization path (protected directory): ${outDir}`);
   }
   for (const pr of protectedDirs) {
     const r = path.resolve(pr);
-    if (real === r || real.startsWith(r + path.sep)) {
+    if (canonical === r || canonical.startsWith(r + path.sep)) {
       throw new Error(`unsafe materialization path (protected directory): ${outDir}`);
     }
   }
-  return real;
+
+  // Defense in depth (2).
+  const rel2 = path.relative(rootReal, canonical);
+  if (rel2 === "" || rel2.startsWith("..") || path.isAbsolute(rel2)) {
+    throw new Error(`unsafe materialization path (must be strictly inside ${MATERIALIZATION_ROOT}): ${outDir}`);
+  }
+
+  return canonical;
 }
 
 export function buildReviewerMaterialization(candidateId: string, outDir: string): MaterializationResult {
   assertCandidate(candidateId);
   const safeDir = resolveSafeOutDir(outDir);
 
-  // Safe deletion: only the validated path inside the dedicated root.
+  // Safe deletion: only the validated canonical path inside the dedicated root.
   fs.rmSync(safeDir, { recursive: true, force: true });
   fs.mkdirSync(safeDir, { recursive: true });
 
