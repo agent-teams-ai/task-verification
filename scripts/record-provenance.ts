@@ -157,7 +157,7 @@ function behaviorText(behavior: string): string {
 }
 
 /** Write a complete application snapshot into `destDir` without touching `.git`. */
-function writeSource(destDir: string, behavior: string, isHead: boolean): void {
+function writeSource(destDir: string, behavior: string, isHead: boolean, includeHelper: boolean): void {
   fs.mkdirSync(destDir, { recursive: true });
   // Clear only non-.git entries so an existing git repository is preserved.
   for (const entry of fs.readdirSync(destDir, { withFileTypes: true })) {
@@ -170,9 +170,13 @@ function writeSource(destDir: string, behavior: string, isHead: boolean): void {
   fs.copyFileSync(path.join(FIXTURE_SRC, "audit.ts"), path.join(destDir, "audit.ts"));
   fs.writeFileSync(
     path.join(destDir, "app.ts"),
-    isHead ? fs.readFileSync(path.join(FIXTURE_SRC, "app.ts"), "utf8") : stubAppText(),
+    isHead ? (includeHelper ? fs.readFileSync(path.join(FIXTURE_SRC, "app-delegate.ts"), "utf8") : fs.readFileSync(path.join(FIXTURE_SRC, "app.ts"), "utf8")) : stubAppText(),
     "utf8"
   );
+  if (includeHelper) {
+    // The helper is present in the base and remains unchanged in the head.
+    fs.copyFileSync(path.join(FIXTURE_SRC, "authz.ts"), path.join(destDir, "authz.ts"));
+  }
   fs.writeFileSync(path.join(destDir, "behavior.ts"), behaviorText(behavior), "utf8");
 }
 
@@ -217,8 +221,10 @@ function main(): void {
     );
     const headBehavior = manifest.behavior;
 
+    const includeHelper = c.id === "S1-C2";
+
     // --- Base commit (deny-all stub, base behavior) ---
-    writeSource(repo, BASE_BEHAVIOR[c.base], false);
+    writeSource(repo, BASE_BEHAVIOR[c.base], false, includeHelper);
     git(repo, ["add", "-A"]);
     git(repo, ["commit", "-q", "--allow-empty", "-m", `base: ${c.base} (deny-all stub)`]);
     const baseCommit = git(repo, ["rev-parse", "HEAD"]);
@@ -226,7 +232,7 @@ function main(): void {
     const baseTreeDigest = treeDigest(repo);
 
     // --- Head commit (full candidate implementation, head behavior) ---
-    writeSource(repo, headBehavior, true);
+    writeSource(repo, headBehavior, true, includeHelper);
     git(repo, ["add", "-A"]);
     git(repo, ["commit", "-q", "--allow-empty", "-m", `head: ${c.head} (${c.id})`]);
     const headCommit = git(repo, ["rev-parse", "HEAD"]);

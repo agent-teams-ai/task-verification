@@ -15,11 +15,20 @@ unrelated Git branches/history.
 
 ## Materialization contents (per selected candidate)
 
-Included:
-- The selected candidate's application source: `src/{app,audit,behavior,types}.ts`
-- `candidates/S1-Cn/MANIFEST.json`: candidate id, base/head identities, label, expected criteria, behavior, source inventory, sanitization flag, tree digest
-- Base/head identities and permitted base-to-head diff (recorded in
-  `candidates/provenance.json` from disposable sanitized git repos)
+Included (strict explicit allowlist, built by `src/materialization.ts`):
+- The selected candidate's application source: `app.ts`, `audit.ts`, `behavior.ts`, `types.ts`, and (for S1-C2) `authz.ts`
+- `base-head-identities.json`: base/head identities only (no manifest, no expected criteria, no behavior label)
+- `base-to-head.diff`: the complete permitted base-to-head diff
+- `criteria.json`: frozen criterion IDs and wording (`crit-v1`, AC-1..AC-5) only
+- `task-metadata.json`: approved shared task/PR metadata
+
+Excluded (never copied into reviewer materialization):
+- `candidates/S1-Cn/MANIFEST.json` (candidate labels, expected criteria, behavior descriptions)
+- `candidates/provenance.json` (reference mapping)
+- Parent experiment checkout and its Git history
+- Sibling candidates
+- Oracle source and execution internals (`oracle/src/`)
+- Reference answer files and ground-truth labels (`truth-v1.json`, anonymization map, salt)
 
 Excluded:
 - Parent experiment checkout and its Git history

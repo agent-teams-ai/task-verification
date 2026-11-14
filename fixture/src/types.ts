@@ -23,20 +23,18 @@ export interface Caller {
 
 export interface AppBehavior {
   /**
-   * Whether revocation is enforced. When false, revoked tokens incorrectly
-   * pass (models the S1-C3 behavioral violation). Governs AC-3.
+   * Whether revocation is enforced. When false, revoked tokens are not
+   * rejected. Governs AC-3.
    */
   revokeEnforced: boolean;
   /**
    * Whether revocation lookup compares the correct token field. When false,
-   * the lookup reads the revocation set but compares against the wrong
-   * field, so revoked tokens pass (models S1-C3). Governs AC-3.
+   * the lookup uses a derived key and revoked tokens may pass. Governs AC-3.
    */
   revokeFieldCorrect: boolean;
   /**
    * Whether the serialized profile includes sensitive `role`/`internal`
-   * fields. When true, every response body leaks those fields (models
-   * S1-C4). Governs AC-4.
+   * fields. When true, every response body includes those fields. Governs AC-4.
    */
   serializerIncludesRole: boolean;
 }

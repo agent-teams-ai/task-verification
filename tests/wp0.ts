@@ -27,8 +27,8 @@ function pnpmVersion(): string {
 }
 
 describe("WP0", () => {
-  test("runtime version is the pinned Node 24.13.1", () => {
-    assert.strictEqual(process.versions.node.split(".")[0], "24");
+  test("runtime version is exactly the pinned Node 24.13.1", () => {
+    assert.strictEqual(process.versions.node, "24.13.1");
   });
 
   test("pnpm is installed and at the pinned version", () => {
@@ -64,7 +64,7 @@ describe("WP0", () => {
     assert.strictEqual(out.trim(), "");
   });
 
-  test("build script emits without error", () => {
+  test("declaration build (build:types) emits without error", () => {
     runTsc(["-p", "tsconfig.json"]);
     assert.ok(fs.existsSync(path.join(ROOT, "dist")));
   });

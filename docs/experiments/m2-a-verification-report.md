@@ -123,13 +123,14 @@ Public artifacts (fixture definitions, truth, anonymization map, salt, version m
 
 ## 15. Tests executed and exact results
 
-36 tests, 36 pass, 0 fail:
+51 tests, 51 pass, 0 fail (corrective pass):
 
-- WP0 (8): runtime version, pnpm version, TS pin, strict TS, lockfile, typecheck, build, (docs tooling configured)
-- WP1 (10): fixture startup, request/response, state reset, candidate isolation, B0/B1 identities, H1–H4 reconstruction, tree-digest reproducibility, S1-C4 B1 difference, sanitization/file inventory
+- WP0 (7): exact runtime version (24.13.1), pnpm version (9.15.0), TS pin (7.0.2), strict TS, lockfile, typecheck, declaration build (build:types)
+- WP1 (14): fixture startup, request/response, state reset, candidate isolation, B0/B1 identities, H1–H4 reconstruction, tree-digest reproducibility, S1-C4 B1 difference, S1-C3 AC-3 violation, C1/C2 behavioral equivalence, C2 structural difference + helper dependency, helper stability
 - WP2 assertions (12): AC-1..AC-5 pass/fail behavior, fault control rejection, criterion coverage
 - Oracle end-to-end (2): 32 requests / 40 assertions, two-pass repeatability
-- Reviewer isolation (4): materialization contents, sibling/oracle exclusion, reference-artifact exclusion, parent-checkout non-reference
+- HTTP-level fault injection (5): 4 faulty variants rejected via the HTTP driver + unmodified C1 passes
+- Reviewer isolation (11): exact materialized tree, no labels/answer annotations, Profile B input fields, headFiles allowlist, parent/sibling/oracle exclusion, reference-artifact exclusion
 
 No unexecuted test is claimed as passed.
 
@@ -154,6 +155,18 @@ Draft PR opened from `feat/m2-a-foundation-fixture-oracle` against `research/mil
 ## 20. Recommended next stage
 
 Proceed to WP3–WP4 (M2-B): canonical `truth-v1.json` packaging, anonymization map, salt, version manifest, Evidence Packet, deterministic baseline, then WP5 Scorer — after WP7 OCR tool/network boundary qualification and live-execution gates (D1/D2) are resolved. Do not begin M2-B automatically; M2-A stops here after submission as a separate Draft PR.
+
+## Corrective pass (P0/P1) — applied to PR #2
+
+Summary of corrections applied in the corrective commit:
+- **Isolation:** Strict explicit allowlist builder (`src/materialization.ts`) assembles reviewer materialization and the actual serialized Profile B input. Candidate manifests, provenance, expected criteria/labels/behavior are excluded. Opaque reviewer-facing identifiers (`S1-FIX-<12 hex>`). Real tests inspect exact materialized tree, file inventory, and serialized Profile B input.
+- **C2:** S1-C2 now uses a distinct delegating implementation (`app.ts` thin router + `authz.ts` unchanged helper) instead of an identical copy of S1-C1. Structural difference proven by tests (file sets differ, C2 imports `./authz.ts`, helper not inlined, C1 and C2 behaviorally equivalent).
+- **HTTP-level fault controls:** Four test-only faulty variants exercised through the actual Oracle HTTP driver (wrong caller, denial-field leak, missing audit, duplicate audit); all rejected; unmodified C1 passes.
+- **WP0 tests:** exact Node version `24.13.1`; pnpm verified via `cmd` (cross-platform spawn); tsc invoked via `tsc.CMD` through `cmd /c` (no hard-coded `.CMD` direct spawn).
+- **Build semantics:** `build` renamed to `build:types` (declaration-only); `emitDeclarationOnly: true`; build test verifies declaration output from a clean directory.
+- **Audit timestamps:** repeatability compares behavioral outcomes only; timestamps/ports treated as execution metadata; no claim of byte-identical raw records.
+- **CI:** minimal GitHub Actions workflow (`.github/workflows/ci.yml`) on Ubuntu + Windows with pinned Node/pnpm, `--frozen-lockfile`, typecheck, declaration build, all tests.
+- **Docs:** obsolete "manifest included in reviewer materialization" claim removed; isolation and verification report updated.
 
 ## Stop-condition check
 

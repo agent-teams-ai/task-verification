@@ -57,11 +57,7 @@ function isRevoked(token: string, behavior: AppBehavior, revokedTokens: Set<stri
     return false;
   }
   if (!behavior.revokeFieldCorrect) {
-    /**
-     * S1-C3 fault: the revocation lookup reads the revocation set but compares
-     * against the wrong field (caller id instead of the token), so no revoked
-     * token ever matches and revoked tokens incorrectly pass.
-     */
+    // Revocation lookup compares against a derived key rather than the token.
     return revokedTokens.has(token.length > 0 ? token.charAt(0) : token);
   }
   return revokedTokens.has(token);
@@ -129,7 +125,7 @@ export function createApp(deps: AppDeps) {
     }
 
     // AC-1: active token -> 200 with caller id and email.
-    // AC-4: no role/internal unless serializerIncludesRole (S1-C4 violation).
+    // AC-4: no role/internal unless serializerIncludesRole.
     const profile = serializeProfile(caller, deps.behavior);
     audit.record(AUDIT_EVENT_DENIED, AUDIT_REASON_GRANTED, ctx.path, true, caller.id);
     sendJson(res, 200, profile);

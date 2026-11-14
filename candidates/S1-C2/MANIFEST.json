@@ -3,7 +3,7 @@
   "snapshotPair": "B0 -> H2",
   "base": "B0",
   "head": "H2",
-  "label": "correct alternative: behavior in unchanged helpers",
+  "label": "correct alternative using unchanged helper",
   "provenance": "generated from fixture/src by scripts/gen-candidates.ts",
   "expectedCriteria": {
     "AC1": true,
@@ -15,11 +15,12 @@
   "behavior": "{ revokeEnforced: true, revokeFieldCorrect: true, serializerIncludesRole: false }",
   "sourceInventory": [
     "app.ts",
-    "types.ts",
     "audit.ts",
-    "behavior.ts"
+    "authz.ts",
+    "behavior.ts",
+    "types.ts"
   ],
   "sanitized": true,
-  "treeDigest": "f616397dd31a6ec77d41cc5da5eaed11635382c8c12c999d658bd41c1db2761a",
-  "generatedAt": "2026-11-14T16:28:32.820Z"
+  "treeDigest": "f1beb1cfd63a175c35e5136a619a24846ad447e71ddcdaad95852a6a9b3177c1",
+  "generatedAt": "2026-11-14T17:33:28.270Z"
 }

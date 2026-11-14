@@ -15,11 +15,11 @@
   "behavior": "{ revokeEnforced: true, revokeFieldCorrect: true, serializerIncludesRole: false }",
   "sourceInventory": [
     "app.ts",
-    "types.ts",
     "audit.ts",
-    "behavior.ts"
+    "behavior.ts",
+    "types.ts"
   ],
   "sanitized": true,
-  "treeDigest": "d25d49bdefc6d49670758634c45885ce0357b089ce044a75bb16d1d9876e2b75",
-  "generatedAt": "2026-11-14T16:28:32.810Z"
+  "treeDigest": "1911d544fe5b7d50c80132ac2d9bd53dd2d5cb71e13e7a90ab6296586b88e3a8",
+  "generatedAt": "2026-11-14T17:33:28.257Z"
 }

@@ -57,6 +57,16 @@ establish oracle adequacy; adequacy is separately demonstrated by the four
 fault controls (`m2-a-oracle-adequacy.md`), all of which reject their intended
 defects while the unmodified fixture passes.
 
+## Volatile fields
+
+Behavioral criterion outcomes are compared deterministically (passed/not-passed
+per criterion per candidate per pass). Runtime timestamps (`AuditRecord.timestamp`,
+`generatedAt` in receipts) and ephemeral ports are execution metadata and are
+**not** compared for repeatability; they are not expected to be byte-identical
+across runs. No report claims that full raw execution records are byte-identical
+when their timestamps differ. Useful observation timestamps are retained.
+
+
 ## Criterion-to-assertion coverage
 
 Five assertion groups per candidate per pass: AC-1, AC-2, AC-3, AC-4, AC-5

@@ -11,7 +11,7 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "build": "tsc -p tsconfig.json",
+    "build:types": "tsc -p tsconfig.json",
     "test": "node --experimental-strip-types --test tests/*.ts"
   },
   "devDependencies": {

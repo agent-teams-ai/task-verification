@@ -116,10 +116,15 @@ describe("WP1 fixture and candidates", () => {
   });
 
   test("candidate sources are isolated and self-contained", async () => {
+    const allowedBase = ["app.ts", "audit.ts", "behavior.ts", "types.ts"];
     for (const id of ["S1-C1", "S1-C2", "S1-C3", "S1-C4"]) {
       const src = candidateSrcDir(id);
       const files = fs.readdirSync(src).sort();
-      assert.deepStrictEqual(files, ["app.ts", "audit.ts", "behavior.ts", "types.ts"]);
+      // C2 (delegating variant) additionally carries the unchanged helper authz.ts.
+      const expected = id === "S1-C2"
+        ? ["app.ts", "audit.ts", "authz.ts", "behavior.ts", "types.ts"]
+        : allowedBase;
+      assert.deepStrictEqual(files, expected, `${id} file inventory mismatch`);
       // No imports back into fixture/ or sibling candidates.
       for (const f of files) {
         const content = fs.readFileSync(path.join(src, f), "utf8");
@@ -179,5 +184,41 @@ describe("WP1 fixture and candidates", () => {
       digests.push(treeDigest(candidateSrcDir(id)));
     }
     assert.strictEqual(new Set(digests).size, 4, "candidate head trees must be distinct");
+  });
+
+  test("C1 and C2 produce the same behavioral results but different source structure", async () => {
+    const c1 = await runCandidate("S1-C1");
+    const c2 = await runCandidate("S1-C2");
+    // Same behavioral outcomes for all five criteria.
+    for (const id of ["P-active-a", "P-active-b", "P-missing", "P-revoked"]) {
+      assert.deepStrictEqual(c1.results[id], c2.results[id], `behavioral mismatch on ${id}`);
+    }
+    // Different file sets: C2 carries the unchanged authz helper.
+    const c1Files = fs.readdirSync(candidateSrcDir("S1-C1")).sort();
+    const c2Files = fs.readdirSync(candidateSrcDir("S1-C2")).sort();
+    assert.ok(!c1Files.includes("authz.ts"), "C1 must not carry authz.ts");
+    assert.ok(c2Files.includes("authz.ts"), "C2 must carry the authz helper");
+    assert.notDeepEqual(c1Files, c2Files, "C1 and C2 file sets must differ");
+  });
+
+  test("C2 depends on the unchanged authz helper (helper not in changed-file-only inventory)", async () => {
+    const c2Src = candidateSrcDir("S1-C2");
+    const appContent = fs.readFileSync(path.join(c2Src, "app.ts"), "utf8");
+    // C2's app delegates to authz.ts.
+    assert.ok(appContent.includes("./authz.ts"), "C2 app.ts must import the helper");
+    // The helper is a separate file, so a changed-file-only inventory (app.ts)
+    // would not contain its implementation.
+    const helperContent = fs.readFileSync(path.join(c2Src, "authz.ts"), "utf8");
+    assert.ok(helperContent.includes("handleProfile"), "helper must implement handleProfile");
+    assert.ok(!appContent.includes("function handleProfile"), "app.ts must not inline handleProfile");
+  });
+
+  test("helper remains present (unchanged) across base and head for C2", async () => {
+    // The candidate's authz.ts is a self-contained helper; its content is
+    // stable and does not depend on candidate-specific behavior flags beyond
+    // the AppBehavior interface. Verify it imports only types, not behavior labels.
+    const content = fs.readFileSync(path.join(candidateSrcDir("S1-C2"), "authz.ts"), "utf8");
+    assert.ok(!content.includes("S1-C"), "helper must not reference candidate labels");
+    assert.ok(content.includes("export function handleProfile"), "helper must export handleProfile");
   });
 });

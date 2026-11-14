@@ -3,7 +3,7 @@
   "snapshotPair": "B0 -> H3",
   "base": "B0",
   "head": "H3",
-  "label": "behavioral violation: revoked tokens pass (wrong field compare)",
+  "label": "revoked-token behavioral violation",
   "provenance": "generated from fixture/src by scripts/gen-candidates.ts",
   "expectedCriteria": {
     "AC1": true,
@@ -15,11 +15,11 @@
   "behavior": "{ revokeEnforced: true, revokeFieldCorrect: false, serializerIncludesRole: false }",
   "sourceInventory": [
     "app.ts",
-    "types.ts",
     "audit.ts",
-    "behavior.ts"
+    "behavior.ts",
+    "types.ts"
   ],
   "sanitized": true,
-  "treeDigest": "4e04d3eb62616dc3bfcec3135eca2e68957c11fb1e76205b6671a79ed25c7b0f",
-  "generatedAt": "2026-11-14T16:28:32.827Z"
+  "treeDigest": "2840c19ebdb21baa7a15595d5df5674b90a1cf826d459ac4d1b88fa395ee08d3",
+  "generatedAt": "2026-11-14T17:33:28.278Z"
 }
