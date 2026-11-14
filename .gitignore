@@ -1,0 +1,11 @@
+# M2-A experiment substrate
+node_modules/
+dist/
+*.log
+.candidates-work/
+
+# TypeScript
+*.tsbuildinfo
+
+# M2-A generated evidence (regenerated deterministically; results documented in docs/)
+.oracle-receipts/

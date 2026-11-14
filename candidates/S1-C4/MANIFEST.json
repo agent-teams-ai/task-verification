@@ -1,0 +1,25 @@
+{
+  "candidate": "S1-C4",
+  "snapshotPair": "B1 -> H4",
+  "base": "B1",
+  "head": "H4",
+  "label": "omitted redaction: serializer includes role",
+  "provenance": "generated from fixture/src by scripts/gen-candidates.ts",
+  "expectedCriteria": {
+    "AC1": true,
+    "AC2": true,
+    "AC3": true,
+    "AC4": false,
+    "AC5": true
+  },
+  "behavior": "{ revokeEnforced: true, revokeFieldCorrect: true, serializerIncludesRole: true }",
+  "sourceInventory": [
+    "app.ts",
+    "types.ts",
+    "audit.ts",
+    "behavior.ts"
+  ],
+  "sanitized": true,
+  "treeDigest": "bbb731c217421062ccfdf0b35c524d9a6bf2b66ef0020993cb38d61a582a2bf8",
+  "generatedAt": "2026-11-14T16:28:32.834Z"
+}
