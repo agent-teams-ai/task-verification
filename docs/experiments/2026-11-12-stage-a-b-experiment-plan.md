@@ -368,7 +368,11 @@ Generate and freeze an order from a recorded seed before the first live slot. Do
 
 Present candidates as `S1-FIX-<12 hex>` from a salted digest; reject collisions. Keep salt/mapping and gold labels outside reviewer-visible prompts, files, Git history and tool reach. The materialized repository contains only the selected application base/head pair with sanitized messages; no other branches, fixture labels, reference answers or oracle source. A public plan is not a reviewer input.
 
-Sealing is an access/materialization property, not just hashing a file. Retain an auditable reviewer-visible file inventory and input digest.
+**Public reproducibility artifacts.** Keep the synthetic fixture definitions, canonical truth, anonymization map, salt and version manifest in this public experimental repository. No private repository, GitHub Secrets or private-storage provisioning gate is required for this pilot. Freeze their identities before evaluation. "Sealed" means frozen and excluded from the evaluated reviewer's supplied context and actual tool reach; it does not imply confidential storage. The salt provides neutral candidate IDs within that context and is reproducibility data, not a credential.
+
+Sealing is an access/materialization property, not just hashing a file. Retain an auditable reviewer-visible file inventory and input digest. In the existing model-free qualification, verify that input assembly and enabled reviewer tools exclude the parent experiment checkout/history and retrieval of public reference artifacts, including via external URLs. For `/llm`, check the assembled input; for managed OCR, check its actual file/tool boundary with the fake provider. The deterministic baseline consumes only observations and the frozen sufficiency policy; the scorer joins gold labels after assessment outputs are fixed.
+
+This is an openly specified pilot with controlled reviewer inputs. The candidate classes and intended labels are already public in §4.2; it does not establish that these tasks are previously unseen by a model or unaffected by public benchmark exposure.
 
 ### 7.4 Isolation
 
@@ -582,7 +586,7 @@ Missing criteria, a single invalid output or ordinary model disagreement is reco
 | Artifact | Purpose / milestone |
 | --- | --- |
 | Frozen criteria, candidate application trees and oracle manifest | scope, input/assertion mapping and bounded sufficiency policy; Milestone 2 |
-| `truth-v1.json` and anonymization map | sealed labels/mapping with digests; never reviewer inputs |
+| `truth-v1.json`, anonymization map, salt and version manifest | public, versioned reference artifacts; frozen and excluded from reviewer inputs/tool reach |
 | Reviewer-visible input inventories and prompt/config manifests | prove supplied context and isolation; live D1/D2 values frozen before live registration |
 | `runs.jsonl` | every started attempt, including failures/unknown effects; stub runs explicitly labelled |
 | Raw/normalized outputs | available bytes/text, digests and skipped diagnostics; explicit raw-unavailable state |
@@ -592,7 +596,7 @@ Missing criteria, a single invalid output or ordinary model disagreement is reco
 | Model-free substrate report | Milestone 2 deliverables, limits and readiness for live authorization |
 | Later `metrics.md` and experiment report | live counts/results only after separately authorized execution; no stub result presented as model accuracy |
 
-Do not commit credentials or compiled OCR assets. Keep sealed artifacts out of any reviewer-visible materialization even if they are retained elsewhere for reproducibility.
+Do not commit credentials or compiled OCR assets. Retain the synthetic reference artifacts publicly for reproducibility, outside every reviewer-visible materialization and its tool reach (§7.3).
 
 ## 16. Risks and remaining dependencies
 
@@ -622,7 +626,7 @@ Technical choices below resolve the plan for the next model-free work; they do n
 | D2 | Model, reasoning, request/token/time/quota/currency limits | **Milestone 2: zero live calls.** Concrete live configuration remains an owner decision before qualification/evaluation, not a substrate prerequisite |
 | D3 | B interface | **Selected:** one `/llm` assessment over supplied context; supported structured output is the reason, not a claim that the short criteria cannot fit OCR |
 | D4 | Fixture and candidates | **Selected for this pilot:** four snapshots, five authored criteria, fixtures in this repository. Freeze inputs/oracle mapping in Milestone 2; bring back any substantive criterion ambiguity rather than quietly editing it |
-| D5 | Truth and anonymization | **Selected:** reviewed bounded oracle, sealed labels/map, sanitized reviewer materialization and explicit overlap/coverage limits |
+| D5 | Truth and anonymization | **Selected:** reviewed bounded oracle; public, frozen truth/map/salt and version manifest; sanitized reviewer materialization with enforced input/tool boundaries and explicit overlap/coverage limits (§7.3). No private-storage prerequisite |
 | D6 | Stage B and stops | **Selected:** §8 and §14, all four B candidates, deterministic baseline, no automatic harness inference retries, three offline controls |
 | D7 | Docs/tooling bootstrap | **Included in Milestone 2:** minimal supported Docs Protocol setup and maintained strict TypeScript tooling under the org standard; not implemented by this docs-only revision |
 | D8 | New research documents and results licence | **Confirmed by the owner on 2026-11-14:** CC BY 4.0 for original research/planning documents, experiment reports and original research results; Apache 2.0 for original code, tests and tooling. See [documentation licence notice](../../LICENSE-DOCS) |
