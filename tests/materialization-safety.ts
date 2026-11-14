@@ -152,6 +152,48 @@ describe("materialization path safety", () => {
     fs.rmSync(external, { recursive: true, force: true });
   });
 
+  test("dangling symlink/junction is explicitly rejected (not incidental ENOENT)", (t) => {
+    const externalParent = path.join(ROOT, ".external-dangling-parent");
+    const missingChild = path.join(externalParent, "missing-child");
+    const link = path.join(MATERIALIZATION_ROOT, "dangling-link");
+    const out = path.join(MATERIALIZATION_ROOT, "dangling-link", "new", "nested", "mat");
+
+    fs.mkdirSync(MATERIALIZATION_ROOT, { recursive: true });
+    fs.mkdirSync(externalParent, { recursive: true });
+    // Ensure the child does NOT exist (dangling target).
+    if (fs.existsSync(missingChild)) fs.rmSync(missingChild, { recursive: true, force: true });
+
+    const created = makeDirLink(link, missingChild);
+    if (!created) {
+      fs.rmSync(externalParent, { recursive: true, force: true });
+      t.skip("directory links not supported on this platform");
+      return;
+    }
+
+    let threw = false;
+    let message = "";
+    try {
+      buildReviewerMaterialization("S1-C1", out);
+    } catch (e) {
+      threw = true;
+      message = (e as Error).message;
+    } finally {
+      // Cleanup the dangling link itself (existsSync may be false).
+      try { fs.rmSync(link, { recursive: true, force: true }); } catch { /* ignore */ }
+      try { fs.rmSync(externalParent, { recursive: true, force: true }); } catch { /* ignore */ }
+    }
+
+    assert.ok(threw, "dangling link path must be rejected");
+    // Must be rejected by validation, not by a later mkdir ENOENT.
+    assert.ok(/unsafe materialization path/.test(message), `expected unsafe-path rejection, got: ${message}`);
+    assert.ok(/symlink\/junction/.test(message), `expected symlink/junction rejection, got: ${message}`);
+    // External parent unchanged; missing target not created.
+    assert.ok(!fs.existsSync(missingChild), "missing target must not be created");
+    // Protected files unchanged.
+    const marker = path.join(ROOT, "candidates", "S1-C1", "src", "app.ts");
+    assert.ok(fs.existsSync(marker));
+  });
+
   test("protected files are not deleted by rejected calls", () => {
     const marker = path.join(ROOT, "candidates", "S1-C1", "src", "app.ts");
     const before = fs.readFileSync(marker, "utf8");

@@ -73,24 +73,38 @@ function assertCandidate(candidateId: string): void {
 }
 
 /**
+ * Does a filesystem entry exist, including dangling symlinks? lstatSync does
+ * NOT follow the link, so dangling links are reported as present.
+ */
+function entryExists(p: string): boolean {
+  try {
+    fs.lstatSync(p);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Resolve and validate an output directory so that it is strictly inside
  * MATERIALIZATION_ROOT, defeating symlinks/junctions/reparse points at any
- * level (including non-existing trailing segments following an existing link).
+ * level, including dangling/broken links whose targets are absent.
  *
  * Strategy:
- *  1. Ensure MATERIALIZATION_ROOT exists and resolve it canonically. If the
- *     root itself is a symlink/junction, realpathSync reveals its true target;
- *     we require that target to remain the dedicated root location (basename
- *     preserved) — a root that has been replaced by a link to elsewhere is
- *     rejected by the containment check below.
+ *  1. Ensure MATERIALIZATION_ROOT exists and resolve it canonically. Reject
+ *     if the root itself is a redirected symlink/junction.
  *  2. Resolve the absolute requested path.
- *  3. Walk upward until the deepest existing ancestor is found.
- *  4. Canonicalize that ancestor via realpathSync (resolves symlinks/junctions/
- *     reparse points on both POSIX and Windows).
- *  5. Append the remaining non-existing segments to the canonical ancestor.
- *  6. Verify strict containment below the canonical root (defense in depth,
- *     checked twice).
- *  7. Reject protected directories.
+ *  3. Walk upward until the deepest existing ancestor is found, using
+ *     lstat-based existence so dangling links are not skipped.
+ *  4. Component-by-component validation using lstatSync (not existsSync) so
+ *     dangling links are detected. Distinguish genuinely absent components
+ *     (ENOENT/ENOTDIR) from present-but-dangling links. Unexpected errors are
+ *     not treated as safe.
+ *  5. Canonicalize the deepest existing ancestor via realpathSync; reject if
+ *     it fails (dangling) or if any link is found.
+ *  6. Append non-existing trailing segments to the canonical ancestor.
+ *  7. Verify strict containment below the canonical root (twice).
+ *  8. Reject protected directories.
  *
  * No recursive deletion of arbitrary caller paths is performed; deletion
  * happens only after this validation, on the validated canonical path.
@@ -103,13 +117,10 @@ function resolveSafeOutDir(outDir: string): string {
   // Ensure the dedicated root exists (only this root is ever created here).
   fs.mkdirSync(MATERIALIZATION_ROOT, { recursive: true });
   const rootReal = fs.realpathSync(MATERIALIZATION_ROOT);
-  // Reject if the root itself is a symlink/junction/reparse point pointing
-  // elsewhere (case-insensitive comparison to tolerate Windows casing).
   const rootLexical = path.resolve(MATERIALIZATION_ROOT);
   if (rootLexical.toLowerCase() !== rootReal.toLowerCase()) {
     throw new Error(`unsafe materialization root (must not be a symlink/junction): ${MATERIALIZATION_ROOT}`);
   }
-  // Also reject explicit symbolic links (covers POSIX and Windows symlinks).
   try {
     if (fs.lstatSync(MATERIALIZATION_ROOT).isSymbolicLink()) {
       throw new Error(`unsafe materialization root (symlink): ${MATERIALIZATION_ROOT}`);
@@ -120,47 +131,62 @@ function resolveSafeOutDir(outDir: string): string {
 
   const resolved = path.resolve(outDir);
 
-  // Walk upward until the deepest existing ancestor is found. While walking,
-  // reject any existing ancestor that is itself a symlink/junction/reparse
-  // point (this covers broken links and multi-level escapes).
+  // Walk upward until the deepest existing ancestor is found.
   const segments: string[] = [];
   let cur = resolved;
-  while (cur && cur !== path.dirname(cur) && !fs.existsSync(cur)) {
+  while (cur && cur !== path.dirname(cur) && !entryExists(cur)) {
     segments.unshift(path.basename(cur));
     cur = path.dirname(cur);
   }
-  // Check every existing ancestor from root down for symlink/junction.
+
+  // Component-by-component validation using lstatSync (dangling-aware).
   {
-    // Check components of `resolved` relative to root's parent.
     const relResolved = path.relative(path.dirname(MATERIALIZATION_ROOT), resolved);
     const parts = relResolved.split(path.sep).filter(Boolean);
     let acc = path.dirname(MATERIALIZATION_ROOT);
     for (const part of parts) {
       acc = path.join(acc, part);
-      if (!fs.existsSync(acc)) break;
-      let isLink = false;
+      let st: fs.Stats;
       try {
-        const st = fs.lstatSync(acc);
-        isLink = st.isSymbolicLink();
-        // On Windows, junctions/reparse points: detect via realpath mismatch.
-        const rp = fs.realpathSync(acc);
-        if (rp.toLowerCase() !== path.resolve(acc).toLowerCase()) {
-          isLink = true;
+        st = fs.lstatSync(acc);
+      } catch (e: any) {
+        if (e && (e.code === "ENOENT" || e.code === "ENOTDIR")) {
+          // Genuinely absent component: stop walking.
+          break;
         }
+        // Unexpected error: do not assume safe.
+        throw new Error(`unsafe materialization path (cannot inspect component): ${outDir}`);
+      }
+      // Entry exists (including dangling links). Reject symlinks/junctions.
+      let isLink = st.isSymbolicLink();
+      let realPath: string | null = null;
+      try {
+        realPath = fs.realpathSync(acc);
       } catch {
-        /* ignore */
+        // realpathSync fails for dangling links -> treat as link/unsafe.
+        isLink = true;
+      }
+      if (realPath !== null && realPath.toLowerCase() !== path.resolve(acc).toLowerCase()) {
+        isLink = true;
       }
       if (isLink) {
-        // Allow the root itself (already validated) but reject anything below.
         if (path.resolve(acc).toLowerCase() !== rootLexical.toLowerCase()) {
           throw new Error(`unsafe materialization path (symlink/junction in path): ${outDir}`);
         }
       }
     }
   }
+
   let canonical: string;
-  if (fs.existsSync(cur)) {
-    canonical = path.join(fs.realpathSync(cur), ...segments);
+  if (entryExists(cur)) {
+    let rp: string;
+    try {
+      rp = fs.realpathSync(cur);
+    } catch {
+      // Dangling link at the ancestor level.
+      throw new Error(`unsafe materialization path (symlink/junction in path): ${outDir}`);
+    }
+    canonical = path.join(rp, ...segments);
   } else {
     canonical = resolved;
   }
