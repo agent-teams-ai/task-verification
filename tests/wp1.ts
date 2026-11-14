@@ -62,7 +62,7 @@ function treeDigest(dir: string): string {
   for (const f of files) {
     h.update(f);
     h.update("\0");
-    h.update(fs.readFileSync(path.join(dir, f), "utf8"));
+    h.update(fs.readFileSync(path.join(dir, f), "utf8").replace(/\r\n/g, "\n").replace(/\r/g, "\n"));
     h.update("\0");
   }
   return h.digest("hex");
