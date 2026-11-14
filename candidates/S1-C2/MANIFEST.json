@@ -1,0 +1,25 @@
+{
+  "candidate": "S1-C2",
+  "snapshotPair": "B0 -> H2",
+  "base": "B0",
+  "head": "H2",
+  "label": "correct alternative: behavior in unchanged helpers",
+  "provenance": "generated from fixture/src by scripts/gen-candidates.ts",
+  "expectedCriteria": {
+    "AC1": true,
+    "AC2": true,
+    "AC3": true,
+    "AC4": true,
+    "AC5": true
+  },
+  "behavior": "{ revokeEnforced: true, revokeFieldCorrect: true, serializerIncludesRole: false }",
+  "sourceInventory": [
+    "app.ts",
+    "types.ts",
+    "audit.ts",
+    "behavior.ts"
+  ],
+  "sanitized": true,
+  "treeDigest": "f616397dd31a6ec77d41cc5da5eaed11635382c8c12c999d658bd41c1db2761a",
+  "generatedAt": "2026-11-14T16:28:32.820Z"
+}

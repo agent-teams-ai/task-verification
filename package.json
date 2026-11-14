@@ -1,0 +1,21 @@
+{
+  "name": "@agent-teams/task-verification-m2-a",
+  "version": "0.1.0",
+  "private": true,
+  "description": "M2-A model-free experimental substrate: foundation, fixture and behavioral oracle for Task Verification (WP0-WP2). No live model calls.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "engines": {
+    "node": "24.13.1",
+    "pnpm": "9.15.0"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "build": "tsc -p tsconfig.json",
+    "test": "node --experimental-strip-types --test tests/*.ts"
+  },
+  "devDependencies": {
+    "@types/node": "24.0.0",
+    "typescript": "7.0.2"
+  }
+}
