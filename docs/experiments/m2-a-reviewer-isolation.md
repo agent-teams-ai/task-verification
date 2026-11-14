@@ -72,6 +72,34 @@ verified to exclude public reference artifacts and oracle outputs.
 | Input assembly excludes reference artifacts (Profile B `/llm` assembled input checked) | Full enabled-tool and network isolation for managed OCR (fake provider + loopback + network restrictions) |
 | Reviewer-visible file inventory and digest recorded | Loopback-only fake provider validation of OCR tool boundary |
 
+## Opaque alias vs. anonymization (clarification)
+
+The reviewer-facing identifier `S1-FIX-<12 hex>` produced by `opaqueId()` in
+`src/materialization.ts` is a **reviewer-facing opaque alias**, not a
+confidentiality or anonymization control:
+
+- The salt used to derive it is public reproducibility data (not a secret).
+- The mapping from candidate ID to alias is publicly reconstructable by any
+  reader who applies the same salt and hash.
+- No claim is made that the alias prevents a knowledgeable public reader from
+  identifying a candidate, or that models have never seen the public fixture or
+  reference data.
+
+The alias exists to keep candidate labels out of the reviewer-facing
+materialization and serialized Profile B input (input-field exclusion). It is
+distinct from:
+
+- **Input-field exclusion** (tested here): manifests, provenance, expected
+  criteria, labels and behavior descriptions are never placed in reviewer
+  materialization or Profile B input.
+- **Filesystem/tool isolation** (tested here): only the allowlisted
+  application files are materialized; sibling candidates, oracle source and
+  parent checkout are excluded.
+- **Network/tool isolation** (deferred to WP7): managed OCR tool and network
+  boundary qualification is not claimed in M2-A.
+- **Public availability and reproducibility**: all reference artifacts remain
+  public; reproducibility is preserved.
+
 ## Public-artifact policy followed
 
 Public availability of reference artifacts (fixture definitions, truth,

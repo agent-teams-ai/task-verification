@@ -2,8 +2,7 @@
  * Authorization helper for the Task Verification fixture.
  *
  * Encapsulates token verification, revocation, profile serialization and
- * audit recording so that a candidate may delegate to this unchanged helper
- * rather than implementing the logic inline.
+ * audit recording for the profile endpoint.
  *
  * Licensed under Apache 2.0. See LICENSE.
  */

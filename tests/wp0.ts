@@ -4,6 +4,10 @@
  * Verifies the pinned runtime, package manager, strict TypeScript tooling and
  * committed lockfile. No live model calls.
  *
+ * Cross-platform: pnpm is resolved per-OS without shell interpolation; the
+ * TypeScript CLI is invoked through the current Node executable using its
+ * JavaScript entry point so no .CMD shim or `cmd` is required on POSIX.
+ *
  * Licensed under Apache 2.0. See LICENSE.
  */
 
@@ -15,15 +19,30 @@ import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const TSC_CMD = path.join(ROOT, "node_modules", ".bin", "tsc.CMD");
+const TSC_ENTRY = path.join(ROOT, "node_modules", "typescript", "bin", "tsc");
 
 function readJson(p: string): unknown {
   return JSON.parse(fs.readFileSync(p, "utf8"));
 }
 
-/** Resolve the pnpm executable (run via cmd on Windows). */
+/** Resolve the pnpm version cross-platform without shell interpolation. */
 function pnpmVersion(): string {
-  return execFileSync("cmd", ["/c", "pnpm --version"], { encoding: "utf8" }).trim();
+  if (process.platform === "win32") {
+    // On Windows the pnpm shim is a .cmd; invoke through cmd with a fixed,
+    // trusted literal (no untrusted interpolation).
+    return execFileSync("cmd", ["/c", "pnpm --version"], { encoding: "utf8" }).trim();
+  }
+  // On POSIX, invoke the pnpm executable directly.
+  return execFileSync("pnpm", ["--version"], { encoding: "utf8" }).trim();
+}
+
+/** Invoke the TypeScript CLI through the current Node executable. */
+function runTsc(args: string[]): string {
+  return execFileSync(process.execPath, [TSC_ENTRY, ...args], {
+    cwd: ROOT,
+    encoding: "utf8",
+    maxBuffer: 10 * 1024 * 1024,
+  });
 }
 
 describe("WP0", () => {
@@ -50,14 +69,6 @@ describe("WP0", () => {
     const lock = fs.readFileSync(path.join(ROOT, "pnpm-lock.yaml"), "utf8");
     assert.ok(lock.includes("typescript"));
   });
-
-  function runTsc(args: string[]): string {
-    return execFileSync("cmd", ["/c", `${TSC_CMD} ${args.join(" ")}`], {
-      cwd: ROOT,
-      encoding: "utf8",
-      maxBuffer: 10 * 1024 * 1024,
-    });
-  }
 
   test("typecheck script passes (tsc --noEmit)", () => {
     const out = runTsc(["--noEmit", "-p", "tsconfig.json"]);

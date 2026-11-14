@@ -13,15 +13,15 @@ import { test, describe } from "node:test";
 import assert from "node:assert/strict";
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { fileURLToPath } from "node:url";
+
 import {
   buildReviewerMaterialization,
   buildProfileBInput,
   FROZEN_CRITERIA,
+  MATERIALIZATION_ROOT,
 } from "../src/materialization.ts";
 
-const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const TMP = path.join(ROOT, ".isolation-tmp");
+const TMP = MATERIALIZATION_ROOT;
 
 function cleanup(p: string) {
   try { fs.rmSync(p, { recursive: true, force: true }); } catch { /* ignore */ }
@@ -87,6 +87,34 @@ describe("reviewer input isolation (actual builder outputs)", () => {
     assert.ok(paths.includes("authz.ts"));
     for (const f of paths) {
       assert.ok(["app.ts", "audit.ts", "behavior.ts", "types.ts", "authz.ts"].includes(f));
+    }
+  });
+
+  test("reviewer-facing source contains no benchmark-answer hints", () => {
+    const forbidden = [
+      /S1-C[1-4]/,
+      /unchanged helper/i,
+      /delegate to this/i,
+      /correct inline/i,
+      /correct alternative/i,
+      /behavioral violation/i,
+      /omitted redaction/i,
+      /revoked-token behavioral/i,
+      /experimental scenario/i,
+      /intended outcome/i,
+    ];
+    for (const candidateId of ["S1-C1", "S1-C2", "S1-C3", "S1-C4"]) {
+      const out = path.join(TMP, candidateId, "hint-check");
+      buildReviewerMaterialization(candidateId, out);
+      for (const f of fs.readdirSync(out)) {
+        if (!f.endsWith(".ts")) continue;
+        const content = fs.readFileSync(path.join(out, f), "utf8");
+        for (const rx of forbidden) {
+          assert.ok(!rx.test(content), `${candidateId}/${f} contains forbidden hint ${rx}`);
+        }
+      }
+      // cleanup
+      try { fs.rmSync(path.join(TMP, candidateId, "hint-check"), { recursive: true, force: true }); } catch { /* ignore */ }
     }
   });
 
