@@ -4,7 +4,7 @@
   "version": "v1",
   "producer": "oracle-O-1",
   "candidateAnonId": "S1-FIX-f91b12c2cee5",
-  "candidateSnapshotDigest": "af93f879c98c792e833ee3917dfc6314df5ee3f3bd1ac2a0fb26cbb89edfb604",
+  "candidateSnapshotDigest": "e3700e622872ba32465e28ef014978236de90fec2bc21c5865a6a42aab253b92",
   "runtime": "node-24.13.1",
   "checkDefinitionDigest": "ef5ca877ec5fbbfe4aabe935a1a366a3c1cacd68e922eb3f7cb1419d01056b1b",
   "inputsScope": "candidate application snapshot + oracle observations",

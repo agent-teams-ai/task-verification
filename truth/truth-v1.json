@@ -35,17 +35,31 @@
     }
   },
   "assertionReferences": {
-    "AC-1": ["P-active-a", "P-active-b"],
-    "AC-2": ["P-missing"],
-    "AC-3": ["P-revoked"],
-    "AC-4": ["P-active-a", "P-active-b", "P-missing", "P-revoked"],
-    "AC-5": ["P-missing"]
+    "AC-1": [
+      "P-active-a",
+      "P-active-b"
+    ],
+    "AC-2": [
+      "P-missing"
+    ],
+    "AC-3": [
+      "P-revoked"
+    ],
+    "AC-4": [
+      "P-active-a",
+      "P-active-b",
+      "P-missing",
+      "P-revoked"
+    ],
+    "AC-5": [
+      "P-missing"
+    ]
   },
   "candidateHeadDigests": {
-    "S1-C1": "eff76066dcfb6a8c981f51e956f8f0f7e44c987ad3a1e4df542485137be25c89",
-    "S1-C2": "cd83f7c60958f28c7e84ec16811307bad17ac3b20d272a60ee5eb7f429fa2cef",
-    "S1-C3": "20b6c1b150dbc848cb39148ef2b5eabf1a1c9e25dbfeba984e6c152c7ea80d63",
-    "S1-C4": "af93f879c98c792e833ee3917dfc6314df5ee3f3bd1ac2a0fb26cbb89edfb604"
+    "S1-C1": "327d0a9690ff70ed5ff8b19e03cd4f9eb822fa4f6a87203b37f4b91499f4030a",
+    "S1-C2": "229cd951be058c0d099a50298713c81d666cf79bb653f921939303caa97d793c",
+    "S1-C3": "4fb700863d2a942aa6f5a43747b3c0da252a6911b454e87d1c6c7efb37bddbda",
+    "S1-C4": "e3700e622872ba32465e28ef014978236de90fec2bc21c5865a6a42aab253b92"
   },
   "scope": "Approved pilot labels under the declared fixture/input policy (crit-v1). Finite examples; not a claim of universal coverage.",
   "publicArtifactPolicy": "Public reproducibility artifact. Frozen and excluded from reviewer inputs and tool reach. Not a secret."

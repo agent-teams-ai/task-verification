@@ -14,9 +14,9 @@ import type { AppDeps } from "./types.ts";
 export const VALID_TOKENS: Map<string, { id: string; email: string }> = new Map([
   ["token-active-a", { id: "caller-a", email: "caller-a@example.example" }],
   ["token-active-b", { id: "caller-b", email: "caller-b@example.example" }],
-  // token-revoked is a *valid* token that is present in the revocation set, so
-  // P-revoked exercises the revocation path (AC-3) rather than failing at
-  // "unknown token" before revocation is consulted.
+  // token-revoked is a valid token that is present in the revocation set, so
+  // the revoked-token request reaches the revocation check rather than failing
+  // earlier as an unknown token.
   ["token-revoked", { id: "caller-revoked", email: "caller-revoked@example.example" }],
 ]);
 

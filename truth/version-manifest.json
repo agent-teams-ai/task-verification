@@ -4,9 +4,24 @@
   "repository": "agent-teams-ai/task-verification",
   "milestone": "M2-B (WP3-WP4)",
   "artifacts": [
-    { "path": "truth/truth-v1.json", "version": "v1", "sha256": "f27396557a6ea7d0f925b8235a9708fb52b3108beabaf6f5682ca7fea8e7fc63", "bytes": 1491 },
-    { "path": "truth/anonymization-map.json", "version": "v1", "sha256": "b3971745d35e3821f63bc8c94259ba1d968d7736b946eb73ea1c426413086a3d", "bytes": 433 },
-    { "path": "truth/salt.txt", "version": "v1", "sha256": "5efd4612b8414663caf120661f7fd15c2800d89e03dc71e1018c7ec8cc134c06", "bytes": 46 }
+    {
+      "path": "truth/truth-v1.json",
+      "version": "v1",
+      "sha256": "70466fb11e63d36838f67cd26144dacb65dae35ecc1651edfecd4ca391f3ff2b",
+      "bytes": 1575
+    },
+    {
+      "path": "truth/anonymization-map.json",
+      "version": "v1",
+      "sha256": "b3971745d35e3821f63bc8c94259ba1d968d7736b946eb73ea1c426413086a3d",
+      "bytes": 433
+    },
+    {
+      "path": "truth/salt.txt",
+      "version": "v1",
+      "sha256": "5efd4612b8414663caf120661f7fd15c2800d89e03dc71e1018c7ec8cc134c06",
+      "bytes": 46
+    }
   ],
   "notes": "All artifacts are public reproducibility data. Salt is not a credential."
 }

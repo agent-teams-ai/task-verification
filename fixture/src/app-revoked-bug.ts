@@ -1,9 +1,7 @@
 /**
- * Task Verification fixture application (revocation-defect variant).
+ * Task Verification fixture application.
  *
- * Implements the profile route inline but consults the revocation set with the
- * caller identity instead of the presented token, so a revoked token is not
- * recognized and the request is served.
+ * Implements the profile route inline.
  *
  * Licensed under Apache 2.0. See LICENSE.
  */
@@ -64,8 +62,6 @@ export function createApp(deps: AppDeps) {
       return;
     }
 
-    // Defect: the revocation set is consulted with the caller id rather than
-    // the presented token, so a revoked token is not rejected.
     if (deps.revokedTokens.has(caller.id)) {
       audit.record(AUDIT_EVENT_DENIED, AUDIT_REASON_TOKEN_REVOKED, path, true, caller.id);
       sendJson(res, 401, { error: "token_revoked" });

@@ -21,6 +21,6 @@
     "types.ts"
   ],
   "sanitized": true,
-  "baseApplicationDigest": "6cd7ce751d13288667d5f1136ade1b21061e62754378a963c58af45a6ceb9639",
-  "headApplicationDigest": "eff76066dcfb6a8c981f51e956f8f0f7e44c987ad3a1e4df542485137be25c89"
+  "baseApplicationDigest": "037cbdbfc1df045ccf634e1b14ca6faa4afdc9e2d40d2633c57753a879350ed4",
+  "headApplicationDigest": "327d0a9690ff70ed5ff8b19e03cd4f9eb822fa4f6a87203b37f4b91499f4030a"
 }
