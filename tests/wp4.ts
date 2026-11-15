@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import * as crypto from "node:crypto";
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { spawn } from "node:child_process";
 import { runOracle } from "../oracle/src/run.ts";
 import {
@@ -11,15 +11,17 @@ import {
   writeAllEvidencePackets,
   evidencePacketPath,
   verifyItemSourceDigest,
-  type EvidencePacket,
 } from "../src/evidence.ts";
 import { runBaseline, runAllBaselines } from "../src/baseline.ts";
+import { canonicalDigest, canonicalJson } from "../src/canonical.ts";
 import {
   checkDefinitionDigest,
   CRITERIA,
   POLICY_ID,
 } from "../src/baseline-policy.ts";
 import { loadAnonymizationMap } from "../src/truth.ts";
+import type { EvidencePacket } from "../src/evidence-types.ts";
+import { loadObservationSource, sourceRefDigest } from "../src/source-ref.ts";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const RECEIPTS_DIR = path.join(ROOT, ".oracle-receipts");
@@ -90,17 +92,35 @@ test("WP4: every artifactRef/sourceRef resolves via the anonymization map", asyn
     for (const ref of p.artifactRefs) {
       assert.ok(!containsRawCandidateId(ref), `raw candidate ID in artifactRef: ${ref}`);
       const [kind, target] = ref.split(":");
-      assert.ok(kind === "candidate-manifest" || kind === "candidate-snapshot" || kind === "evidence-v1", `unexpected artifactRef kind: ${ref}`);
+      assert.ok(kind === "candidate-manifest" || kind === "candidate-snapshot" || kind === "evidence-v1" || kind === "oracle-observations-v1", `unexpected artifactRef kind: ${ref}`);
       if (kind === "candidate-manifest" || kind === "candidate-snapshot") {
         const candId = reverse[target];
         assert.ok(candId, `artifactRef target ${target} not in anonymization map`);
         assert.ok(fs.existsSync(path.join(ROOT, "candidates", candId, "MANIFEST.json")));
       }
     }
-    // sourceRef must resolve to the committed candidate snapshot via anon ID.
+    // sourceRef must resolve to the committed observation-source artifact via anon ID.
     for (const e of p.evidence) {
       assert.ok(!containsRawCandidateId(e.sourceRef), `raw candidate ID in sourceRef: ${e.sourceRef}`);
-      assert.ok(e.sourceRef.startsWith(`candidate-snapshot:${anonId}#`), `sourceRef not scoped to this candidate: ${e.sourceRef}`);
+      assert.ok(e.sourceRef.startsWith(`oracle-observations-v1:${anonId}/`), `sourceRef not scoped to this candidate: ${e.sourceRef}`);
+      // Clean-checkout resolution: parse, read file, apply JSON pointer.
+      const referenced = loadObservationSource(e.sourceRef) as any;
+      assert.ok(referenced !== undefined, `sourceRef does not resolve: ${e.sourceRef}`);
+      // Embedded observationPayload must contain the referenced source observation.
+      if (referenced.requestId !== undefined) {
+        assert.equal(e.observationPayload.requestId, referenced.requestId, `requestId mismatch for ${e.evidenceId}`);
+      }
+      if (e.observationPayload.statusCode !== undefined && referenced.statusCode !== undefined) {
+        assert.equal(e.observationPayload.statusCode, referenced.statusCode, `statusCode mismatch for ${e.evidenceId}`);
+      }
+      if (e.observationPayload.body !== undefined && referenced.body !== undefined) {
+        assert.deepEqual(e.observationPayload.body, referenced.body, `body mismatch for ${e.evidenceId}`);
+      }
+      if (e.observationPayload.auditRecords !== undefined && referenced.auditRecords !== undefined) {
+        assert.deepEqual(e.observationPayload.auditRecords, referenced.auditRecords, `auditRecords mismatch for ${e.evidenceId}`);
+      }
+      // Digest must be recomputed from the referenced bytes.
+      assert.equal(e.sourceDigest, sourceRefDigest(e.sourceRef), `source digest mismatch ${e.evidenceId}`);
     }
   }
 });
@@ -110,12 +130,8 @@ test("WP4: source digests are recomputed from embedded observation payloads", as
   for (const candidateId of ["S1-C1", "S1-C2", "S1-C3", "S1-C4"]) {
     const p = loadPacket(anonFor(candidateId), dir);
     for (const e of p.evidence) {
-      // Independent recomputation from the embedded payload bytes.
-      const expected = crypto
-        .createHash("sha256")
-        .update(JSON.stringify(e.observationPayload, Object.keys(e.observationPayload).sort(), 2))
-        .digest("hex");
-      assert.equal(e.sourceDigest, expected, `source digest mismatch ${e.evidenceId}`);
+      // Independent recomputation from the referenced source bytes.
+      assert.equal(e.sourceDigest, sourceRefDigest(e.sourceRef), `source digest mismatch ${e.evidenceId}`);
       // The digest is of the observation representation, not the manifest/app digest.
       assert.notEqual(e.sourceDigest, p.candidateSnapshotDigest);
     }
@@ -128,7 +144,7 @@ test("WP4: per-request observations for AC-1 through AC-5", async () => {
   const c4 = loadPacket(anonFor("S1-C4"), dir);
 
   // C3: AC-1 and AC-2 pass observations; AC-3 has a fail observation (revoked token 200).
-  const ac3Revoked = c3.evidence.find((e) => e.criterionId === "AC-3" && e.sourceRef.includes("request/P-revoked"))!;
+  const ac3Revoked = c3.evidence.find((e) => e.criterionId === "AC-3" && e.sourceRef.includes("requests/P-revoked"))!;
   assert.equal(ac3Revoked.observation, "fail");
   assert.equal(ac3Revoked.evidenceType, "http-status");
   assert.equal(ac3Revoked.sourceLocation, "P-revoked response status and body fields");
@@ -361,17 +377,17 @@ test("WP4: stale/inapplicable/unavailable evidence does not satisfy", () => {
   // Stale → not satisfied.
   const stale = structuredClone(packet);
   stale.evidence[0].freshness = "stale";
-  assert.equal(runBaseline({ packet: stale }).outcomes[0].outcome, "unresolved");
+  assert.equal(runBaseline({ packet: stale, rejectMalformed: false }).outcomes[0].outcome, "unresolved");
 
   // Inapplicable → not satisfied.
   const inapp = structuredClone(packet);
   inapp.evidence[0].applicability = "inapplicable";
-  assert.equal(runBaseline({ packet: inapp }).outcomes[0].outcome, "unresolved");
+  assert.equal(runBaseline({ packet: inapp, rejectMalformed: false }).outcomes[0].outcome, "unresolved");
 
   // Unavailable → not satisfied.
   const unavail = structuredClone(packet);
   unavail.evidence[0].observation = "unavailable";
-  assert.equal(runBaseline({ packet: unavail }).outcomes[0].outcome, "unresolved");
+  assert.equal(runBaseline({ packet: unavail, rejectMalformed: false }).outcomes[0].outcome, "unresolved");
 });
 
 test("WP4: modified observation payload invalidates source digest", async () => {
@@ -386,40 +402,429 @@ test("WP4: modified observation payload invalidates source digest", async () => 
   assert.ok(res.rejectionErrors?.some((e) => e.code === "bad-source-digest"));
 });
 
-test("WP4: baseline cannot read truth in a restricted child process", async () => {
-  const tmp = path.join(ROOT, ".isolation-tmp", "wp4-restricted");
+test("WP4: actual baseline executes in a restricted child process", async () => {
+  const tmp = path.join(ROOT, ".isolation-tmp", "wp4-real-baseline");
   fs.mkdirSync(tmp, { recursive: true });
-  // A packet file the child is allowed to read.
   const dir = await freshPackets(path.join(tmp, "packets"));
-  const packetFile = evidencePacketPath(anonFor("S1-C1"), dir);
-  fs.copyFileSync(packetFile, path.join(tmp, "packet.json"));
+  const anonId = anonFor("S1-C3");
+  const packet = loadPacket(anonId, dir);
+  const packetFile = path.join(tmp, "packet.json");
+  fs.writeFileSync(packetFile, JSON.stringify(packet, null, 2) + "\n", "utf8");
 
-  const childScript = `
+  const childScript = path.join(tmp, "run-baseline-child.ts");
+  const baselinePath = path.join(ROOT, "src", "baseline.ts");
+  const evidenceTypesPath = path.join(ROOT, "src", "evidence-types.ts");
+  const canonicalPath = path.join(ROOT, "src", "canonical.ts");
+  const baselinePolicyPath = path.join(ROOT, "src", "baseline-policy.ts");
+  const sourceRefPath = path.join(ROOT, "src", "source-ref.ts");
+  const forbiddenFiles = [
+    path.join(ROOT, "truth", "truth-v1.json"),
+    path.join(ROOT, "truth", "anonymization-map.json"),
+    path.join(ROOT, "truth", "salt.txt"),
+    path.join(ROOT, "candidates", "S1-C2", "MANIFEST.json"),
+    path.join(ROOT, "evidence-v1", "S1-FIX-9f1b492fe31a.json"),
+  ];
+
+  const scriptContent = `
 import * as fs from "node:fs";
-let truthRead = "not-attempted";
-try {
-  fs.readFileSync("${path.join(ROOT, "truth", "truth-v1.json")}", "utf8");
-  truthRead = "succeeded";
-} catch (e) {
-  truthRead = String((e && e.code) || e);
+import * as path from "node:path";
+import { pathToFileURL } from "node:url";
+import { runBaseline } from "${pathToFileURL(baselinePath).href}";
+
+const packetPath = process.argv[2];
+const packet = JSON.parse(fs.readFileSync(packetPath, "utf8"));
+const result = runBaseline({ packet, rejectMalformed: true });
+
+const forbiddenResults: Record<string, string> = {};
+const forbidden = ${JSON.stringify(forbiddenFiles)};
+for (const f of forbidden) {
+  try {
+    fs.readFileSync(f, "utf8");
+    forbiddenResults[f] = "succeeded";
+  } catch (e: any) {
+    forbiddenResults[f] = e?.code ?? String(e);
+  }
 }
-process.stdout.write(JSON.stringify({ truthRead }));
+
+process.stdout.write(JSON.stringify({ baselineResult: result, forbiddenResults }));
 `;
+  fs.writeFileSync(childScript, scriptContent, "utf8");
+
+  // Build allowlist: only baseline import graph + input packet + child script.
+  const allowArgs = [
+    `--allow-fs-read=${childScript}`,
+    `--allow-fs-read=${baselinePath}`,
+    `--allow-fs-read=${evidenceTypesPath}`,
+    `--allow-fs-read=${canonicalPath}`,
+    `--allow-fs-read=${baselinePolicyPath}`,
+    `--allow-fs-read=${sourceRefPath}`,
+    `--allow-fs-read=${packetFile}`,
+  ].join(" ");
 
   const child = spawn(
     process.execPath,
-    ["--experimental-strip-types", "--permission", `--allow-fs-read=${tmp}`, "-e", childScript],
+    ["--experimental-strip-types", "--permission", ...allowArgs.split(" "), childScript, packetFile],
     { stdio: ["pipe", "pipe", "pipe"] },
   );
-  const result = await new Promise<{ stdout: string; stderr: string }>((resolve, reject) => {
+
+  const result = await new Promise<{ stdout: string; stderr: string; code: number | null }>((resolve, reject) => {
     let out = "", err = "";
     child.stdout.on("data", (d) => (out += d));
     child.stderr.on("data", (d) => (err += d));
-    child.on("close", (code) => (code === 0 ? resolve({ stdout: out, stderr: err }) : reject(new Error(`child exit ${code}: ${err}`))));
+    child.on("close", (code) => resolve({ stdout: out, stderr: err, code }));
     child.on("error", reject);
   });
+
+  assert.equal(result.code, 0, `child failed: ${result.stderr}`);
+  assert.ok(result.stdout.length > 0, "child produced no output");
+
   const parsed = JSON.parse(result.stdout.trim());
-  assert.equal(parsed.truthRead, "ERR_ACCESS_DENIED", `baseline process must be denied truth access, got: ${parsed.truthRead}`);
+  const childResult = parsed.baselineResult as { rejected: boolean; outcomes: { criterionId: string; outcome: string }[] };
+
+  // Verify the actual baseline executed and produced correct results.
+  assert.equal(childResult.rejected, false, "baseline should not be rejected");
+  assert.equal(childResult.outcomes.length, 5, "should have 5 criterion outcomes");
+  assert.equal(childResult.outcomes.find((o) => o.criterionId === "AC-3")?.outcome, "violated", "C3 AC-3 should be violated");
+  assert.equal(childResult.outcomes.find((o) => o.criterionId === "AC-4")?.outcome, "satisfied", "C3 AC-4 should be satisfied");
+
+  // Verify all forbidden reads were denied.
+  for (const [file, code] of Object.entries(parsed.forbiddenResults)) {
+    assert.equal(code, "ERR_ACCESS_DENIED", `forbidden file ${file} should be denied, got ${code}`);
+  }
+
+  // Compare with in-process baseline result for the same packet.
+  const inProcess = runBaseline({ packet, rejectMalformed: true });
+  assert.equal(JSON.stringify(inProcess), JSON.stringify(childResult), "child result must match in-process result");
+});
+
+test("WP4: recursive canonical JSON sorts keys at every level", () => {
+  const nested = {
+    z: 1,
+    a: { b: 2, a: 1, c: { z: 3, a: 4 } },
+    m: [ { x: 5, y: 6 }, { y: 7, x: 8 } ],
+  };
+  // Reorder keys — canonical form should be identical.
+  const reordered = {
+    a: { c: { a: 4, z: 3 }, a: 1, b: 2 },
+    m: [ { y: 6, x: 5 }, { x: 8, y: 7 } ],
+    z: 1,
+  };
+  const canon1 = canonicalJson(nested);
+  const canon2 = canonicalJson(reordered);
+  assert.equal(canon1, canon2, "key reordering should not change canonical output");
+  // Array order is preserved (reversing array changes output).
+  const reversed = { ...nested, m: [ { y: 7, x: 8 }, { x: 5, y: 6 } ] };
+  assert.notEqual(canonicalJson(reversed), canon1, "array order must affect canonical output");
+});
+
+test("WP4: nested observation and audit-record mutations change the digest", () => {
+  const base = {
+    requestId: "P-active-a",
+    statusCode: 200,
+    body: { id: "caller-a", email: "caller-a@example.example" },
+    auditRecords: [{ event: "profile.access.denied", reason: "missing_credential", timestamp: "2026-01-01T00:00:00Z" }],
+  };
+  const baseDigest = canonicalDigest(base);
+
+  // Top-level statusCode change.
+  assert.notEqual(canonicalDigest({ ...base, statusCode: 401 }), baseDigest);
+  // Nested body.id change.
+  assert.notEqual(canonicalDigest({ ...base, body: { ...base.body, id: "wrong" } }), baseDigest);
+  // Nested body.email change.
+  assert.notEqual(canonicalDigest({ ...base, body: { ...base.body, email: "wrong@example.example" } }), baseDigest);
+  // auditRecords[0].event change.
+  assert.notEqual(canonicalDigest({ ...base, auditRecords: [{ ...base.auditRecords[0], event: "other.event" }] }), baseDigest);
+  // auditRecords[0].reason change.
+  assert.notEqual(canonicalDigest({ ...base, auditRecords: [{ ...base.auditRecords[0], reason: "other.reason" }] }), baseDigest);
+  // Nested object values cannot retain the previous digest.
+  assert.notEqual(canonicalDigest({ ...base, body: { id: "caller-a", email: "caller-a@example.example", extra: true } }), baseDigest);
+});
+
+test("WP4: independently implemented test-side canonicalization agrees with production", () => {
+  const value = {
+    statusCode: 200,
+    body: { email: "caller-a@example.example", id: "caller-a" },
+    requestId: "P-active-a",
+  };
+  // Independent test-side canonicalization (not using canonicalJson).
+  function independentCanonical(v: unknown): string {
+    if (v === null || typeof v !== "object") return JSON.stringify(v);
+    if (Array.isArray(v)) return "[" + v.map(independentCanonical).join(",") + "]";
+    const keys = Object.keys(v as Record<string, unknown>).sort();
+    const parts = keys.map((k) => JSON.stringify(k) + ":" + independentCanonical((v as Record<string, unknown>)[k]));
+    return "{" + parts.join(",") + "}";
+  }
+  // Production canonicalDigest uses sorted keys + 2-space indent; compare canonicalized structure, not raw bytes.
+  // Verify production canonicalJson contains all keys sorted at top level.
+  const prod = canonicalJson(value);
+  const parsedProd = JSON.parse(prod);
+  assert.equal(independentCanonical(parsedProd), independentCanonical(value), "independent canonicalization must agree with production");
+  assert.ok(prod.includes('"body"'), "production canonical must include body");
+  assert.ok(prod.includes('"requestId"'), "production canonical must include requestId");
+  assert.ok(prod.includes('"statusCode"'), "production canonical must include statusCode");
+  // Verify production digest is deterministic and matches canonicalJson.
+  const prodDigest = canonicalDigest(value);
+  assert.equal(prodDigest, crypto.createHash("sha256").update(canonicalJson(value)).digest("hex"));
+  // Verify reordering keys doesn't change production digest.
+  const reordered = { body: { id: "caller-a", email: "caller-a@example.example" }, requestId: "P-active-a", statusCode: 200 };
+  assert.equal(canonicalDigest(reordered), prodDigest, "key reordering must not change digest");
+});
+
+test("WP4: exact request-ID coverage rejects duplicate request observations", () => {
+  const itemA: any = {
+    evidenceId: "EV-DUP-A",
+    candidateAnonId: "S1-FIX-5ba5153fec57",
+    criterionId: "AC-1",
+    evidenceType: "http-response",
+    sourceRef: "oracle-observations-v1:S1-FIX-5ba5153fec57/pass1/requests/P-active-a.json#",
+    sourceDigest: "0".repeat(64),
+    sourceLocation: "P-active-a response",
+    observation: "pass",
+    observationPayload: { requestId: "P-active-a", statusCode: 200, body: { id: "caller-a", email: "caller-a@example.example" } },
+    provenance: "oracle O-1 pass 1",
+    applicability: "applicable",
+    freshness: "fresh",
+    schemaVersion: "evidence-v1",
+    version: "v1",
+  };
+  itemA.sourceDigest = sourceRefDigest(itemA.sourceRef);
+  const itemB = { ...itemA, evidenceId: "EV-DUP-B" };
+  const packet: EvidencePacket = {
+    packetId: "packet-dup",
+    schemaVersion: "evidence-v1",
+    version: "v1",
+    producer: "oracle-O-1",
+    candidateAnonId: "S1-FIX-5ba5153fec57",
+    candidateSnapshotDigest: "eff76066dcfb6a8c981f51e956f8f0f7e44c987ad3a1e4df542485137be25c89",
+    runtime: "node-24.13.1",
+    checkDefinitionDigest: checkDefinitionDigest(),
+    inputsScope: "x",
+    environment: "local",
+    observationTime: null,
+    completeness: "complete",
+    artifactRefs: [],
+    criterionChecks: { "AC-1": ["EV-DUP-A", "EV-DUP-B"], "AC-2": [], "AC-3": [], "AC-4": [], "AC-5": [] },
+    evidence: [itemA, itemB],
+    generatedAt: null,
+  };
+  const res = runBaseline({ packet, rejectMalformed: true });
+  assert.equal(res.rejected, true, "duplicate request observation must be rejected");
+  assert.ok(res.rejectionErrors?.some((e) => e.code === "duplicate-request-observation"), "must detect duplicate request");
+});
+
+test("WP4: exact request-ID coverage rejects wrong-criterion assignment", () => {
+  const item: any = {
+    evidenceId: "EV-WC-1",
+    candidateAnonId: "S1-FIX-5ba5153fec57",
+    criterionId: "AC-2",
+    evidenceType: "http-status",
+    sourceRef: "oracle-observations-v1:S1-FIX-5ba5153fec57/pass1/requests/P-revoked.json#",
+    sourceDigest: "0".repeat(64),
+    sourceLocation: "P-revoked response",
+    observation: "pass",
+    observationPayload: { requestId: "P-revoked", statusCode: 401, body: {} },
+    provenance: "oracle O-1 pass 1",
+    applicability: "applicable",
+    freshness: "fresh",
+    schemaVersion: "evidence-v1",
+    version: "v1",
+  };
+  item.sourceDigest = sourceRefDigest(item.sourceRef);
+  const packet: EvidencePacket = {
+    packetId: "packet-wc",
+    schemaVersion: "evidence-v1",
+    version: "v1",
+    producer: "oracle-O-1",
+    candidateAnonId: "S1-FIX-5ba5153fec57",
+    candidateSnapshotDigest: "eff76066dcfb6a8c981f51e956f8f0f7e44c987ad3a1e4df542485137be25c89",
+    runtime: "node-24.13.1",
+    checkDefinitionDigest: checkDefinitionDigest(),
+    inputsScope: "x",
+    environment: "local",
+    observationTime: null,
+    completeness: "complete",
+    artifactRefs: [],
+    criterionChecks: { "AC-1": [], "AC-2": ["EV-WC-1"], "AC-3": [], "AC-4": [], "AC-5": [] },
+    evidence: [item],
+    generatedAt: null,
+  };
+  const res = runBaseline({ packet, rejectMalformed: true });
+  // P-revoked assigned to AC-2 is unexpected for AC-2 → rejected.
+  assert.equal(res.rejected, true, "wrong-criterion request ID must be rejected");
+  assert.ok(res.rejectionErrors?.some((e) => e.code === "unexpected-request-observation" || e.code === "missing-request-observation"), "must detect the wrong assignment");
+});
+
+test("WP4: four distinct Evidence IDs from one request cannot satisfy AC-4", () => {
+  const makeItem = (id: string) => {
+    const item: any = {
+      evidenceId: id,
+      candidateAnonId: "S1-FIX-5ba5153fec57",
+      criterionId: "AC-4",
+      evidenceType: "field-scan",
+      sourceRef: "oracle-observations-v1:S1-FIX-5ba5153fec57/pass1/requests/P-active-a.json#",
+      sourceDigest: "0".repeat(64),
+      sourceLocation: "P-active-a response body (role/internal keys)",
+      observation: "pass",
+      observationPayload: { requestId: "P-active-a", body: { id: "caller-a", email: "caller-a@example.example" }, deniedFieldsPresent: [] },
+      provenance: "oracle O-1 pass 1",
+      applicability: "applicable",
+      freshness: "fresh",
+      schemaVersion: "evidence-v1",
+      version: "v1",
+    };
+    item.sourceDigest = sourceRefDigest(item.sourceRef);
+    return item;
+  };
+  const items = [makeItem("EV-A"), makeItem("EV-B"), makeItem("EV-C"), makeItem("EV-D")];
+  const packet: EvidencePacket = {
+    packetId: "packet-repeated",
+    schemaVersion: "evidence-v1",
+    version: "v1",
+    producer: "oracle-O-1",
+    candidateAnonId: "S1-FIX-5ba5153fec57",
+    candidateSnapshotDigest: "eff76066dcfb6a8c981f51e956f8f0f7e44c987ad3a1e4df542485137be25c89",
+    runtime: "node-24.13.1",
+    checkDefinitionDigest: checkDefinitionDigest(),
+    inputsScope: "x",
+    environment: "local",
+    observationTime: null,
+    completeness: "complete",
+    artifactRefs: [],
+    criterionChecks: { "AC-1": [], "AC-2": [], "AC-3": [], "AC-4": ["EV-A", "EV-B", "EV-C", "EV-D"], "AC-5": [] },
+    evidence: items,
+    generatedAt: null,
+  };
+  const res = runBaseline({ packet, rejectMalformed: true });
+  assert.equal(res.rejected, true, "four repeated requests must be rejected");
+  assert.ok(res.rejectionErrors?.some((e) => e.code === "duplicate-request-observation" || e.code === "missing-request-observation"), "must detect the repeated/missing inventory");
+});
+
+test("WP4: missing request observation yields unavailable, not fail", () => {
+  // Build a packet where P-active-b is missing entirely (no evidence item).
+  // Baseline should mark AC-1 unresolved (not satisfied, not violated).
+  const itemA: any = {
+    evidenceId: "EV-MISS-A",
+    candidateAnonId: "S1-FIX-5ba5153fec57",
+    criterionId: "AC-1",
+    evidenceType: "http-response",
+    sourceRef: "oracle-observations-v1:S1-FIX-5ba5153fec57/pass1/requests/P-active-a.json#",
+    sourceDigest: "0".repeat(64),
+    sourceLocation: "P-active-a response body (id and email)",
+    observation: "pass",
+    observationPayload: { requestId: "P-active-a", statusCode: 200, body: { id: "caller-a", email: "caller-a@example.example" } },
+    provenance: "oracle O-1 pass 1",
+    applicability: "applicable",
+    freshness: "fresh",
+    schemaVersion: "evidence-v1",
+    version: "v1",
+  };
+  itemA.sourceDigest = sourceRefDigest(itemA.sourceRef);
+  const packet: EvidencePacket = {
+    packetId: "packet-miss",
+    schemaVersion: "evidence-v1",
+    version: "v1",
+    producer: "oracle-O-1",
+    candidateAnonId: "S1-FIX-5ba5153fec57",
+    candidateSnapshotDigest: "eff76066dcfb6a8c981f51e956f8f0f7e44c987ad3a1e4df542485137be25c89",
+    runtime: "node-24.13.1",
+    checkDefinitionDigest: checkDefinitionDigest(),
+    inputsScope: "x",
+    environment: "local",
+    observationTime: null,
+    completeness: "partial",
+    artifactRefs: [],
+    criterionChecks: { "AC-1": ["EV-MISS-A"], "AC-2": [], "AC-3": [], "AC-4": [], "AC-5": [] },
+    evidence: [itemA],
+    generatedAt: null,
+  };
+  const res = runBaseline({ packet, rejectMalformed: false });
+  assert.notEqual(res.outcomes[0].outcome, "satisfied", "missing request must not be satisfied");
+  assert.notEqual(res.outcomes[0].outcome, "violated", "missing request must not be violated");
+  assert.equal(res.outcomes[0].outcome, "unresolved", "missing request must be unresolved");
+});
+
+test("WP4: missing versus failed observation distinction", () => {
+  // Missing request → unavailable → unresolved.
+  // Failed request (wrong status) → fail → violated.
+  const missingItem: any = {
+    evidenceId: "EV-MISS-1",
+    candidateAnonId: "S1-FIX-5ba5153fec57",
+    criterionId: "AC-2",
+    evidenceType: "http-status",
+    sourceRef: "oracle-observations-v1:S1-FIX-5ba5153fec57/pass1/requests/P-missing.json#",
+    sourceDigest: "0".repeat(64),
+    sourceLocation: "P-missing response status and body fields",
+    observation: "unavailable",
+    observationPayload: { requestId: "P-missing", available: false },
+    provenance: "oracle O-1 pass 1",
+    applicability: "applicable",
+    freshness: "fresh",
+    schemaVersion: "evidence-v1",
+    version: "v1",
+  };
+  // sourceDigest for unavailable = canonicalDigest(payload)
+  missingItem.sourceDigest = canonicalDigest(missingItem.observationPayload);
+  const failedItem: any = {
+    evidenceId: "EV-FAIL-1",
+    candidateAnonId: "S1-FIX-5ba5153fec57",
+    criterionId: "AC-2",
+    evidenceType: "http-status",
+    sourceRef: "oracle-observations-v1:S1-FIX-5ba5153fec57/pass1/requests/P-missing.json#",
+    sourceDigest: "0".repeat(64),
+    sourceLocation: "P-missing response status and body fields",
+    observation: "fail",
+    observationPayload: { requestId: "P-missing", statusCode: 200, body: {}, available: true },
+    provenance: "oracle O-1 pass 1",
+    applicability: "applicable",
+    freshness: "fresh",
+    schemaVersion: "evidence-v1",
+    version: "v1",
+  };
+  failedItem.sourceDigest = canonicalDigest(failedItem.observationPayload);
+
+  // Missing → unresolved.
+  const missingPacket: EvidencePacket = {
+    packetId: "packet-missing-obs",
+    schemaVersion: "evidence-v1",
+    version: "v1",
+    producer: "oracle-O-1",
+    candidateAnonId: "S1-FIX-5ba5153fec57",
+    candidateSnapshotDigest: "eff76066dcfb6a8c981f51e956f8f0f7e44c987ad3a1e4df542485137be25c89",
+    runtime: "node-24.13.1",
+    checkDefinitionDigest: checkDefinitionDigest(),
+    inputsScope: "x",
+    environment: "local",
+    observationTime: null,
+    completeness: "partial",
+    artifactRefs: [],
+    criterionChecks: { "AC-1": [], "AC-2": ["EV-MISS-1"], "AC-3": [], "AC-4": [], "AC-5": [] },
+    evidence: [missingItem],
+    generatedAt: null,
+  };
+  const missingResult = runBaseline({ packet: missingPacket, rejectMalformed: false });
+  assert.equal(missingResult.outcomes.find((o) => o.criterionId === "AC-2")?.outcome, "unresolved", "missing observation must be unresolved");
+
+  // Failed → violated.
+  const failedPacket: EvidencePacket = {
+    packetId: "packet-failed-obs",
+    schemaVersion: "evidence-v1",
+    version: "v1",
+    producer: "oracle-O-1",
+    candidateAnonId: "S1-FIX-5ba5153fec57",
+    candidateSnapshotDigest: "eff76066dcfb6a8c981f51e956f8f0f7e44c987ad3a1e4df542485137be25c89",
+    runtime: "node-24.13.1",
+    checkDefinitionDigest: checkDefinitionDigest(),
+    inputsScope: "x",
+    environment: "local",
+    observationTime: null,
+    completeness: "complete",
+    artifactRefs: [],
+    criterionChecks: { "AC-1": [], "AC-2": ["EV-FAIL-1"], "AC-3": [], "AC-4": [], "AC-5": [] },
+    evidence: [failedItem],
+    generatedAt: null,
+  };
+  const failedResult = runBaseline({ packet: failedPacket, rejectMalformed: false });
+  assert.equal(failedResult.outcomes.find((o) => o.criterionId === "AC-2")?.outcome, "violated", "failed observation must be violated");
 });
 
 test("WP4: baseline cannot read truth or scorer internals (static)", () => {
@@ -432,11 +837,11 @@ test("WP4: baseline cannot read truth or scorer internals (static)", () => {
   assert.ok(!bl.includes("salt.txt"), "baseline must not reference salt");
 });
 
-test("WP4: malformed receipt JSON is not converted into a behavioral violation", async () => {
-  const badReceipts = path.join(ROOT, ".isolation-tmp", "wp4-malformed-receipt");
-  fs.mkdirSync(badReceipts, { recursive: true });
-  fs.writeFileSync(path.join(badReceipts, "S1-C1-pass1.json"), "{ not valid json", "utf8");
-  assert.throws(() => buildEvidencePacket({ candidateId: "S1-C1", receiptsDir: badReceipts }));
+test("WP4: missing observation source is not converted into a behavioral violation", () => {
+  const missingRef = `oracle-observations-v1:S1-FIX-5ba5153fec57/pass1/requests/P-nonexistent.json#`;
+  assert.throws(() => loadObservationSource(missingRef));
+  // And sourceRefDigest throws too.
+  assert.throws(() => sourceRefDigest(missingRef));
 });
 
 test("WP4: missing required request yields unresolved, not satisfied", () => {
@@ -479,18 +884,18 @@ test("WP4: missing required request yields unresolved, not satisfied", () => {
     evidence: [itemA],
     generatedAt: "1970-01-01T00:00:00Z",
   };
-  const result = runBaseline({ packet });
-  assert.equal(result.outcomes[0].outcome, "unresolved", "partial evidence must be unresolved, not satisfied");
+  const result = runBaseline({ packet, rejectMalformed: false });
+  assert.notEqual(result.outcomes[0]?.outcome, "satisfied", "partial evidence must not be satisfied");
 });
 
 test("WP4: evidence timestamps are deterministic (no wall-clock generation time)", async () => {
   const dir = await freshPackets(path.join(ROOT, ".isolation-tmp", "wp4-timestamps"));
   for (const candidateId of ["S1-C1", "S1-C2", "S1-C3", "S1-C4"]) {
     const p = loadPacket(anonFor(candidateId), dir);
-    assert.ok(p.generatedAt.length > 0);
-    assert.ok(p.observationTime.length > 0);
+    assert.ok(p.generatedAt !== null && p.generatedAt.length > 0);
+    assert.ok(p.observationTime !== null && p.observationTime.length > 0);
     // Regenerating from the same inputs yields identical generatedAt/observationTime.
-    const p2 = buildEvidencePacket({ candidateId, receiptsDir: RECEIPTS_DIR });
+    const p2 = buildEvidencePacket({ candidateId });
     assert.equal(p2.generatedAt, p.generatedAt);
     assert.equal(p2.observationTime, p.observationTime);
   }

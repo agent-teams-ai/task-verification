@@ -52,26 +52,27 @@ changed to suit implementation convenience.
 ### Packet builder (`src/evidence.ts`)
 
 Each candidate has one packet (`evidence-v1/S1-FIX-<12 hex>.json`), derived
-from permitted artifacts and actual M2-A oracle observations only. Packets are
-self-contained: each evidence item embeds the canonical observation payload so
-reviewers do not need raw oracle receipts (which remain outside reviewer
-access).
+from committed, sanitized Oracle observation-source artifacts and the
+anonymization map. Packets are self-contained: each evidence item embeds the
+referenced observation so reviewers do not need raw oracle receipts (which
+remain outside reviewer access).
 
 Per-evidence-item identity:
 - `evidenceId` — `EV-<anonId>-<criterion>-<request>-<n>` (anonymized, no raw
   candidate ID).
-- `sourceRef` — anonymous logical reference scoped to the candidate snapshot,
-  e.g. `candidate-snapshot:S1-FIX-...#request/P-revoked/response`, resolvable
-  via the anonymization map to committed candidate artifacts.
-- `sourceDigest` — SHA-256 of the embedded canonical observation payload
-  (the explicit observation representation), independently recomputed and
-  verified (`verifyItemSourceDigest`). It is deliberately NOT the candidate
-  application digest.
+- `sourceRef` — anonymous logical reference to the committed observation-source
+  artifact, e.g. `oracle-observations-v1:S1-FIX-.../pass1/requests/P-active-a.json#`,
+  resolvable from a clean checkout via `src/source-ref.ts`.
+- `sourceDigest` — SHA-256 of the canonical form of the exact referenced
+  observation object (`canonicalDigest`), independently recomputable from the
+  referenced bytes via `sourceRefDigest`. Distinct from the packet-level
+  `candidateSnapshotDigest`.
 - `sourceLocation` — exact request/response field or audit record.
 - `observation` — `pass`/`fail`/`unavailable` derived from actual per-request
-  data (AC-1: 200 + caller id/email; AC-2/AC-3: 401 + no profile fields;
-  AC-4: denied-field field scan; AC-5: exactly one missing_credential audit
-  record).
+  source data (AC-1: 200 + caller id/email; AC-2/AC-3: 401 + no profile
+  fields; AC-4: denied-field field scan; AC-5: exactly one
+  missing_credential audit record). Missing source records are `unavailable`,
+  never an inferred `fail`.
 - `applicability`/`freshness` — `applicable`/`fresh` for real observations.
 
 Packet-level:
@@ -79,31 +80,51 @@ Packet-level:
   source digests).
 - `checkDefinitionDigest` — SHA-256 of the frozen baseline policy, bound to
   `src/baseline-policy.ts`.
-- `artifactRefs` — anonymous logical references (`candidate-manifest:<anon>`,
-  `candidate-snapshot:<anon>`, `evidence-v1:<anon>.json`) resolvable from a
-  clean checkout via the anonymization map; no `.oracle-receipts/` dependence.
-- Deterministic: `observationTime`/`generatedAt` derive from the recorded
-  observation timestamp, not wall clock; no `new Date()` in the payload.
+- `artifactRefs` — anonymous logical references resolvable from a clean
+  checkout.
+- Deterministic: `observationTime`/`generatedAt` derive from the latest audit
+  record timestamp (run-level metadata), never wall clock; no fabricated
+  timestamps. Stripped from canonical form for reproducibility comparison.
+
+### Observation-source artifacts (`oracle-observations-v1/`)
+
+Committed, sanitized artifacts derived from M2-A oracle receipts (pass 1):
+- `oracle-observations-v1/<alias>/pass1/requests/<requestId>.json` —
+  `{requestId, statusCode, body, profileFieldsPresent, deniedFieldsPresent,
+  available}`.
+- `oracle-observations-v1/<alias>/pass1/audit/P-missing.json` —
+  `{requestId, auditRecords, auditRecordCount, available}`.
+- `oracle-observations-v1/manifest.json` — version and per-file SHA-256
+  checksums.
+
+No raw `S1-C1`..`S1-C4` identifiers, ground-truth labels, scorer internals,
+defect explanations or candidate-class descriptions. Raw receipts are not
+committed.
 
 ### Deterministic baseline (`src/baseline.ts`)
 
 Consumes a versioned evidence packet and the frozen criterion policy only:
 - Never reads `truth-v1.json`, the anonymization map, salt, scorer internals,
-  or another candidate's state.
+  or another candidate's state (neutral import graph: `src/baseline.ts` does
+  not import `src/truth.ts`).
 - Never calls a model or external service.
 - Validates the packet against the frozen policy before scoring and rejects
-  malformed/incomplete packets (bad schema, bad policy digest, duplicate or
-  unknown evidence IDs, cross-candidate evidence, source-digest mismatch,
-  undeclared evidence) rather than silently treating them as complete.
+  malformed/incomplete packets. Enforces exact criterion-to-request coverage:
+  AC-1 requires exactly one P-active-a and one P-active-b observation; AC-2
+  exactly one P-missing; AC-3 exactly one P-revoked; AC-4 exactly one per
+  request; AC-5 exactly one P-missing audit observation. Duplicate request
+  IDs (even with distinct evidence IDs), missing, unexpected, or
+  wrong-criterion request IDs are rejected. Count-only validation is not used.
 - Outcome per criterion:
   - `satisfied`: all required observations present, applicable, fresh, valid,
     and passing under the frozen policy.
   - `violated`: at least one valid, applicable, fresh observation demonstrates
     a required-behavior violation.
   - `unresolved`: required evidence missing, technically unavailable, stale,
-    inapplicable or insufficient.
-- Missing/malformed evidence is never converted into `satisfied` or into a
-  behavioral violation; insufficient evidence stays `unresolved`.
+    inapplicable or insufficient. Never converted to `satisfied` or to a
+    behavioral violation.
+- Missing observations are `unavailable` → `unresolved`; actual failures
+  (`fail`) → `violated`.
 
 Baseline output (`baseline/baseline-results.json`) matches the observed
 evidence: C1/C2 all satisfied; C3 AC-3 violated; C4 AC-4 violated — derived
@@ -112,23 +133,34 @@ without reading truth.
 ## Reproducibility
 
 - Evidence packets regenerated from the same immutable source inputs produce
-  byte-identical output (verified by independent regeneration into two clean
-  directories and SHA-256 comparison).
+  byte-identical output (independent regeneration into two clean directories,
+  SHA-256 compared).
 - Baseline output is byte-identical across clean repetitions.
-- Determinism verified by `tests/wp4.ts` (independent regeneration, canonical
-  serialization, policy digest stability).
+- Recursive canonical JSON (`src/canonical.ts`) sorts keys at every nesting
+  level, preserves array order and primitive types, rejects unsupported
+  values. Independently implemented test-side canonicalization agrees with
+  production. Nested payload and audit-record mutations change the digest;
+  key reordering does not.
+- Determinism verified by `tests/wp4.ts`.
+
+## Reviewer/baseline boundary
+
+- Restricted child-process test (`tests/wp4.ts`): an actual fresh OS child
+  process loads and executes the real production `runBaseline` on a real
+  packet, with `--permission` allowlisting only the baseline import graph
+  (`src/baseline.ts`, `src/evidence-types.ts`, `src/canonical.ts`,
+  `src/baseline-policy.ts`, `src/source-ref.ts`) and the input packet. All
+  forbidden reads (`truth/truth-v1.json`, `truth/anonymization-map.json`,
+  `truth/salt.txt`, other candidate manifests/evidence, raw receipts) return
+  `ERR_ACCESS_DENIED`. Child output matches the in-process baseline result.
+- Reviewer materialization excludes truth artifacts and sibling candidates
+  (verified against actual builder output).
 
 ## Verification
 
-Full suite: all tests pass, 0 fail, 0 skipped (includes 83 M2-A regression
-tests plus WP3/WP4 tests). Strict typecheck and declaration build pass.
-Fresh CI runs on Ubuntu 24.04 and Windows 2022 for the stacked PR #3:
-
-- Commit SHA: `278128e8b33e806fe7042500389c200894a83858`
-- Push CI run `43702048245`: success — `verify (ubuntu-24.04)`,
-  `verify (windows-2022)`
-- PR CI run `43702053758`: success — `verify (ubuntu-24.04)`,
-  `verify (windows-2022)`
+Full suite: all tests pass, 0 fail, 0 skipped. Strict typecheck and declaration
+build pass. Fresh CI runs on Ubuntu 24.04 and Windows 2022 for the stacked
+PR #3.
 
 ## Deferred work
 

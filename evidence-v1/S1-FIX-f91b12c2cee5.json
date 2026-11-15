@@ -9,12 +9,13 @@
   "checkDefinitionDigest": "ef5ca877ec5fbbfe4aabe935a1a366a3c1cacd68e922eb3f7cb1419d01056b1b",
   "inputsScope": "candidate application snapshot + oracle observations",
   "environment": "local",
-  "observationTime": "2026-11-15T10:00:07.670Z",
+  "observationTime": "2026-11-15T11:14:26.624Z",
   "completeness": "complete",
   "artifactRefs": [
     "candidate-manifest:S1-FIX-f91b12c2cee5",
     "candidate-snapshot:S1-FIX-f91b12c2cee5",
-    "evidence-v1:S1-FIX-f91b12c2cee5.json"
+    "evidence-v1:S1-FIX-f91b12c2cee5.json",
+    "oracle-observations-v1:S1-FIX-f91b12c2cee5"
   ],
   "criterionChecks": {
     "AC-1": [
@@ -43,8 +44,8 @@
       "candidateAnonId": "S1-FIX-f91b12c2cee5",
       "criterionId": "AC-1",
       "evidenceType": "http-response",
-      "sourceRef": "candidate-snapshot:S1-FIX-f91b12c2cee5#request/P-active-a/response",
-      "sourceDigest": "378c3d7beb6255e1c63903a898354a318183b2884bebe04da1ac3478d137c081",
+      "sourceRef": "oracle-observations-v1:S1-FIX-f91b12c2cee5/pass1/requests/P-active-a.json#",
+      "sourceDigest": "cfe1bd3d3e8c8baa288b66b4ab703cf2a6216cb49f2e167c9c5b3d6a33e8bb90",
       "sourceLocation": "P-active-a response body (id and email)",
       "observation": "pass",
       "observationPayload": {
@@ -62,7 +63,11 @@
           "role",
           "internal"
         ],
-        "timestamp": "2026-11-15T10:00:07.670Z"
+        "deniedFieldsPresent": [
+          "role",
+          "internal"
+        ],
+        "available": true
       },
       "provenance": "oracle O-1 pass 1, request P-active-a",
       "applicability": "applicable",
@@ -75,8 +80,8 @@
       "candidateAnonId": "S1-FIX-f91b12c2cee5",
       "criterionId": "AC-1",
       "evidenceType": "http-response",
-      "sourceRef": "candidate-snapshot:S1-FIX-f91b12c2cee5#request/P-active-b/response",
-      "sourceDigest": "24c0edad2e696315aeb205fb9cbd494cb6d505b3be5c00d2aaaa8cd3e1c19048",
+      "sourceRef": "oracle-observations-v1:S1-FIX-f91b12c2cee5/pass1/requests/P-active-b.json#",
+      "sourceDigest": "c54c721851035f7b9454ec9eebf691e63699e8f1ebf5f68d30b1732769cc755e",
       "sourceLocation": "P-active-b response body (id and email)",
       "observation": "pass",
       "observationPayload": {
@@ -94,7 +99,11 @@
           "role",
           "internal"
         ],
-        "timestamp": "2026-11-15T10:00:07.670Z"
+        "deniedFieldsPresent": [
+          "role",
+          "internal"
+        ],
+        "available": true
       },
       "provenance": "oracle O-1 pass 1, request P-active-b",
       "applicability": "applicable",
@@ -107,8 +116,8 @@
       "candidateAnonId": "S1-FIX-f91b12c2cee5",
       "criterionId": "AC-2",
       "evidenceType": "http-status",
-      "sourceRef": "candidate-snapshot:S1-FIX-f91b12c2cee5#request/P-missing/response",
-      "sourceDigest": "9af77df63e919c856f8804b9b0fa3a9d4fdb80e3120e66cec53745ff75f35689",
+      "sourceRef": "oracle-observations-v1:S1-FIX-f91b12c2cee5/pass1/requests/P-missing.json#",
+      "sourceDigest": "2cbac7c413aba7d66e07bc7eff5a69fcdf92a3f351aad7101a3605cfce551775",
       "sourceLocation": "P-missing response status and body fields",
       "observation": "pass",
       "observationPayload": {
@@ -118,7 +127,8 @@
           "error": "missing_credential"
         },
         "profileFieldsPresent": [],
-        "timestamp": "2026-11-15T10:00:07.670Z"
+        "deniedFieldsPresent": [],
+        "available": true
       },
       "provenance": "oracle O-1 pass 1, request P-missing",
       "applicability": "applicable",
@@ -131,8 +141,8 @@
       "candidateAnonId": "S1-FIX-f91b12c2cee5",
       "criterionId": "AC-3",
       "evidenceType": "http-status",
-      "sourceRef": "candidate-snapshot:S1-FIX-f91b12c2cee5#request/P-revoked/response",
-      "sourceDigest": "9d1273f5fba8b64d450143f479f2a4f5af60a4744615cc46f9c7039f26c98366",
+      "sourceRef": "oracle-observations-v1:S1-FIX-f91b12c2cee5/pass1/requests/P-revoked.json#",
+      "sourceDigest": "e041b8066d35e81fa26bb3ae71b411d4d86417c58c8942b4f229d407509874d3",
       "sourceLocation": "P-revoked response status and body fields",
       "observation": "pass",
       "observationPayload": {
@@ -142,7 +152,8 @@
           "error": "token_revoked"
         },
         "profileFieldsPresent": [],
-        "timestamp": "2026-11-15T10:00:07.670Z"
+        "deniedFieldsPresent": [],
+        "available": true
       },
       "provenance": "oracle O-1 pass 1, request P-revoked",
       "applicability": "applicable",
@@ -155,23 +166,30 @@
       "candidateAnonId": "S1-FIX-f91b12c2cee5",
       "criterionId": "AC-4",
       "evidenceType": "field-scan",
-      "sourceRef": "candidate-snapshot:S1-FIX-f91b12c2cee5#request/P-active-a/response",
-      "sourceDigest": "fb193f1577c04a78985edc813d7e882d3f5c38fb67165f1ae250bf8cbfc5d296",
+      "sourceRef": "oracle-observations-v1:S1-FIX-f91b12c2cee5/pass1/requests/P-active-a.json#",
+      "sourceDigest": "cfe1bd3d3e8c8baa288b66b4ab703cf2a6216cb49f2e167c9c5b3d6a33e8bb90",
       "sourceLocation": "P-active-a response body (role/internal keys)",
       "observation": "fail",
       "observationPayload": {
         "requestId": "P-active-a",
+        "statusCode": 200,
         "body": {
           "id": "caller-a",
           "email": "caller-a@example.example",
           "role": "reviewer",
           "internal": true
         },
+        "profileFieldsPresent": [
+          "id",
+          "email",
+          "role",
+          "internal"
+        ],
         "deniedFieldsPresent": [
           "role",
           "internal"
         ],
-        "timestamp": "2026-11-15T10:00:07.670Z"
+        "available": true
       },
       "provenance": "oracle O-1 pass 1, request P-active-a",
       "applicability": "applicable",
@@ -184,23 +202,30 @@
       "candidateAnonId": "S1-FIX-f91b12c2cee5",
       "criterionId": "AC-4",
       "evidenceType": "field-scan",
-      "sourceRef": "candidate-snapshot:S1-FIX-f91b12c2cee5#request/P-active-b/response",
-      "sourceDigest": "470b3115cfff6ca865e246f8189d451c6efcf5d8130f34e80214bed6c2047bbc",
+      "sourceRef": "oracle-observations-v1:S1-FIX-f91b12c2cee5/pass1/requests/P-active-b.json#",
+      "sourceDigest": "c54c721851035f7b9454ec9eebf691e63699e8f1ebf5f68d30b1732769cc755e",
       "sourceLocation": "P-active-b response body (role/internal keys)",
       "observation": "fail",
       "observationPayload": {
         "requestId": "P-active-b",
+        "statusCode": 200,
         "body": {
           "id": "caller-b",
           "email": "caller-b@example.example",
           "role": "reviewer",
           "internal": true
         },
+        "profileFieldsPresent": [
+          "id",
+          "email",
+          "role",
+          "internal"
+        ],
         "deniedFieldsPresent": [
           "role",
           "internal"
         ],
-        "timestamp": "2026-11-15T10:00:07.670Z"
+        "available": true
       },
       "provenance": "oracle O-1 pass 1, request P-active-b",
       "applicability": "applicable",
@@ -213,17 +238,19 @@
       "candidateAnonId": "S1-FIX-f91b12c2cee5",
       "criterionId": "AC-4",
       "evidenceType": "field-scan",
-      "sourceRef": "candidate-snapshot:S1-FIX-f91b12c2cee5#request/P-missing/response",
-      "sourceDigest": "f635bd7f73238d7522d8cbfe1d57086d279511e76fe01b4aba06b11f4b59b817",
+      "sourceRef": "oracle-observations-v1:S1-FIX-f91b12c2cee5/pass1/requests/P-missing.json#",
+      "sourceDigest": "2cbac7c413aba7d66e07bc7eff5a69fcdf92a3f351aad7101a3605cfce551775",
       "sourceLocation": "P-missing response body (role/internal keys)",
       "observation": "pass",
       "observationPayload": {
         "requestId": "P-missing",
+        "statusCode": 401,
         "body": {
           "error": "missing_credential"
         },
+        "profileFieldsPresent": [],
         "deniedFieldsPresent": [],
-        "timestamp": "2026-11-15T10:00:07.670Z"
+        "available": true
       },
       "provenance": "oracle O-1 pass 1, request P-missing",
       "applicability": "applicable",
@@ -236,17 +263,19 @@
       "candidateAnonId": "S1-FIX-f91b12c2cee5",
       "criterionId": "AC-4",
       "evidenceType": "field-scan",
-      "sourceRef": "candidate-snapshot:S1-FIX-f91b12c2cee5#request/P-revoked/response",
-      "sourceDigest": "263d239dd0da68c782607893ccbbda35984b807ca428fbcd7b38da537f05fdfd",
+      "sourceRef": "oracle-observations-v1:S1-FIX-f91b12c2cee5/pass1/requests/P-revoked.json#",
+      "sourceDigest": "e041b8066d35e81fa26bb3ae71b411d4d86417c58c8942b4f229d407509874d3",
       "sourceLocation": "P-revoked response body (role/internal keys)",
       "observation": "pass",
       "observationPayload": {
         "requestId": "P-revoked",
+        "statusCode": 401,
         "body": {
           "error": "token_revoked"
         },
+        "profileFieldsPresent": [],
         "deniedFieldsPresent": [],
-        "timestamp": "2026-11-15T10:00:07.670Z"
+        "available": true
       },
       "provenance": "oracle O-1 pass 1, request P-revoked",
       "applicability": "applicable",
@@ -259,8 +288,8 @@
       "candidateAnonId": "S1-FIX-f91b12c2cee5",
       "criterionId": "AC-5",
       "evidenceType": "audit-delta",
-      "sourceRef": "candidate-snapshot:S1-FIX-f91b12c2cee5#request/P-missing/audit-delta",
-      "sourceDigest": "025be5a3b3791bb7cfaf40f6465330c344a7befcaeb9203675c1282fc837c7b9",
+      "sourceRef": "oracle-observations-v1:S1-FIX-f91b12c2cee5/pass1/audit/P-missing.json#",
+      "sourceDigest": "39f1fdfba352f96a944732cbfbd47cf09291a123019a84fcc6ce327d0a2a886a",
       "sourceLocation": "P-missing audit delta (exactly one missing_credential record)",
       "observation": "pass",
       "observationPayload": {
@@ -271,11 +300,11 @@
             "reason": "missing_credential",
             "path": "/profile",
             "tokenPresent": false,
-            "timestamp": "2026-11-15T10:00:07.670Z"
+            "timestamp": "2026-11-15T11:14:26.624Z"
           }
         ],
         "auditRecordCount": 1,
-        "timestamp": "2026-11-15T10:00:07.670Z"
+        "available": true
       },
       "provenance": "oracle O-1 pass 1, request P-missing",
       "applicability": "applicable",
@@ -284,5 +313,5 @@
       "version": "v1"
     }
   ],
-  "generatedAt": "2026-11-15T10:00:07.670Z"
+  "generatedAt": "2026-11-15T11:14:26.624Z"
 }

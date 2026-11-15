@@ -1,0 +1,49 @@
+{
+  "schemaVersion": "observation-source-v1",
+  "version": "v1",
+  "producer": "oracle-O-1",
+  "source": "m2-a-oracle-receipts pass 1",
+  "candidates": {
+    "S1-FIX-5ba5153fec57": {
+      "alias": "S1-FIX-5ba5153fec57",
+      "checksums": {
+        "requests/P-active-a.json": "393b27235d98fac941698b6c91f17cab85a045ccbb27c2eb573669cbaa113063",
+        "requests/P-active-b.json": "849aa12e2d27a338c40e40e26c256bb53ac16d60bd34ca63ebcadcae8ba5c32b",
+        "requests/P-missing.json": "ac7768c4df27e2b72fd179f5d916de72489e08bc733366bb89b4563ad97b5ce8",
+        "requests/P-revoked.json": "00075db688488511484c2e0b7c63e47ff60d5fc247f237ea56442de306e9dfd6",
+        "audit/P-missing.json": "2039e2e0cd0f8bfc51186065c003b0edb976551daa3bf0833e6463176048ba6d"
+      }
+    },
+    "S1-FIX-9f1b492fe31a": {
+      "alias": "S1-FIX-9f1b492fe31a",
+      "checksums": {
+        "requests/P-active-a.json": "393b27235d98fac941698b6c91f17cab85a045ccbb27c2eb573669cbaa113063",
+        "requests/P-active-b.json": "849aa12e2d27a338c40e40e26c256bb53ac16d60bd34ca63ebcadcae8ba5c32b",
+        "requests/P-missing.json": "ac7768c4df27e2b72fd179f5d916de72489e08bc733366bb89b4563ad97b5ce8",
+        "requests/P-revoked.json": "00075db688488511484c2e0b7c63e47ff60d5fc247f237ea56442de306e9dfd6",
+        "audit/P-missing.json": "d717942f49b7af5e681683e59b92914ebfe808c45d094fca4348c6f08ccae14a"
+      }
+    },
+    "S1-FIX-c719e43e54e4": {
+      "alias": "S1-FIX-c719e43e54e4",
+      "checksums": {
+        "requests/P-active-a.json": "393b27235d98fac941698b6c91f17cab85a045ccbb27c2eb573669cbaa113063",
+        "requests/P-active-b.json": "849aa12e2d27a338c40e40e26c256bb53ac16d60bd34ca63ebcadcae8ba5c32b",
+        "requests/P-missing.json": "ac7768c4df27e2b72fd179f5d916de72489e08bc733366bb89b4563ad97b5ce8",
+        "requests/P-revoked.json": "bf976848421509152bd67420b79a0cac8f6bff4cd10e0bbaa49a263329435c4e",
+        "audit/P-missing.json": "e74c857bd0e32fcd35a8d01d7647ee4d13412674fecb3bad9a6805430b9865a1"
+      }
+    },
+    "S1-FIX-f91b12c2cee5": {
+      "alias": "S1-FIX-f91b12c2cee5",
+      "checksums": {
+        "requests/P-active-a.json": "4e7f65784e0418a2ca9f0500e9c7f74cb28a6100ca68a4f68a84ddd15f6c9cec",
+        "requests/P-active-b.json": "7620b181a51e3e2c3600a1e43026e720353ec587ce2b155aa02ccfb019ca9a0e",
+        "requests/P-missing.json": "ac7768c4df27e2b72fd179f5d916de72489e08bc733366bb89b4563ad97b5ce8",
+        "requests/P-revoked.json": "00075db688488511484c2e0b7c63e47ff60d5fc247f237ea56442de306e9dfd6",
+        "audit/P-missing.json": "d6393ca7fcc02d95780a04f43d5faf0851cc9e153ad4db76214b053d87f908bf"
+      }
+    }
+  },
+  "generatedAt": null
+}

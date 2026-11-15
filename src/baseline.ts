@@ -2,7 +2,7 @@
  * Deterministic baseline (WP4).
  *
  * Consumes a versioned evidence packet and the frozen criterion policy only.
- * Never reads sealed truth artifacts, anonymization map or salt, scorer
+ * Never reads sealed truth artifacts, the anonymization map or salt, scorer
  * internals, or another candidate's state. Never calls a model or external
  * service.
  *
@@ -12,13 +12,31 @@
  * before scoring and rejects malformed or incomplete packets rather than
  * silently treating them as complete.
  *
+ * Exact criterion-to-request coverage is enforced: each criterion must be
+ * backed by exactly one valid observation for each request ID in
+ * FROZEN_CRITERION_CHECKS[criterion], with no duplicates, no missing request
+ * IDs, no unexpected request IDs, and no request ID assigned to the wrong
+ * criterion.
+ *
+ * Outcome semantics:
+ *   satisfied: all required observations present, applicable, fresh, valid and
+ *              passing under the frozen policy.
+ *   violated:  at least one valid, applicable, fresh observation demonstrates
+ *              a required-behavior violation.
+ *   unresolved: required evidence missing, technically unavailable, stale,
+ *               inapplicable or insufficient. Never converted to satisfied or
+ *               to a behavioral violation.
+ *
  * Licensed under Apache 2.0. See LICENSE.
  */
 
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
-import type { EvidencePacket } from "./evidence.ts";
+import type { EvidencePacket } from "./evidence-types.ts";
+import {
+  canonicalDigest,
+} from "./canonical.ts";
 import {
   BASELINE_POLICY_VERSION,
   CRITERIA,
@@ -26,11 +44,7 @@ import {
   checkDefinitionDigest,
   POLICY_ID,
   type CriterionId,
-  type ObservationStatus,
-  type EvidenceApplicability,
-  type EvidenceFreshness,
 } from "./baseline-policy.ts";
-import { verifyItemSourceDigest } from "./evidence.ts";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 export const BASELINE_DIR = path.join(ROOT, "baseline");
@@ -68,12 +82,18 @@ export interface RunBaselineOptions {
   rejectMalformed?: boolean;
 }
 
-const SUPPORTED_OBSERVATIONS: ObservationStatus[] = ["pass", "fail", "unavailable"];
-const SUPPORTED_APPLICABILITY: EvidenceApplicability[] = ["applicable", "inapplicable"];
-const SUPPORTED_FRESHNESS: EvidenceFreshness[] = ["fresh", "stale"];
-
 function reject(code: string, message: string, detail?: unknown): BaselineError {
   return { code, message, detail };
+}
+
+function isObservation(value: unknown): value is "pass" | "fail" | "unavailable" {
+  return value === "pass" || value === "fail" || value === "unavailable";
+}
+function isApplicability(value: unknown): value is "applicable" | "inapplicable" {
+  return value === "applicable" || value === "inapplicable";
+}
+function isFreshness(value: unknown): value is "fresh" | "stale" {
+  return value === "fresh" || value === "stale";
 }
 
 function validatePacket(packet: EvidencePacket): BaselineError[] {
@@ -97,7 +117,10 @@ function validatePacket(packet: EvidencePacket): BaselineError[] {
   if (typeof packet.candidateAnonId !== "string" || packet.candidateAnonId.length === 0) {
     errors.push(reject("bad-candidate-anon-id", "missing candidateAnonId"));
   }
-  if (typeof packet.candidateSnapshotDigest !== "string" || packet.candidateSnapshotDigest.length === 0) {
+  if (
+    typeof packet.candidateSnapshotDigest !== "string" ||
+    packet.candidateSnapshotDigest.length === 0
+  ) {
     errors.push(reject("bad-candidate-snapshot-digest", "missing candidateSnapshotDigest"));
   }
 
@@ -119,6 +142,8 @@ function validatePacket(packet: EvidencePacket): BaselineError[] {
   const seenIds = new Set<string>();
   const actualIds = new Set<string>();
   const criterionToEvidenceIds = new Map<string, Set<string>>();
+  // Per-criterion request-ID inventory: requestId -> set of evidence IDs.
+  const criterionRequestInventory = new Map<string, Map<string, string[]>>();
   for (const e of packet.evidence) {
     actualIds.add(e.evidenceId);
     if (seenIds.has(e.evidenceId)) {
@@ -136,20 +161,20 @@ function validatePacket(packet: EvidencePacket): BaselineError[] {
     if (!CRITERIA.includes(e.criterionId as CriterionId)) {
       errors.push(reject("unknown-criterion", `evidence ${e.evidenceId} unknown criterion ${e.criterionId}`));
     }
-    if (!SUPPORTED_OBSERVATIONS.includes(e.observation as ObservationStatus)) {
-      errors.push(
-        reject("bad-observation", `evidence ${e.evidenceId} unsupported observation ${e.observation}`),
-      );
+    if (!isObservation(e.observation)) {
+      errors.push(reject("bad-observation", `evidence ${e.evidenceId} unsupported observation ${e.observation}`));
     }
-    if (!SUPPORTED_APPLICABILITY.includes(e.applicability as EvidenceApplicability)) {
-      errors.push(
-        reject("bad-applicability", `evidence ${e.evidenceId} unsupported applicability ${e.applicability}`),
-      );
+    if (!isApplicability(e.applicability)) {
+      errors.push(reject("bad-applicability", `evidence ${e.evidenceId} unsupported applicability ${e.applicability}`));
     }
-    if (!SUPPORTED_FRESHNESS.includes(e.freshness as EvidenceFreshness)) {
+    if (!isFreshness(e.freshness)) {
       errors.push(reject("bad-freshness", `evidence ${e.evidenceId} unsupported freshness ${e.freshness}`));
     }
-    if (!verifyItemSourceDigest(e)) {
+    // Source digest must match the canonical digest of the embedded observation
+    // payload (self-consistency). Source-ref resolution and observation-payload
+    // matching against committed source files are verified separately by the
+    // parent/test with full filesystem access.
+    if (e.sourceDigest !== canonicalDigest(e.observationPayload)) {
       errors.push(reject("bad-source-digest", `evidence ${e.evidenceId} sourceDigest mismatch`));
     }
     let ids = criterionToEvidenceIds.get(e.criterionId);
@@ -158,6 +183,19 @@ function validatePacket(packet: EvidencePacket): BaselineError[] {
       criterionToEvidenceIds.set(e.criterionId, ids);
     }
     ids.add(e.evidenceId);
+
+    // Track request-ID inventory per criterion for exact-coverage validation.
+    const requestId = e.observationPayload?.requestId;
+    if (typeof requestId === "string") {
+      let inv = criterionRequestInventory.get(e.criterionId);
+      if (!inv) {
+        inv = new Map();
+        criterionRequestInventory.set(e.criterionId, inv);
+      }
+      const entries = inv.get(requestId) ?? [];
+      entries.push(e.evidenceId);
+      inv.set(requestId, entries);
+    }
   }
 
   // criterionChecks must correspond exactly to actual Evidence IDs per criterion.
@@ -176,43 +214,113 @@ function validatePacket(packet: EvidencePacket): BaselineError[] {
     }
   }
 
+  // Exact criterion-to-request coverage: required request-ID set must match
+  // exactly, with no duplicates, no missing, no unexpected, no wrong criterion.
+  for (const cr of CRITERIA) {
+    const required = FROZEN_CRITERION_CHECKS[cr] ?? [];
+    const inv = criterionRequestInventory.get(cr) ?? new Map();
+    const observedRequestIds = new Set(inv.keys());
+
+    // Missing required request IDs.
+    for (const reqId of required) {
+      if (!observedRequestIds.has(reqId)) {
+        errors.push(
+          reject(
+            "missing-request-observation",
+            `criterion ${cr} missing required observation for request ${reqId}`,
+          ),
+        );
+      }
+    }
+    // Unexpected request IDs (not in the required set).
+    for (const reqId of observedRequestIds) {
+      if (!required.includes(reqId as never)) {
+        errors.push(
+          reject(
+            "unexpected-request-observation",
+            `criterion ${cr} has unexpected observation for request ${reqId}`,
+          ),
+        );
+      }
+    }
+    // Duplicate observations for the same request ID (different evidence IDs).
+    for (const [reqId, entries] of inv) {
+      if (entries.length > 1) {
+        errors.push(
+          reject(
+            "duplicate-request-observation",
+            `criterion ${cr} has ${entries.length} observations for request ${reqId}: ${entries.join(", ")}`,
+          ),
+        );
+      }
+    }
+  }
+
   return errors;
 }
 
 function scoreCriterion(cr: CriterionId, packet: EvidencePacket): BaselineCriterionResult {
   const items = packet.evidence.filter((e) => e.criterionId === cr);
-  const applicableFresh = items.filter(
-    (e) => e.applicability === "applicable" && e.freshness === "fresh",
-  );
-  const contradictions = applicableFresh.filter((e) => e.observation === "fail");
-  const passes = applicableFresh.filter((e) => e.observation === "pass");
   const required = FROZEN_CRITERION_CHECKS[cr] ?? [];
-  const requiredCount = required.length;
+
+  // Map each required request to its observation, using exact coverage.
+  const observationsByRequest = new Map<string, { observation: string; evidenceId: string }>();
+  for (const e of items) {
+    const reqId = e.observationPayload?.requestId;
+    if (typeof reqId === "string") {
+      observationsByRequest.set(reqId, {
+        observation: e.observation,
+        evidenceId: e.evidenceId,
+      });
+    }
+  }
+
+  const contradictions: string[] = [];
+  const passes: string[] = [];
+  const unavailableOrMissing: string[] = [];
+
+  for (const reqId of required) {
+    const obs = observationsByRequest.get(reqId);
+    if (!obs) {
+      unavailableOrMissing.push(reqId);
+      continue;
+    }
+    if (obs.observation === "fail") {
+      contradictions.push(obs.evidenceId);
+    } else if (obs.observation === "pass") {
+      passes.push(obs.evidenceId);
+    } else {
+      // unavailable (or any non-pass/non-fail) → insufficient, unresolved.
+      unavailableOrMissing.push(obs.evidenceId);
+    }
+  }
+
+  // Also count non-required-request items as unavailable for the criterion.
+  const extraItems = items.filter(
+    (e) => {
+      const reqId = e.observationPayload?.requestId;
+      return typeof reqId !== "string" || !required.includes(reqId as never);
+    },
+  );
+  for (const e of extraItems) {
+    unavailableOrMissing.push(e.evidenceId);
+  }
 
   let outcome: BaselineOutcome;
   let rationale: string;
 
   if (contradictions.length > 0) {
     outcome = "violated";
-    rationale = `Applicable observed violation(s): ${contradictions
-      .map((e) => e.evidenceId)
-      .join(", ")}.`;
+    rationale = `Applicable observed violation(s): ${contradictions.join(", ")}.`;
   } else if (
-    applicableFresh.length > 0 &&
-    passes.length === applicableFresh.length &&
-    applicableFresh.length >= requiredCount
+    passes.length === required.length &&
+    unavailableOrMissing.length === 0
   ) {
     outcome = "satisfied";
-    rationale = `All required applicable fresh observations pass: ${passes
-      .map((e) => e.evidenceId)
-      .join(", ")}.`;
+    rationale = `All required applicable fresh observations pass: ${passes.join(", ")}.`;
   } else {
-    const unavailable = items.filter(
-      (e) =>
-        e.observation === "unavailable" || e.freshness === "stale" || e.applicability === "inapplicable",
-    );
-    rationale = `Insufficient/unavailable/stale/inapplicable evidence; required=${requiredCount}, passes=${passes.length}, contradictions=${contradictions.length}, unavailable=${unavailable.length}.`;
     outcome = "unresolved";
+    rationale = `Insufficient/unavailable/missing evidence; required=${required.length}, passes=${passes.length}, contradictions=${contradictions.length}, missing/unavailable=${unavailableOrMissing.length}.`;
   }
 
   return {
@@ -241,7 +349,6 @@ export function runBaseline(options: RunBaselineOptions): BaselineResult {
         rejectionErrors: validationErrors,
       };
     }
-    // Non-rejecting mode: still score what can be scored, marking unresolved.
   }
 
   const outcomes = CRITERIA.map((cr) => scoreCriterion(cr, packet));

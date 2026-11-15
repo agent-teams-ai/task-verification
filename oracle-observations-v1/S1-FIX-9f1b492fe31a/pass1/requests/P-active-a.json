@@ -1,0 +1,14 @@
+{
+  "requestId": "P-active-a",
+  "statusCode": 200,
+  "body": {
+    "id": "caller-a",
+    "email": "caller-a@example.example"
+  },
+  "profileFieldsPresent": [
+    "id",
+    "email"
+  ],
+  "deniedFieldsPresent": [],
+  "available": true
+}
