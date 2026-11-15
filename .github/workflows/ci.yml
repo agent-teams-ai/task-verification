@@ -2,9 +2,9 @@ name: M2-A deterministic checks
 
 on:
   push:
-    branches: [feat/m2-a-foundation-fixture-oracle]
+    branches: [feat/m2-a-foundation-fixture-oracle, feat/m2-b-truth-evidence]
   pull_request:
-    branches: [research/milestone-1-experiment-plan-2026-11-12]
+    branches: [research/milestone-1-experiment-plan-2026-11-12, feat/m2-a-foundation-fixture-oracle]
 
 permissions:
   contents: read
