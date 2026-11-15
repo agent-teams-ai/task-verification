@@ -827,6 +827,114 @@ test("WP4: missing versus failed observation distinction", () => {
   assert.equal(failedResult.outcomes.find((o) => o.criterionId === "AC-2")?.outcome, "violated", "failed observation must be violated");
 });
 
+test("WP4: freshness/applicability — all required AC-1 fresh applicable pass → satisfied", async () => {
+  const dir = await freshPackets(path.join(ROOT, ".isolation-tmp", "wp4-fa-sat"));
+  const p = structuredClone(loadPacket(anonFor("S1-C1"), dir));
+  const res = runBaseline({ packet: p, rejectMalformed: true });
+  assert.equal(res.rejected, false);
+  assert.equal(res.outcomes.find((o) => o.criterionId === "AC-1")?.outcome, "satisfied");
+});
+
+test("WP4: freshness/applicability — stale pass on P-active-a does not satisfy", async () => {
+  const dir = await freshPackets(path.join(ROOT, ".isolation-tmp", "wp4-fa-stale-pass"));
+  const p = structuredClone(loadPacket(anonFor("S1-C1"), dir));
+  p.evidence.find((e) => e.evidenceId.includes("AC-1-P-active-a"))!.freshness = "stale";
+  const res = runBaseline({ packet: p, rejectMalformed: true });
+  assert.equal(res.rejected, false);
+  assert.equal(res.outcomes.find((o) => o.criterionId === "AC-1")?.outcome, "unresolved");
+});
+
+test("WP4: freshness/applicability — inapplicable pass on P-active-a does not satisfy", async () => {
+  const dir = await freshPackets(path.join(ROOT, ".isolation-tmp", "wp4-fa-inapp-pass"));
+  const p = structuredClone(loadPacket(anonFor("S1-C1"), dir));
+  p.evidence.find((e) => e.evidenceId.includes("AC-1-P-active-a"))!.applicability = "inapplicable";
+  const res = runBaseline({ packet: p, rejectMalformed: true });
+  assert.equal(res.rejected, false);
+  assert.equal(res.outcomes.find((o) => o.criterionId === "AC-1")?.outcome, "unresolved");
+});
+
+test("WP4: freshness/applicability — stale fail on P-active-a does not create violation", async () => {
+  const dir = await freshPackets(path.join(ROOT, ".isolation-tmp", "wp4-fa-stale-fail"));
+  const p = structuredClone(loadPacket(anonFor("S1-C1"), dir));
+  const item = p.evidence.find((e) => e.evidenceId.includes("AC-1-P-active-a"))!;
+  item.observation = "fail";
+  item.freshness = "stale";
+  const res = runBaseline({ packet: p, rejectMalformed: true });
+  assert.equal(res.rejected, false);
+  assert.equal(res.outcomes.find((o) => o.criterionId === "AC-1")?.outcome, "unresolved");
+});
+
+test("WP4: freshness/applicability — inapplicable fail on P-active-a does not create violation", async () => {
+  const dir = await freshPackets(path.join(ROOT, ".isolation-tmp", "wp4-fa-inapp-fail"));
+  const p = structuredClone(loadPacket(anonFor("S1-C1"), dir));
+  const item = p.evidence.find((e) => e.evidenceId.includes("AC-1-P-active-a"))!;
+  item.observation = "fail";
+  item.applicability = "inapplicable";
+  const res = runBaseline({ packet: p, rejectMalformed: true });
+  assert.equal(res.rejected, false);
+  assert.equal(res.outcomes.find((o) => o.criterionId === "AC-1")?.outcome, "unresolved");
+});
+
+test("WP4: freshness/applicability — fresh applicable failure plus stale second observation → violated", async () => {
+  const dir = await freshPackets(path.join(ROOT, ".isolation-tmp", "wp4-fa-violated-stale"));
+  const p = structuredClone(loadPacket(anonFor("S1-C1"), dir));
+  // Make P-active-a a fresh applicable failure.
+  const a = p.evidence.find((e) => e.evidenceId.includes("AC-1-P-active-a"))!;
+  a.observation = "fail";
+  a.applicability = "applicable";
+  a.freshness = "fresh";
+  // Make P-active-b stale but passing.
+  const b = p.evidence.find((e) => e.evidenceId.includes("AC-1-P-active-b"))!;
+  b.freshness = "stale";
+  const res = runBaseline({ packet: p, rejectMalformed: true });
+  assert.equal(res.rejected, false);
+  assert.equal(res.outcomes.find((o) => o.criterionId === "AC-1")?.outcome, "violated");
+});
+
+test("WP4: freshness/applicability — fresh applicable AC-3 failure → violated", async () => {
+  const dir = await freshPackets(path.join(ROOT, ".isolation-tmp", "wp4-fa-ac3"));
+  const p = structuredClone(loadPacket(anonFor("S1-C3"), dir));
+  const res = runBaseline({ packet: p, rejectMalformed: true });
+  assert.equal(res.rejected, false);
+  assert.equal(res.outcomes.find((o) => o.criterionId === "AC-3")?.outcome, "violated");
+});
+
+test("WP4: freshness/applicability — fresh pass plus unavailable required → unresolved", async () => {
+  const dir = await freshPackets(path.join(ROOT, ".isolation-tmp", "wp4-fa-unavail"));
+  const p = structuredClone(loadPacket(anonFor("S1-C1"), dir));
+  // Remove P-active-b evidence entirely → missing → unresolved.
+  p.evidence = p.evidence.filter((e) => !e.evidenceId.includes("AC-1-P-active-b"));
+  p.criterionChecks["AC-1"] = p.criterionChecks["AC-1"].filter((id) => !id.includes("P-active-b"));
+  const res = runBaseline({ packet: p, rejectMalformed: false });
+  assert.equal(res.outcomes.find((o) => o.criterionId === "AC-1")?.outcome, "unresolved");
+});
+
+test("WP4: freshness/applicability — all five criteria complete fresh applicable pass → satisfied", async () => {
+  const dir = await freshPackets(path.join(ROOT, ".isolation-tmp", "wp4-fa-all"));
+  const p = structuredClone(loadPacket(anonFor("S1-C1"), dir));
+  const res = runBaseline({ packet: p, rejectMalformed: true });
+  assert.equal(res.rejected, false);
+  for (const cr of CRITERIA) {
+    assert.equal(res.outcomes.find((o) => o.criterionId === cr)?.outcome, "satisfied", `${cr} should be satisfied`);
+  }
+});
+
+test("WP4: freshness/applicability — stale/inapplicable observation stays in diagnostics", async () => {
+  const dir = await freshPackets(path.join(ROOT, ".isolation-tmp", "wp4-fa-diag"));
+  const p = structuredClone(loadPacket(anonFor("S1-C1"), dir));
+  const item = p.evidence.find((e) => e.evidenceId.includes("AC-1-P-active-a"))!;
+  item.freshness = "stale";
+  const res = runBaseline({ packet: p, rejectMalformed: true });
+  assert.equal(res.rejected, false);
+  const ac1 = res.outcomes.find((o) => o.criterionId === "AC-1")!;
+  assert.equal(ac1.outcome, "unresolved");
+  // The stale observation must remain visible in evidenceRefs.
+  assert.ok(ac1.evidenceRefs.includes(item.evidenceId), "stale observation must remain in evidenceRefs");
+  // The rationale must mention the excluded observation.
+  assert.ok(ac1.rationale.includes("Excluded observations"), "rationale must mention excluded observations");
+  assert.ok(ac1.rationale.includes(item.evidenceId), "rationale must name the excluded evidence item");
+});
+
 test("WP4: baseline cannot read truth or scorer internals (static)", () => {
   const bl = fs.readFileSync(path.join(ROOT, "src", "baseline.ts"), "utf8");
   assert.ok(!bl.includes("loadTruth"), "baseline must not load truth");

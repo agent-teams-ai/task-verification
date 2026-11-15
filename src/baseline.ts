@@ -263,20 +263,26 @@ function scoreCriterion(cr: CriterionId, packet: EvidencePacket): BaselineCriter
   const items = packet.evidence.filter((e) => e.criterionId === cr);
   const required = FROZEN_CRITERION_CHECKS[cr] ?? [];
 
-  // Map each required request to its observation, using exact coverage.
-  const observationsByRequest = new Map<string, { observation: string; evidenceId: string }>();
+  // Map each required request to its observation, including admission dimensions.
+  const observationsByRequest = new Map<
+    string,
+    { observation: string; evidenceId: string; applicability: string; freshness: string }
+  >();
   for (const e of items) {
     const reqId = e.observationPayload?.requestId;
     if (typeof reqId === "string") {
       observationsByRequest.set(reqId, {
         observation: e.observation,
         evidenceId: e.evidenceId,
+        applicability: e.applicability,
+        freshness: e.freshness,
       });
     }
   }
 
-  const contradictions: string[] = [];
-  const passes: string[] = [];
+  const contradictions: string[] = []; // valid fresh applicable failures
+  const passes: string[] = []; // valid fresh applicable passes
+  const excluded: { evidenceId: string; reason: string }[] = []; // stale/inapplicable/unavailable/missing
   const unavailableOrMissing: string[] = [];
 
   for (const reqId of required) {
@@ -285,24 +291,42 @@ function scoreCriterion(cr: CriterionId, packet: EvidencePacket): BaselineCriter
       unavailableOrMissing.push(reqId);
       continue;
     }
+    // Stale observations are insufficient regardless of pass/fail.
+    if (obs.freshness !== "fresh") {
+      excluded.push({ evidenceId: obs.evidenceId, reason: `stale (${obs.freshness})` });
+      unavailableOrMissing.push(obs.evidenceId);
+      continue;
+    }
+    // Inapplicable observations are insufficient regardless of pass/fail.
+    if (obs.applicability !== "applicable") {
+      excluded.push({ evidenceId: obs.evidenceId, reason: `inapplicable (${obs.applicability})` });
+      unavailableOrMissing.push(obs.evidenceId);
+      continue;
+    }
+    // Unavailable observations are insufficient.
+    if (obs.observation === "unavailable") {
+      excluded.push({ evidenceId: obs.evidenceId, reason: "unavailable" });
+      unavailableOrMissing.push(obs.evidenceId);
+      continue;
+    }
+    // Valid fresh applicable observations.
     if (obs.observation === "fail") {
       contradictions.push(obs.evidenceId);
     } else if (obs.observation === "pass") {
       passes.push(obs.evidenceId);
     } else {
-      // unavailable (or any non-pass/non-fail) → insufficient, unresolved.
+      excluded.push({ evidenceId: obs.evidenceId, reason: `unknown status (${obs.observation})` });
       unavailableOrMissing.push(obs.evidenceId);
     }
   }
 
-  // Also count non-required-request items as unavailable for the criterion.
-  const extraItems = items.filter(
-    (e) => {
-      const reqId = e.observationPayload?.requestId;
-      return typeof reqId !== "string" || !required.includes(reqId as never);
-    },
-  );
+  // Also count non-required-request items as excluded for the criterion.
+  const extraItems = items.filter((e) => {
+    const reqId = e.observationPayload?.requestId;
+    return typeof reqId !== "string" || !required.includes(reqId as never);
+  });
   for (const e of extraItems) {
+    excluded.push({ evidenceId: e.evidenceId, reason: "unexpected request ID" });
     unavailableOrMissing.push(e.evidenceId);
   }
 
@@ -320,7 +344,16 @@ function scoreCriterion(cr: CriterionId, packet: EvidencePacket): BaselineCriter
     rationale = `All required applicable fresh observations pass: ${passes.join(", ")}.`;
   } else {
     outcome = "unresolved";
-    rationale = `Insufficient/unavailable/missing evidence; required=${required.length}, passes=${passes.length}, contradictions=${contradictions.length}, missing/unavailable=${unavailableOrMissing.length}.`;
+    const parts: string[] = [];
+    if (excluded.length > 0) {
+      parts.push(
+        `Excluded observations: ${excluded.map((x) => `${x.evidenceId} (${x.reason})`).join(", ")}.`,
+      );
+    }
+    if (unavailableOrMissing.length > 0) {
+      parts.push(`Insufficient/missing: ${unavailableOrMissing.join(", ")}.`);
+    }
+    rationale = `Insufficient/unavailable/stale/inapplicable evidence; required=${required.length}, valid passes=${passes.length}, valid violations=${contradictions.length}. ${parts.join(" ")}`.trim();
   }
 
   return {
@@ -328,6 +361,7 @@ function scoreCriterion(cr: CriterionId, packet: EvidencePacket): BaselineCriter
     outcome,
     rationale,
     evidenceRefs: items.map((e) => e.evidenceId),
+    errors: excluded.length > 0 ? excluded.map((x) => ({ code: "excluded-observation", message: x.reason, detail: x.evidenceId })) : undefined,
   };
 }
 
