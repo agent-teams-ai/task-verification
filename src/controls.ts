@@ -87,3 +87,49 @@ export function ct3Evaluate(
     cancelledNeverCurrent: !isAssessmentCurrentForCriteria(cancelledAssessment, v3Revision.revisionId),
   };
 }
+
+// --- Shared consumer admission function ---
+
+export interface AdmissionDecision {
+  admitted: boolean;
+  reason: string;
+  criteriaMatch: boolean;
+  snapshotMatch: boolean;
+  lifecycleValid: boolean;
+  coverageComplete: boolean;
+  evidenceApplicable: boolean;
+}
+
+export function consumerAdmit(
+  assessment: AssessmentBinding,
+  currentCriteriaRevision: CriteriaRevision,
+  currentSnapshot: string,
+  expectedCriterionIds: string[],
+  evidenceApplicable: boolean,
+  cancelledOrSuperseded: boolean,
+): AdmissionDecision {
+  const criteriaMatch = assessment.criteriaRevision === currentCriteriaRevision.revisionId;
+  const snapshotMatch = assessment.candidateSnapshot === currentSnapshot;
+  const lifecycleValid = !cancelledOrSuperseded;
+  const coverageComplete = expectedCriterionIds.length > 0;
+  const evidenceApp = evidenceApplicable;
+
+  const admitted = criteriaMatch && snapshotMatch && lifecycleValid && coverageComplete && evidenceApp;
+
+  let reason = "admitted";
+  if (!criteriaMatch) reason = "criteria revision mismatch";
+  else if (!snapshotMatch) reason = "snapshot mismatch";
+  else if (!lifecycleValid) reason = "cancelled or superseded";
+  else if (!coverageComplete) reason = "incomplete coverage";
+  else if (!evidenceApp) reason = "evidence not applicable";
+
+  return {
+    admitted,
+    reason,
+    criteriaMatch,
+    snapshotMatch,
+    lifecycleValid,
+    coverageComplete,
+    evidenceApplicable: evidenceApp,
+  };
+}

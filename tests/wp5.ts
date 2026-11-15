@@ -2,6 +2,20 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { computeCoverage, buildResultContract, validateResultContract } from "../src/result-contract.ts";
 import { scoreResult, evaluateRubric, isReferenceSupporting, SCORER_VERSION, RUBRIC_VERSION } from "../src/scorer.ts";
+import type { TruthBinding } from "../src/scorer.ts";
+
+function makeTruthBinding(rc: any, truthOutcomes: Record<string, boolean>): TruthBinding {
+  return {
+    canonicalCandidateId: rc.candidate.repositoryMaterializationId,
+    anonymizedCandidateId: rc.candidate.opaqueFixtureId,
+    headApplicationDigest: rc.candidate.runtimeSnapshotDigest,
+    criteriaRevision: rc.criteria.authoredCriteriaRevision,
+    expectedCriterionInventory: rc.criteria.expectedCriterionIds,
+    truthVersion: "truth-v1",
+    truthDigest: "digest",
+    truthOutcomes,
+  };
+}
 
 test("WP5: result contract validates", () => {
   const rc = buildResultContract({
@@ -105,7 +119,7 @@ test("WP5: scorer separates label agreement, reference validity and semantic sup
   const rubrics: Record<string, import("../src/scorer.ts").RubricDecision> = {
     "ref-1": { referenceExists: true, tiedToCandidate: true, supportsBehavior: false, coversSubclauses: false, relevantCurrentApplicable: true, contradictsClaim: false },
   };
-  const result = scoreResult({ resultContract: rc, truthCandidateId: "S1-C1", truthOutcomes: truth, referenceRubrics: rubrics });
+  const result = scoreResult({ resultContract: rc, truthBinding: makeTruthBinding(rc, truth), referenceRubrics: rubrics });
   // Label agreement: AC-1 satisfied, truth true → agrees.
   assert.equal(result.labelAgreement[0].agrees, true);
   // Reference validity: ref-1 exists and tied → valid.
@@ -133,7 +147,7 @@ test("WP5: correct label with irrelevant reference is not supported", () => {
   const rubrics: Record<string, import("../src/scorer.ts").RubricDecision> = {
     "irrelevant-ref": { referenceExists: true, tiedToCandidate: true, supportsBehavior: false, coversSubclauses: false, relevantCurrentApplicable: true, contradictsClaim: false },
   };
-  const result = scoreResult({ resultContract: rc, truthCandidateId: "S1-C1", truthOutcomes: { "AC-1": true }, referenceRubrics: rubrics });
+  const result = scoreResult({ resultContract: rc, truthBinding: makeTruthBinding(rc, { "AC-1": true }), referenceRubrics: rubrics });
   assert.equal(result.labelAgreement[0].agrees, true, "label should agree");
   assert.equal(result.semanticSupport[0].supporting, false, "irrelevant ref should not support");
 });
@@ -153,7 +167,7 @@ test("WP5: empty references remain unsupported", () => {
     usage: { inputTokens: null, outputTokens: null, totalTokens: null, durationMs: null, cost: null, currency: null, requestedModel: null, observedModel: null, capacityObservations: [] },
     capacity: { durableFactCapacity: null, retentionPolicy: null },
   });
-  const result = scoreResult({ resultContract: rc, truthCandidateId: "S1-C1", truthOutcomes: { "AC-1": true }, referenceRubrics: {} });
+  const result = scoreResult({ resultContract: rc, truthBinding: makeTruthBinding(rc, { "AC-1": true }), referenceRubrics: {} });
   assert.equal(result.diagnostics.some((d) => d.includes("no references")), true, "empty refs should be flagged");
 });
 
@@ -173,10 +187,12 @@ test("WP5: false satisfaction and false violation are recorded", () => {
     capacity: { durableFactCapacity: null, retentionPolicy: null },
   });
   // False satisfaction: admitted satisfied, truth false.
-  const falseSat = scoreResult({ resultContract: makeRc("satisfied"), truthCandidateId: "S1-C3", truthOutcomes: { "AC-1": false }, referenceRubrics: {} });
+  const rcSat = makeRc("satisfied");
+  const falseSat = scoreResult({ resultContract: rcSat, truthBinding: makeTruthBinding(rcSat, { "AC-1": false }), referenceRubrics: {} });
   assert.equal(falseSat.labelAgreement[0].agrees, false, "false satisfaction must be recorded");
   // False violation: admitted violated, truth true.
-  const falseVio = scoreResult({ resultContract: makeRc("violated"), truthCandidateId: "S1-C1", truthOutcomes: { "AC-1": true }, referenceRubrics: {} });
+  const rcVio = makeRc("violated");
+  const falseVio = scoreResult({ resultContract: rcVio, truthBinding: makeTruthBinding(rcVio, { "AC-1": true }), referenceRubrics: {} });
   assert.equal(falseVio.labelAgreement[0].agrees, false, "false violation must be recorded");
 });
 
@@ -188,13 +204,13 @@ test("WP5: missing/duplicate/unknown/invalid IDs are separate diagnostics", () =
   assert.equal(coverage.wholeInventoryAdmitted, false);
 });
 
-test("WP5: failed/unknown execution does not acquire invented semantic verdict", () => {
+test("WP5: failed execution preserves claim and suspends verdict", () => {
   const rc = buildResultContract({
     subject: { fixtureTaskId: "task-1", expectedSubjectInventory: ["AC-1"] },
     candidate: { repositoryMaterializationId: "S1-FIX-5ba5153fec57", baseTreeIdentity: "b", headTreeIdentity: "h", runtimeSnapshotDigest: "d", opaqueFixtureId: "o" },
     criteria: { authoredCriteriaRevision: "crit-v1", criteriaTextDigest: "d", expectedCriterionIds: ["AC-1"], criterionToCheckMapping: {}, policyVersion: "v1", policyDigest: "pd" },
     profile: { profileId: "pb", configurationIdentity: "c", promptIdentity: "p", inputIdentity: "i", requestedModel: null, observedModel: null, reasoningConfiguration: {}, adapterEntryIdentity: "a" },
-    assessments: [{ expectedCriterionId: "AC-1", present: true, originalReportedClaim: "satisfied", admittedConclusion: "satisfied", references: [], explanation: null, diagnostics: [] }],
+    assessments: [{ expectedCriterionId: "AC-1", present: true, originalReportedClaim: "this is a violated claim with details", admittedConclusion: "violated", references: [], explanation: null, diagnostics: [] }],
     findings: [],
     coverage: computeCoverage(["AC-1"], ["AC-1"]),
     execution: { state: "failed", slotId: "s", runId: "r", attemptId: "a", requestId: "req", sdkEffectCode: "SDK_FAIL", diagnostics: ["error"], pendingEffects: [], cleanupStatus: "clean" },
@@ -203,8 +219,40 @@ test("WP5: failed/unknown execution does not acquire invented semantic verdict",
     usage: { inputTokens: null, outputTokens: null, totalTokens: null, durationMs: null, cost: null, currency: null, requestedModel: null, observedModel: null, capacityObservations: [] },
     capacity: { durableFactCapacity: null, retentionPolicy: null },
   });
-  const result = scoreResult({ resultContract: rc, truthCandidateId: "S1-C1", truthOutcomes: { "AC-1": true }, referenceRubrics: {} });
+  // Use executionBinding "preserve-claim" to retain the original claim.
+  const result = scoreResult({ resultContract: rc, truthBinding: makeTruthBinding(rc, { "AC-1": true }), referenceRubrics: {}, executionBinding: "preserve-claim" });
+  // Verdict should be suspended (null), not invented.
+  assert.equal(result.labelAgreement[0].agrees, null, "failed execution verdict must be suspended, not invented");
+  // Original claim must be preserved as a reported-claim observation.
+  assert.equal(result.labelAgreement[0].admittedConclusion, "violated", "admitted conclusion preserved");
+  // Diagnostic must record the execution failure.
   assert.ok(result.diagnostics.some((d) => d.includes("execution failed")), "failed execution must be diagnosed");
+  // Original claim must not be overwritten.
+  assert.equal(rc.assessments[0].originalReportedClaim, "this is a violated claim with details");
+});
+
+test("WP5: unknown execution preserves claim and suspends verdict", () => {
+  const rc = buildResultContract({
+    subject: { fixtureTaskId: "task-1", expectedSubjectInventory: ["AC-1"] },
+    candidate: { repositoryMaterializationId: "S1-FIX-5ba5153fec57", baseTreeIdentity: "b", headTreeIdentity: "h", runtimeSnapshotDigest: "d", opaqueFixtureId: "o" },
+    criteria: { authoredCriteriaRevision: "crit-v1", criteriaTextDigest: "d", expectedCriterionIds: ["AC-1"], criterionToCheckMapping: {}, policyVersion: "v1", policyDigest: "pd" },
+    profile: { profileId: "pb", configurationIdentity: "c", promptIdentity: "p", inputIdentity: "i", requestedModel: null, observedModel: null, reasoningConfiguration: {}, adapterEntryIdentity: "a" },
+    assessments: [{ expectedCriterionId: "AC-1", present: true, originalReportedClaim: "unclear claim", admittedConclusion: "inconclusive", references: [], explanation: null, diagnostics: [] }],
+    findings: [],
+    coverage: computeCoverage(["AC-1"], ["AC-1"]),
+    execution: { state: "unknown", slotId: "s", runId: "r", attemptId: "a", requestId: "req", sdkEffectCode: null, diagnostics: [], pendingEffects: [], cleanupStatus: "clean" },
+    rawArtifact: { available: true, rawText: "raw", rawBytesDigest: "d", rawUnavailableCause: null },
+    evidence: { producer: "p", candidateBinding: "c", checkDefinition: "cd", inputScope: "is", environment: "e", observationOutcome: "pass", completeness: "complete", timestamps: [], references: [], applicability: "applicable", provenance: "prov" },
+    usage: { inputTokens: null, outputTokens: null, totalTokens: null, durationMs: null, cost: null, currency: null, requestedModel: null, observedModel: null, capacityObservations: [] },
+    capacity: { durableFactCapacity: null, retentionPolicy: null },
+  });
+  const result = scoreResult({ resultContract: rc, truthBinding: makeTruthBinding(rc, { "AC-1": true }), referenceRubrics: {}, executionBinding: "preserve-claim" });
+  // Verdict suspended for unknown execution.
+  assert.equal(result.labelAgreement[0].agrees, null, "unknown execution verdict must be suspended");
+  // Original claim preserved.
+  assert.equal(result.labelAgreement[0].admittedConclusion, "inconclusive", "admitted conclusion preserved");
+  // Diagnostic must record the execution state.
+  assert.ok(result.diagnostics.some((d) => d.includes("execution unknown")), "unknown execution must be diagnosed");
 });
 
 test("WP5: original claim is never overwritten", () => {
@@ -223,7 +271,7 @@ test("WP5: original claim is never overwritten", () => {
     capacity: { durableFactCapacity: null, retentionPolicy: null },
   });
   assert.equal(rc.assessments[0].originalReportedClaim, "this is a violated claim with details");
-  const result = scoreResult({ resultContract: rc, truthCandidateId: "S1-C1", truthOutcomes: { "AC-1": true }, referenceRubrics: {} });
+  const result = scoreResult({ resultContract: rc, truthBinding: makeTruthBinding(rc, { "AC-1": true }), referenceRubrics: {} });
   assert.equal(result.polarityPreserved, true);
 });
 
@@ -234,4 +282,193 @@ test("WP5: rubric version and scorer version are stable", () => {
   assert.equal(isReferenceSupporting(r), true);
   const r2 = evaluateRubric({ referenceExists: true, tiedToCandidate: true, supportsBehavior: true, coversSubclauses: false, relevantCurrentApplicable: true, contradictsClaim: false });
   assert.equal(isReferenceSupporting(r2), false, "partial subclause coverage should not support");
+});
+
+// Profile A finding scoring tests.
+test("WP5: Profile A finding mapped to truth-violated criterion is supported detection", () => {
+  const rc = buildResultContract({
+    subject: { fixtureTaskId: "task-1", expectedSubjectInventory: ["AC-1"] },
+    candidate: { repositoryMaterializationId: "S1-FIX-5ba5153fec57", baseTreeIdentity: "b", headTreeIdentity: "h", runtimeSnapshotDigest: "d", opaqueFixtureId: "o" },
+    criteria: { authoredCriteriaRevision: "crit-v1", criteriaTextDigest: "d", expectedCriterionIds: ["AC-1"], criterionToCheckMapping: {}, policyVersion: "v1", policyDigest: "pd" },
+    profile: { profileId: "pb", configurationIdentity: "c", promptIdentity: "p", inputIdentity: "i", requestedModel: null, observedModel: null, reasoningConfiguration: {}, adapterEntryIdentity: "a" },
+    assessments: [{ expectedCriterionId: "AC-1", present: true, originalReportedClaim: "satisfied", admittedConclusion: "satisfied", references: [], explanation: null, diagnostics: [] }],
+    findings: [
+      {
+        nativeComment: "finding-AC-1-violated",
+        normalizedFinding: "AC-1 fails under load",
+        skipped: false,
+        skipReason: null,
+        qualityFlags: [],
+        criterionMapping: "AC-1",
+      },
+    ],
+    coverage: computeCoverage(["AC-1"], ["AC-1"]),
+    execution: { state: "completed", slotId: "s", runId: "r", attemptId: "a", requestId: "req", sdkEffectCode: null, diagnostics: [], pendingEffects: [], cleanupStatus: "clean" },
+    rawArtifact: { available: true, rawText: "raw", rawBytesDigest: "d", rawUnavailableCause: null },
+    evidence: { producer: "p", candidateBinding: "c", checkDefinition: "cd", inputScope: "is", environment: "e", observationOutcome: "pass", completeness: "complete", timestamps: [], references: [], applicability: "applicable", provenance: "prov" },
+    usage: { inputTokens: null, outputTokens: null, totalTokens: null, durationMs: null, cost: null, currency: null, requestedModel: null, observedModel: null, capacityObservations: [] },
+    capacity: { durableFactCapacity: null, retentionPolicy: null },
+  });
+  // truthOutcomes: { "AC-1": false } means the criterion is violated (not satisfied).
+  const result = scoreResult({ resultContract: rc, truthBinding: makeTruthBinding(rc, { "AC-1": false }), referenceRubrics: {}, executionBinding: "preserve-claim" });
+  // Finding mapped to truth-violated criterion → supported detection.
+  const finding = result.profileA.findings[0];
+  assert.equal(finding.mappingStatus, "mapped", "finding should be mapped to AC-1");
+  assert.equal(finding.truthComparison, "matches", "finding on violated criterion should match");
+  assert.equal(finding.semanticSupport, "supported", "finding on violated criterion should be supported detection");
+  assert.equal(result.profileA.summary.mapped, 1, "one mapped finding");
+  assert.equal(result.profileA.summary.outOfScope, 0, "no out-of-scope findings");
+});
+
+test("WP5: Profile A finding mapped to truth-satisfied criterion is false allegation", () => {
+  const rc = buildResultContract({
+    subject: { fixtureTaskId: "task-1", expectedSubjectInventory: ["AC-1"] },
+    candidate: { repositoryMaterializationId: "S1-FIX-5ba5153fec57", baseTreeIdentity: "b", headTreeIdentity: "h", runtimeSnapshotDigest: "d", opaqueFixtureId: "o" },
+    criteria: { authoredCriteriaRevision: "crit-v1", criteriaTextDigest: "d", expectedCriterionIds: ["AC-1"], criterionToCheckMapping: {}, policyVersion: "v1", policyDigest: "pd" },
+    profile: { profileId: "pb", configurationIdentity: "c", promptIdentity: "p", inputIdentity: "i", requestedModel: null, observedModel: null, reasoningConfiguration: {}, adapterEntryIdentity: "a" },
+    assessments: [{ expectedCriterionId: "AC-1", present: true, originalReportedClaim: "satisfied", admittedConclusion: "satisfied", references: [], explanation: null, diagnostics: [] }],
+    findings: [
+      {
+        nativeComment: "finding-AC-1-satisfied",
+        normalizedFinding: "AC-1 works correctly",
+        skipped: false,
+        skipReason: null,
+        qualityFlags: [],
+        criterionMapping: "AC-1",
+      },
+    ],
+    coverage: computeCoverage(["AC-1"], ["AC-1"]),
+    execution: { state: "completed", slotId: "s", runId: "r", attemptId: "a", requestId: "req", sdkEffectCode: null, diagnostics: [], pendingEffects: [], cleanupStatus: "clean" },
+    rawArtifact: { available: true, rawText: "raw", rawBytesDigest: "d", rawUnavailableCause: null },
+    evidence: { producer: "p", candidateBinding: "c", checkDefinition: "cd", inputScope: "is", environment: "e", observationOutcome: "pass", completeness: "complete", timestamps: [], references: [], applicability: "applicable", provenance: "prov" },
+    usage: { inputTokens: null, outputTokens: null, totalTokens: null, durationMs: null, cost: null, currency: null, requestedModel: null, observedModel: null, capacityObservations: [] },
+    capacity: { durableFactCapacity: null, retentionPolicy: null },
+  });
+  const result = scoreResult({ resultContract: rc, truthBinding: makeTruthBinding(rc, { "AC-1": true }), referenceRubrics: {}, executionBinding: "preserve-claim" });
+  // Finding mapped to truth-satisfied criterion → false allegation.
+  const finding = result.profileA.findings[0];
+  assert.equal(finding.mappingStatus, "mapped", "finding should be mapped to AC-1");
+  assert.equal(finding.truthComparison, "contradicts", "finding on satisfied criterion should contradict (false allegation)");
+  assert.equal(finding.semanticSupport, "unsupported", "finding on satisfied criterion should be unsupported");
+  assert.equal(result.profileA.summary.mapped, 1, "one mapped finding");
+});
+
+test("WP5: Profile A unmapped genuine finding remains visible", () => {
+  const rc = buildResultContract({
+    subject: { fixtureTaskId: "task-1", expectedSubjectInventory: ["AC-1"] },
+    candidate: { repositoryMaterializationId: "S1-FIX-5ba5153fec57", baseTreeIdentity: "b", headTreeIdentity: "h", runtimeSnapshotDigest: "d", opaqueFixtureId: "o" },
+    criteria: { authoredCriteriaRevision: "crit-v1", criteriaTextDigest: "d", expectedCriterionIds: ["AC-1"], criterionToCheckMapping: {}, policyVersion: "v1", policyDigest: "pd" },
+    profile: { profileId: "pb", configurationIdentity: "c", promptIdentity: "p", inputIdentity: "i", requestedModel: null, observedModel: null, reasoningConfiguration: {}, adapterEntryIdentity: "a" },
+    assessments: [{ expectedCriterionId: "AC-1", present: true, originalReportedClaim: "satisfied", admittedConclusion: "satisfied", references: [], explanation: null, diagnostics: [] }],
+    findings: [
+      {
+        nativeComment: "unrelated memory leak in module X",
+        normalizedFinding: "module X has a memory leak",
+        skipped: false,
+        skipReason: null,
+        qualityFlags: [],
+        criterionMapping: null,
+      },
+    ],
+    coverage: computeCoverage(["AC-1"], ["AC-1"]),
+    execution: { state: "completed", slotId: "s", runId: "r", attemptId: "a", requestId: "req", sdkEffectCode: null, diagnostics: [], pendingEffects: [], cleanupStatus: "clean" },
+    rawArtifact: { available: true, rawText: "raw", rawBytesDigest: "d", rawUnavailableCause: null },
+    evidence: { producer: "p", candidateBinding: "c", checkDefinition: "cd", inputScope: "is", environment: "e", observationOutcome: "pass", completeness: "complete", timestamps: [], references: [], applicability: "applicable", provenance: "prov" },
+    usage: { inputTokens: null, outputTokens: null, totalTokens: null, durationMs: null, cost: null, currency: null, requestedModel: null, observedModel: null, capacityObservations: [] },
+    capacity: { durableFactCapacity: null, retentionPolicy: null },
+  });
+  const result = scoreResult({ resultContract: rc, truthBinding: makeTruthBinding(rc, { "AC-1": true }), referenceRubrics: {}, executionBinding: "preserve-claim" });
+  // Unmapped finding must remain visible and not be treated as false allegation.
+  const finding = result.profileA.findings[0];
+  assert.equal(finding.mappingStatus, "unmapped", "unmapped finding should have mappingStatus=unmapped");
+  assert.equal(finding.semanticSupport, "neutral", "unmapped finding should be neutral");
+  assert.equal(result.profileA.summary.unmapped, 1, "one unmapped finding");
+  // Should not be counted as a false allegation.
+  assert.ok(!result.profileA.findings.some((f) => f.truthComparison === "contradicts"), "unmapped finding should not be contradiction");
+});
+
+test("WP5: Profile A out-of-scope finding", () => {
+  const rc = buildResultContract({
+    subject: { fixtureTaskId: "task-1", expectedSubjectInventory: ["AC-1"] },
+    candidate: { repositoryMaterializationId: "S1-FIX-5ba5153fec57", baseTreeIdentity: "b", headTreeIdentity: "h", runtimeSnapshotDigest: "d", opaqueFixtureId: "o" },
+    criteria: { authoredCriteriaRevision: "crit-v1", criteriaTextDigest: "d", expectedCriterionIds: ["AC-1"], criterionToCheckMapping: {}, policyVersion: "v1", policyDigest: "pd" },
+    profile: { profileId: "pb", configurationIdentity: "c", promptIdentity: "p", inputIdentity: "i", requestedModel: null, observedModel: null, reasoningConfiguration: {}, adapterEntryIdentity: "a" },
+    assessments: [{ expectedCriterionId: "AC-1", present: true, originalReportedClaim: "satisfied", admittedConclusion: "satisfied", references: [], explanation: null, diagnostics: [] }],
+    findings: [
+      {
+        nativeComment: "unrelated UI glitch on button",
+        normalizedFinding: "button UI glitch observed",
+        skipped: false,
+        skipReason: null,
+        qualityFlags: [],
+        criterionMapping: "NONEXISTENT-AC",
+      },
+    ],
+    coverage: computeCoverage(["AC-1"], ["AC-1"]),
+    execution: { state: "completed", slotId: "s", runId: "r", attemptId: "a", requestId: "req", sdkEffectCode: null, diagnostics: [], pendingEffects: [], cleanupStatus: "clean" },
+    rawArtifact: { available: true, rawText: "raw", rawBytesDigest: "d", rawUnavailableCause: null },
+    evidence: { producer: "p", candidateBinding: "c", checkDefinition: "cd", inputScope: "is", environment: "e", observationOutcome: "pass", completeness: "complete", timestamps: [], references: [], applicability: "applicable", provenance: "prov" },
+    usage: { inputTokens: null, outputTokens: null, totalTokens: null, durationMs: null, cost: null, currency: null, requestedModel: null, observedModel: null, capacityObservations: [] },
+    capacity: { durableFactCapacity: null, retentionPolicy: null },
+  });
+  const result = scoreResult({ resultContract: rc, truthBinding: makeTruthBinding(rc, { "AC-1": true }), referenceRubrics: {}, executionBinding: "preserve-claim" });
+  const finding = result.profileA.findings[0];
+  assert.equal(finding.mappingStatus, "out-of-scope", "finding mapped to nonexistent criterion should be out-of-scope");
+  assert.equal(finding.truthComparison, "neutral", "out-of-scope finding should be neutral");
+  assert.equal(result.profileA.summary.outOfScope, 1, "one out-of-scope finding");
+});
+
+test("WP5: Profile A skipped finding not counted as delivered", () => {
+  const rc = buildResultContract({
+    subject: { fixtureTaskId: "task-1", expectedSubjectInventory: ["AC-1"] },
+    candidate: { repositoryMaterializationId: "S1-FIX-5ba5153fec57", baseTreeIdentity: "b", headTreeIdentity: "h", runtimeSnapshotDigest: "d", opaqueFixtureId: "o" },
+    criteria: { authoredCriteriaRevision: "crit-v1", criteriaTextDigest: "d", expectedCriterionIds: ["AC-1"], criterionToCheckMapping: {}, policyVersion: "v1", policyDigest: "pd" },
+    profile: { profileId: "pb", configurationIdentity: "c", promptIdentity: "p", inputIdentity: "i", requestedModel: null, observedModel: null, reasoningConfiguration: {}, adapterEntryIdentity: "a" },
+    assessments: [{ expectedCriterionId: "AC-1", present: true, originalReportedClaim: "satisfied", admittedConclusion: "satisfied", references: [], explanation: null, diagnostics: [] }],
+    findings: [
+      {
+        nativeComment: "duplicate check",
+        normalizedFinding: "duplicate check, skip",
+        skipped: true,
+        skipReason: "duplicate check, already recorded",
+        qualityFlags: [],
+        criterionMapping: "AC-1",
+      },
+    ],
+    coverage: computeCoverage(["AC-1"], ["AC-1"]),
+    execution: { state: "completed", slotId: "s", runId: "r", attemptId: "a", requestId: "req", sdkEffectCode: null, diagnostics: [], pendingEffects: [], cleanupStatus: "clean" },
+    rawArtifact: { available: true, rawText: "raw", rawBytesDigest: "d", rawUnavailableCause: null },
+    evidence: { producer: "p", candidateBinding: "c", checkDefinition: "cd", inputScope: "is", environment: "e", observationOutcome: "pass", completeness: "complete", timestamps: [], references: [], applicability: "applicable", provenance: "prov" },
+    usage: { inputTokens: null, outputTokens: null, totalTokens: null, durationMs: null, cost: null, currency: null, requestedModel: null, observedModel: null, capacityObservations: [] },
+    capacity: { durableFactCapacity: null, retentionPolicy: null },
+  });
+  const result = scoreResult({ resultContract: rc, truthBinding: makeTruthBinding(rc, { "AC-1": true }), referenceRubrics: {}, executionBinding: "preserve-claim" });
+  // Skipped finding should not be counted as delivered.
+  assert.equal(result.profileA.deliveredCount, 0, "skipped finding should not count as delivered");
+  assert.equal(result.profileA.summary.skipped, 1, "one skipped finding");
+  // The skipped finding should be in the findings list.
+  assert.equal(result.profileA.findings.length, 1, "skipped finding should still appear in output");
+  assert.equal(result.profileA.findings[0].skipped, true, "finding should be marked skipped");
+});
+
+test("WP5: Profile A no findings / silence means no finding", () => {
+  const rc = buildResultContract({
+    subject: { fixtureTaskId: "task-1", expectedSubjectInventory: ["AC-1"] },
+    candidate: { repositoryMaterializationId: "S1-FIX-5ba5153fec57", baseTreeIdentity: "b", headTreeIdentity: "h", runtimeSnapshotDigest: "d", opaqueFixtureId: "o" },
+    criteria: { authoredCriteriaRevision: "crit-v1", criteriaTextDigest: "d", expectedCriterionIds: ["AC-1"], criterionToCheckMapping: {}, policyVersion: "v1", policyDigest: "pd" },
+    profile: { profileId: "pb", configurationIdentity: "c", promptIdentity: "p", inputIdentity: "i", requestedModel: null, observedModel: null, reasoningConfiguration: {}, adapterEntryIdentity: "a" },
+    assessments: [{ expectedCriterionId: "AC-1", present: true, originalReportedClaim: "satisfied", admittedConclusion: "satisfied", references: [], explanation: null, diagnostics: [] }],
+    findings: [],
+    coverage: computeCoverage(["AC-1"], ["AC-1"]),
+    execution: { state: "completed", slotId: "s", runId: "r", attemptId: "a", requestId: "req", sdkEffectCode: null, diagnostics: [], pendingEffects: [], cleanupStatus: "clean" },
+    rawArtifact: { available: true, rawText: "raw", rawBytesDigest: "d", rawUnavailableCause: null },
+    evidence: { producer: "p", candidateBinding: "c", checkDefinition: "cd", inputScope: "is", environment: "e", observationOutcome: "pass", completeness: "complete", timestamps: [], references: [], applicability: "applicable", provenance: "prov" },
+    usage: { inputTokens: null, outputTokens: null, totalTokens: null, durationMs: null, cost: null, currency: null, requestedModel: null, observedModel: null, capacityObservations: [] },
+    capacity: { durableFactCapacity: null, retentionPolicy: null },
+  });
+  const result = scoreResult({ resultContract: rc, truthBinding: makeTruthBinding(rc, { "AC-1": true }), referenceRubrics: {}, executionBinding: "preserve-claim" });
+  // Silence means no finding, not an inconclusive B-style assessment.
+  assert.equal(result.profileA.deliveredCount, 0, "no findings = deliveredCount=0");
+  assert.equal(result.profileA.findings.length, 0, "no findings in output");
+  assert.equal(result.profileA.summary.overallStatus, "complete", "silence = complete status");
 });

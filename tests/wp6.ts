@@ -22,10 +22,14 @@ import {
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
 function makeRecord(overrides: Partial<LedgerRecord> = {}): LedgerRecord {
-  return {
+  const baseRecord: LedgerRecord = {
+    schemaVersion: "ledger-event-v1",
+    sequence: 1,
     slotId: "slot-1",
     runId: "run-1",
     attemptId: "attempt-1",
+    eventId: "evt-12345678-1234-1234-1234-123456789012",
+    eventType: "attempt_started",
     opaqueCandidateId: "S1-FIX-5ba5153fec57",
     profile: "profile-b",
     repetition: 1,
@@ -56,8 +60,8 @@ function makeRecord(overrides: Partial<LedgerRecord> = {}): LedgerRecord {
     isStub: true,
     supersededBy: null,
     supersedes: null,
-    ...overrides,
   };
+  return { ...baseRecord, ...overrides };
 }
 
 test("WP6: ledger append and read round-trips", () => {
