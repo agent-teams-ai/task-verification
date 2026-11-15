@@ -2,13 +2,15 @@
  * Authorization helper for the Task Verification fixture.
  *
  * Encapsulates token verification, revocation, profile serialization and
- * audit recording for the profile endpoint.
+ * audit recording for the profile endpoint. Base B0 provides this helper; the
+ * delegating candidate head imports it without modifying it.
  *
  * Licensed under Apache 2.0. See LICENSE.
  */
 
-import type { AppBehavior, Caller } from "./types.ts";
+import type { Caller } from "./types.ts";
 import { AuditSink } from "./audit.ts";
+import { serializeProfile } from "./serializer.ts";
 
 export const PROFILE_PATH = "/profile";
 
@@ -25,31 +27,13 @@ export function verifyToken(token: string, validTokens: ReadonlyMap<string, Call
   return validTokens.get(token);
 }
 
-export function isRevoked(token: string, behavior: AppBehavior, revokedTokens: ReadonlySet<string>): boolean {
-  if (!behavior.revokeEnforced) {
-    return false;
-  }
-  if (!behavior.revokeFieldCorrect) {
-    return revokedTokens.has(token.length > 0 ? token.charAt(0) : token);
-  }
+export function isRevoked(token: string, revokedTokens: ReadonlySet<string>): boolean {
   return revokedTokens.has(token);
-}
-
-export function serializeProfile(caller: Caller, behavior: AppBehavior): unknown {
-  const profile: Record<string, unknown> = {
-    id: caller.id,
-    email: caller.email,
-  };
-  if (behavior.serializerIncludesRole) {
-    profile.role = "reviewer";
-    profile.internal = true;
-  }
-  return profile;
 }
 
 export function handleProfile(
   token: string | undefined,
-  deps: { behavior: AppBehavior; validTokens: ReadonlyMap<string, Caller>; revokedTokens: ReadonlySet<string> },
+  deps: { validTokens: ReadonlyMap<string, Caller>; revokedTokens: ReadonlySet<string> },
   audit: AuditSink,
   path: string
 ): { statusCode: number; body: unknown } {
@@ -66,14 +50,12 @@ export function handleProfile(
     return { statusCode: 401, body: { error: "unknown_token" } };
   }
 
-  if (isRevoked(token, deps.behavior, deps.revokedTokens)) {
+  if (isRevoked(token, deps.revokedTokens)) {
     audit.record("profile.access.denied", "token_revoked", path, true, caller.id);
     return { statusCode: 401, body: { error: "token_revoked" } };
   }
 
-  const profile = serializeProfile(caller, deps.behavior);
+  const profile = serializeProfile(caller);
   audit.record("profile.access.denied", "access_granted", path, true, caller.id);
   return { statusCode: 200, body: profile };
 }
-
-// (no extra types)

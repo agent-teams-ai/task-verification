@@ -28,10 +28,10 @@ no package publication, no Gateway deployment, no OCR rebuild.
 | Script | Command | Purpose |
 |---|---|---|
 | `typecheck` | `tsc --noEmit -p tsconfig.json` | strict type check |
-| `build` | `tsc -p tsconfig.json` | emit declarations (`emitDeclarationOnly`) |
-| `test` | `node --experimental-strip-types --test tests/*.ts` | run all model-free tests |
+| `build:types` | `tsc -p tsconfig.json` | emit declarations (`emitDeclarationOnly`) |
+| `test` | `node --experimental-strip-types --test --test-concurrency=1 tests/*.ts` | run all model-free tests |
 
-Tests: 36/36 pass (WP0 ×8, WP1 ×10, WP2 ×12, oracle end-to-end ×2, reviewer isolation ×4).
+Tests: 83 tests, 83 pass, 0 fail, 0 skipped (10 suites).
 
 ## tsconfig highlights
 

@@ -16,8 +16,10 @@ unrelated Git branches/history.
 ## Materialization contents (per selected candidate)
 
 Included (strict explicit allowlist, built by `src/materialization.ts`):
-- The selected candidate's application source: `app.ts`, `audit.ts`, `behavior.ts`, `types.ts`, and (for S1-C2) `authz.ts`
-- `base-head-identities.json`: base/head identities only (no manifest, no expected criteria, no behavior label)
+- The selected candidate's application source: `app.ts`, `audit.ts`,
+  `authz.ts`, `behavior.ts`, `serializer.ts`, `types.ts`
+- `base-head-identities.json`: base/head identities only (no manifest, no
+  expected criteria, no behavior label)
 - `base-to-head.diff`: the complete permitted base-to-head diff
 - `criteria.json`: frozen criterion IDs and wording (`crit-v1`, AC-1..AC-5) only
 - `task-metadata.json`: approved shared task/PR metadata
@@ -29,20 +31,29 @@ Excluded (never copied into reviewer materialization):
 - Sibling candidates
 - Oracle source and execution internals (`oracle/src/`)
 - Reference answer files and ground-truth labels (`truth-v1.json`, anonymization map, salt)
-
-Excluded:
-- Parent experiment checkout and its Git history
-- Sibling candidates (`S1-C{1..4}\{n}`)
-- Oracle source and execution internals (`oracle/src/`)
-- Reference answer files and ground-truth labels (`truth-v1.json`, anonymization map, salt) — these belong to WP3 and are excluded from reviewer-supplied context
 - Unrelated Git branches and history
+
+The builder recomputes the head application digest from the files it actually
+materialized and records the digest from the authoritative snapshot. A
+materialization is accepted only when the two agree.
+
+## Materialization path safety
+
+`buildReviewerMaterialization` refuses unsafe output paths before deleting or
+writing anything. It uses `lstatSync` so a path that is a symlink, a dangling
+symlink, a junction/reparse point or a redirected root is rejected rather than
+followed. Output must stay strictly inside the materialization root; protected
+directories and unsupported candidate IDs are rejected. `tests/materialization-safety.ts`
+(12 tests) covers valid output, traversal/escape attempts, protected paths,
+unsupported candidates, dangling links, deep nested links, a redirected root,
+and junction/reparse-point rejection.
 
 ## Isolation tested in M2-A (Profile B — `/llm`)
 
-The exact assembled context was tested (`tests/isolation.ts`):
+The exact assembled context was tested (`tests/isolation.ts`, 12 tests):
 
-- Selected candidate materialization contains only the four approved
-  application files.
+- Selected candidate materialization contains only the allowlisted application
+  files.
 - Sibling candidates and oracle source are not part of the reviewer-visible
   application tree.
 - Reference artifacts (truth, salt, anonymization map, version manifest) are
@@ -56,21 +67,24 @@ verified to exclude public reference artifacts and oracle outputs.
 
 ## Profile A (managed OCR) — boundary prepared, not fully qualified
 
-- A clear materialization boundary is prepared for later WP7 testing: only the
-  selected application snapshot and permitted context.
+- A clear materialization boundary is prepared for later live evaluation: only
+  the selected application snapshot and permitted context.
 - Full managed OCR tool-boundary qualification (loopback-only fake provider,
   network restrictions preventing OCR tools from reaching public reference
-  artifact URLs via external URLs) is **deferred to WP7** and is NOT claimed
-  as proven in M2-A.
-- It is explicitly NOT claimed that merely not mounting reference files
-  proves OCR tool/network isolation.
+  artifact URLs via external URLs) is **not** part of M2-A and is **not**
+  claimed as proven here.
+- It is explicitly NOT claimed that merely not mounting reference files proves
+  OCR tool/network isolation.
+- This qualification belongs to later live evaluation. It is **not** a
+  prerequisite for the model-free M2-B work (WP3–WP4).
 
 ## Distinction documented
 
-| Already tested in M2-A | Deferred to WP7 |
+| Tested in M2-A | Not tested in M2-A |
 |---|---|
 | Input assembly excludes reference artifacts (Profile B `/llm` assembled input checked) | Full enabled-tool and network isolation for managed OCR (fake provider + loopback + network restrictions) |
-| Reviewer-visible file inventory and digest recorded | Loopback-only fake provider validation of OCR tool boundary |
+| Reviewer-visible file inventory and digest recorded and recomputed | Loopback-only fake provider validation of the OCR tool boundary |
+| Candidate application runs in a permission-restricted child process with no access to ground truth, scorer internals, siblings or unapproved repo files | Live provider/network behaviour |
 
 ## Opaque alias vs. anonymization (clarification)
 
@@ -94,9 +108,9 @@ distinct from:
   materialization or Profile B input.
 - **Filesystem/tool isolation** (tested here): only the allowlisted
   application files are materialized; sibling candidates, oracle source and
-  parent checkout are excluded.
-- **Network/tool isolation** (deferred to WP7): managed OCR tool and network
-  boundary qualification is not claimed in M2-A.
+  parent checkout are excluded, and candidate execution is permission-restricted.
+- **Network/tool isolation** (later live evaluation): managed OCR tool and
+  network boundary qualification is not claimed in M2-A.
 - **Public availability and reproducibility**: all reference artifacts remain
   public; reproducibility is preserved.
 

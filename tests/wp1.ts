@@ -2,8 +2,9 @@
  * WP1 fixture and candidate snapshot tests (model-free).
  *
  * Covers fixture startup, request/response behavior, state reset, candidate
- * isolation, base/head identities, tree-digest reproducibility, the S1-C4 B1
- * difference, and sanitization/file-inventory checks.
+ * isolation, base/head identities, application-digest reproducibility, the
+ * common B0 for C1/C2/C3, the unchanged C4 serializer and sanitization/file
+ * inventory checks.
  *
  * Licensed under Apache 2.0. See LICENSE.
  */
@@ -11,7 +12,6 @@
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
 import * as fs from "node:fs";
-import * as crypto from "node:crypto";
 import * as path from "node:path";
 import {
   startApp,
@@ -20,12 +20,17 @@ import {
   candidateSrcDir,
   candidateAppUrl,
   candidateBehaviorUrl,
+  candidateManifestPath,
 } from "./helpers.ts";
+import { applicationDigestFromDir } from "../src/digest.ts";
+import { baseFilesFor, headFilesFor } from "../scripts/snapshot-defs.ts";
+
+const CANDIDATE_IDS = ["S1-C1", "S1-C2", "S1-C3", "S1-C4"] as const;
 
 async function runCandidate(candidateId: string) {
   const appMod = await import(candidateAppUrl(candidateId));
   const behMod = await import(candidateBehaviorUrl(candidateId));
-  const deps = behMod.defaultDeps(behMod.defaultBehavior());
+  const deps = behMod.defaultDeps();
   const app = await startApp(appMod, deps);
   const results: Record<string, { statusCode: number; body: unknown }> = {};
   const auditDeltas: Record<string, Array<{ event: string; reason: string; path: string; tokenPresent: boolean; callerId?: string; timestamp: string }>> = {};
@@ -41,31 +46,17 @@ async function runCandidate(candidateId: string) {
     auditDeltas[id] = app.auditDelta();
   }
   await app.stop();
-  return { results, auditDeltas, behavior: behMod.defaultBehavior() };
+  return { results, auditDeltas };
 }
 
-function treeDigest(dir: string): string {
-  const walk = (d: string): string[] => {
-    let out: string[] = [];
-    for (const entry of fs.readdirSync(d, { withFileTypes: true })) {
-      const full = path.join(d, entry.name);
-      if (entry.isDirectory()) {
-        out = out.concat(walk(full));
-      } else {
-        out.push(path.relative(dir, full));
-      }
-    }
-    return out;
-  };
-  const files = walk(dir).sort();
-  const h = crypto.createHash("sha256");
-  for (const f of files) {
-    h.update(f);
-    h.update("\0");
-    h.update(fs.readFileSync(path.join(dir, f), "utf8").replace(/\r\n/g, "\n").replace(/\r/g, "\n"));
-    h.update("\0");
-  }
-  return h.digest("hex");
+function readManifest(candidateId: string): {
+  base: string;
+  head: string;
+  headApplicationDigest: string;
+  baseApplicationDigest: string;
+  expectedCriteria: Record<string, boolean>;
+} {
+  return JSON.parse(fs.readFileSync(candidateManifestPath(candidateId), "utf8"));
 }
 
 describe("WP1 fixture and candidates", () => {
@@ -107,7 +98,7 @@ describe("WP1 fixture and candidates", () => {
   test("explicit reset clears the audit sink", async () => {
     const appMod = await import(candidateAppUrl("S1-C1"));
     const behMod = await import(candidateBehaviorUrl("S1-C1"));
-    const app = await startApp(appMod, behMod.defaultDeps(behMod.defaultBehavior()));
+    const app = await startApp(appMod, behMod.defaultDeps());
     await requestOnce(app.port, "/profile");
     assert.strictEqual(app.auditDelta().length, 1);
     app.reset();
@@ -115,50 +106,45 @@ describe("WP1 fixture and candidates", () => {
     await app.stop();
   });
 
-  test("candidate sources are isolated and self-contained", async () => {
-    const allowedBase = ["app.ts", "audit.ts", "behavior.ts", "types.ts"];
-    for (const id of ["S1-C1", "S1-C2", "S1-C3", "S1-C4"]) {
+  test("candidate sources are isolated and self-contained", () => {
+    for (const id of CANDIDATE_IDS) {
       const src = candidateSrcDir(id);
       const files = fs.readdirSync(src).sort();
-      // C2 (delegating variant) additionally carries the unchanged helper authz.ts.
-      const expected = id === "S1-C2"
-        ? ["app.ts", "audit.ts", "authz.ts", "behavior.ts", "types.ts"]
-        : allowedBase;
-      assert.deepStrictEqual(files, expected, `${id} file inventory mismatch`);
-      // No imports back into fixture/ or sibling candidates.
+      assert.deepStrictEqual(
+        files,
+        ["app.ts", "audit.ts", "authz.ts", "behavior.ts", "serializer.ts", "types.ts"],
+        `${id} file inventory mismatch`
+      );
       for (const f of files) {
         const content = fs.readFileSync(path.join(src, f), "utf8");
         assert.ok(!content.includes("../../fixture"), `${id}/${f} references fixture/`);
         assert.ok(!content.includes("../candidates"), `${id}/${f} references sibling candidates`);
+        assert.ok(!content.includes("S1-C"), `${id}/${f} references a candidate label`);
       }
     }
   });
 
-  test("candidate tree digests reproduce from manifest", async () => {
-    for (const id of ["S1-C1", "S1-C2", "S1-C3", "S1-C4"]) {
-      const manifest = JSON.parse(
-        fs.readFileSync(path.join(candidateSrcDir(id), "..", "MANIFEST.json"), "utf8")
-      );
-      assert.strictEqual(treeDigest(candidateSrcDir(id)), manifest.treeDigest);
+  test("candidate application digests reproduce from the manifest", () => {
+    for (const id of CANDIDATE_IDS) {
+      const manifest = readManifest(id);
+      assert.strictEqual(applicationDigestFromDir(candidateSrcDir(id)), manifest.headApplicationDigest);
     }
   });
 
-  test("S1-C1/S1-C2/S1-C3 use base B0; S1-C4 uses base B1", async () => {
-    const manifests: Record<string, { base: string }> = {};
-    for (const id of ["S1-C1", "S1-C2", "S1-C3", "S1-C4"]) {
-      manifests[id] = JSON.parse(
-        fs.readFileSync(path.join(candidateSrcDir(id), "..", "MANIFEST.json"), "utf8")
-      );
-    }
-    assert.strictEqual(manifests["S1-C1"].base, "B0");
-    assert.strictEqual(manifests["S1-C2"].base, "B0");
-    assert.strictEqual(manifests["S1-C3"].base, "B0");
-    assert.strictEqual(manifests["S1-C4"].base, "B1");
+  test("C1/C2/C3 share the identical B0 base; C4 uses B1", () => {
+    const b0Digests = ["S1-C1", "S1-C2", "S1-C3"].map((id) => readManifest(id).baseApplicationDigest);
+    assert.strictEqual(new Set(b0Digests).size, 1, "C1/C2/C3 must share one B0 application digest");
+    assert.notStrictEqual(readManifest("S1-C4").baseApplicationDigest, b0Digests[0], "C4 base must differ");
+    assert.strictEqual(readManifest("S1-C4").base, "B1");
   });
 
-  test("S1-C4 preserves the B1 serializer difference (role leak, AC-4 violated)", async () => {
-    const { results, behavior } = await runCandidate("S1-C4");
-    assert.strictEqual(behavior.serializerIncludesRole, true);
+  test("C4 exposes the unchanged B1 serializer and violates AC-4", async () => {
+    const base = baseFilesFor("S1-C4");
+    const head = headFilesFor("S1-C4");
+    assert.strictEqual(head["serializer.ts"], base["serializer.ts"], "C4 must not change the serializer");
+    assert.notStrictEqual(base["serializer.ts"], baseFilesFor("S1-C1")["serializer.ts"], "B1 serializer must differ from B0");
+
+    const { results } = await runCandidate("S1-C4");
     assert.deepStrictEqual(results["P-active-a"].body, {
       id: "caller-a",
       email: "caller-a@example.example",
@@ -178,47 +164,57 @@ describe("WP1 fixture and candidates", () => {
     assert.strictEqual(results["P-revoked"].statusCode, 200, "C3 revoked token should pass");
   });
 
-  test("H1-H4 heads are reconstructed with distinct tree digests", async () => {
-    const digests: string[] = [];
-    for (const id of ["S1-C1", "S1-C2", "S1-C3", "S1-C4"]) {
-      digests.push(treeDigest(candidateSrcDir(id)));
-    }
+  test("H1-H4 heads have distinct application digests", () => {
+    const digests = CANDIDATE_IDS.map((id) => applicationDigestFromDir(candidateSrcDir(id)));
     assert.strictEqual(new Set(digests).size, 4, "candidate head trees must be distinct");
   });
 
-  test("C1 and C2 produce the same behavioral results but different source structure", async () => {
+  test("C1 and C2 produce the same behavior from different source structure", async () => {
     const c1 = await runCandidate("S1-C1");
     const c2 = await runCandidate("S1-C2");
-    // Same behavioral outcomes for all five criteria.
     for (const id of ["P-active-a", "P-active-b", "P-missing", "P-revoked"]) {
       assert.deepStrictEqual(c1.results[id], c2.results[id], `behavioral mismatch on ${id}`);
     }
-    // Different file sets: C2 carries the unchanged authz helper.
-    const c1Files = fs.readdirSync(candidateSrcDir("S1-C1")).sort();
-    const c2Files = fs.readdirSync(candidateSrcDir("S1-C2")).sort();
-    assert.ok(!c1Files.includes("authz.ts"), "C1 must not carry authz.ts");
-    assert.ok(c2Files.includes("authz.ts"), "C2 must carry the authz helper");
-    assert.notDeepEqual(c1Files, c2Files, "C1 and C2 file sets must differ");
+    const c1App = fs.readFileSync(path.join(candidateSrcDir("S1-C1"), "app.ts"), "utf8");
+    const c2App = fs.readFileSync(path.join(candidateSrcDir("S1-C2"), "app.ts"), "utf8");
+    assert.notStrictEqual(c1App, c2App, "C1 and C2 app.ts must differ");
+    assert.ok(c2App.includes("./authz.ts"), "C2 app.ts must import the unchanged helper");
+    assert.ok(!c1App.includes("./authz.ts"), "C1 app.ts must implement the flow inline");
   });
 
-  test("C2 depends on the unchanged authz helper (helper not in changed-file-only inventory)", async () => {
+  test("C2 depends on the unchanged authz helper (not inlined)", () => {
     const c2Src = candidateSrcDir("S1-C2");
     const appContent = fs.readFileSync(path.join(c2Src, "app.ts"), "utf8");
-    // C2's app delegates to authz.ts.
-    assert.ok(appContent.includes("./authz.ts"), "C2 app.ts must import the helper");
-    // The helper is a separate file, so a changed-file-only inventory (app.ts)
-    // would not contain its implementation.
     const helperContent = fs.readFileSync(path.join(c2Src, "authz.ts"), "utf8");
     assert.ok(helperContent.includes("handleProfile"), "helper must implement handleProfile");
     assert.ok(!appContent.includes("function handleProfile"), "app.ts must not inline handleProfile");
   });
 
-  test("helper remains present (unchanged) across base and head for C2", async () => {
-    // The candidate's authz.ts is a self-contained helper; its content is
-    // stable and does not depend on candidate-specific behavior flags beyond
-    // the AppBehavior interface. Verify it imports only types, not behavior labels.
-    const content = fs.readFileSync(path.join(candidateSrcDir("S1-C2"), "authz.ts"), "utf8");
-    assert.ok(!content.includes("S1-C"), "helper must not reference candidate labels");
-    assert.ok(content.includes("export function handleProfile"), "helper must export handleProfile");
+  test("helper remains byte-identical across C2 base and head", () => {
+    const base = baseFilesFor("S1-C2");
+    const head = headFilesFor("S1-C2");
+    assert.strictEqual(head["authz.ts"], base["authz.ts"]);
+    assert.strictEqual(
+      fs.readFileSync(path.join(candidateSrcDir("S1-C2"), "authz.ts"), "utf8"),
+      base["authz.ts"]
+    );
+    assert.ok(!base["authz.ts"].includes("S1-C"), "helper must not reference candidate labels");
+  });
+
+  test("all heads are the base map with only app.ts replaced", () => {
+    for (const id of CANDIDATE_IDS) {
+      const base = baseFilesFor(id);
+      const head = headFilesFor(id);
+      const baseKeys = Object.keys(base).sort();
+      const headKeys = Object.keys(head).sort();
+      assert.deepStrictEqual(headKeys, baseKeys, `${id} head file set must match base`);
+      for (const key of baseKeys) {
+        if (key === "app.ts") {
+          assert.notStrictEqual(head[key], base[key], `${id} app.ts must change`);
+        } else {
+          assert.strictEqual(head[key], base[key], `${id}/${key} must remain unchanged`);
+        }
+      }
+    }
   });
 });

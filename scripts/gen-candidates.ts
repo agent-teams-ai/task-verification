@@ -1,197 +1,198 @@
 /**
- * Generate the four self-contained S1 candidate snapshots from the canonical
- * fixture source (WP1).
+ * Generate the four S1 candidate snapshots from the authoritative snapshot
+ * definitions (WP1).
  *
- * Each snapshot is a disposable, reproducible materialization of one base/head
- * pair. `app.ts`, `types.ts` and `audit.ts` are copied verbatim from the
- * canonical `fixture/src/`; only `behavior.ts` is candidate-specific, so each
- * snapshot is isolated and self-contained (no imports from `fixture/`).
+ * One immutable file-map model per candidate is the single source of truth.
+ * Reviewer-visible files, Git tree/commit identities, the base-to-head diff,
+ * the oracle subject and the application digest are all derived from that
+ * same model.
  *
  * Licensed under Apache 2.0. See LICENSE.
  */
 
-import * as crypto from "node:crypto";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
+import { applicationDigest, normalizeText } from "../src/digest.ts";
+import { computeGitProvenance, type GitProvenance } from "./git-provenance.ts";
+import {
+  buildSnapshotModel,
+  CANDIDATE_IDS,
+  REPO_ROOT,
+  type CandidateDef,
+  type FileMap,
+  type SnapshotEntry,
+} from "./snapshot-defs.ts";
 
-const SCRIPTS_DIR = path.dirname(fileURLToPath(import.meta.url));
-const ROOT = path.resolve(SCRIPTS_DIR, "..");
-const FIXTURE_SRC = path.join(ROOT, "fixture", "src");
-const CANDIDATES_DIR = path.join(ROOT, "candidates");
-// (file sets are determined per variant by sharedFilesFor)
+const CANDIDATES_DIR = path.join(REPO_ROOT, "candidates");
+const DEFAULT_WORK_ROOT = path.join(REPO_ROOT, ".candidates-work");
 
-function sharedFilesFor(c: Candidate): string[] {
-  if (c.variant === "delegate") {
-    return ["app-delegate.ts", "authz.ts", "types.ts", "audit.ts"];
-  }
-  return ["app.ts", "types.ts", "audit.ts"];
-}
-
-function renameMapFor(c: Candidate): Record<string, string> {
-  if (c.variant === "delegate") {
-    return { "app-delegate.ts": "app.ts" };
-  }
-  return {};
-}
-
-interface Candidate {
-  id: string;
+export interface CandidateManifest {
+  candidate: string;
+  snapshotPair: string;
   base: string;
   head: string;
   label: string;
-  behavior: string;
-  expected: Record<string, boolean>;
-  /** "inline" => fixture/src/app.ts; "delegate" => fixture/src/app-delegate.ts + authz.ts */
-  variant: "inline" | "delegate";
+  provenance: string;
+  expectedCriteria: Record<string, boolean>;
+  sourceInventory: string[];
+  sanitized: true;
+  baseApplicationDigest: string;
+  headApplicationDigest: string;
 }
 
-const CANDIDATES: Candidate[] = [
-  {
-    id: "S1-C1",
-    base: "B0",
-    head: "H1",
-    label: "correct inline implementation",
-    behavior: `{ revokeEnforced: true, revokeFieldCorrect: true, serializerIncludesRole: false }`,
-    expected: { AC1: true, AC2: true, AC3: true, AC4: true, AC5: true },
-    variant: "inline",
-  },
-  {
-    id: "S1-C2",
-    base: "B0",
-    head: "H2",
-    label: "correct alternative using unchanged helper",
-    behavior: `{ revokeEnforced: true, revokeFieldCorrect: true, serializerIncludesRole: false }`,
-    expected: { AC1: true, AC2: true, AC3: true, AC4: true, AC5: true },
-    variant: "delegate",
-  },
-  {
-    id: "S1-C3",
-    base: "B0",
-    head: "H3",
-    label: "revoked-token behavioral violation",
-    behavior: `{ revokeEnforced: true, revokeFieldCorrect: false, serializerIncludesRole: false }`,
-    expected: { AC1: true, AC2: true, AC3: false, AC4: true, AC5: true },
-    variant: "inline",
-  },
-  {
-    id: "S1-C4",
-    base: "B1",
-    head: "H4",
-    label: "serializer redaction violation",
-    behavior: `{ revokeEnforced: true, revokeFieldCorrect: true, serializerIncludesRole: true }`,
-    expected: { AC1: true, AC2: true, AC3: true, AC4: false, AC5: true },
-    variant: "inline",
-  },
-];
-
-function behaviorSource(c: Candidate): string {
-  const lines: string[] = [];
-  lines.push("/**");
-  lines.push(" * Deterministic behavior configuration for this application snapshot.");
-  lines.push(" * Generated from the canonical fixture behavior.");
-  lines.push(" *");
-  lines.push(" * Licensed under Apache 2.0. See LICENSE.");
-  lines.push(" */");
-  lines.push("");
-  lines.push('import type { AppBehavior, AppDeps } from "./types.ts";');
-  lines.push("");
-  lines.push("/** Fixed valid tokens and their callers (deterministic initial state). */");
-  lines.push("export const VALID_TOKENS: Map<string, { id: string; email: string }> = new Map([");
-  lines.push('  ["token-active-a", { id: "caller-a", email: "caller-a@example.example" }],');
-  lines.push('  ["token-active-b", { id: "caller-b", email: "caller-b@example.example" }],');
-  // token-revoked is a valid token that is present in the revocation set, so
-  // P-revoked exercises the revocation path (AC-3).
-  lines.push('  ["token-revoked", { id: "caller-revoked", email: "caller-revoked@example.example" }],');
-  lines.push("]);");
-  lines.push("");
-  lines.push("/** Fixed revocation set (deterministic initial state). */");
-  lines.push("export const REVOKED_TOKENS: Set<string> = new Set([\"token-revoked\"]);");
-  lines.push("");
-  lines.push("/** Deterministic behavior for this application snapshot. */");
-  lines.push("export function defaultBehavior(): AppBehavior {");
-  lines.push(`  return ${c.behavior};`);
-  lines.push("}");
-  lines.push("");
-  lines.push("/** Build deterministic initial deps for this candidate. */");
-  lines.push("export function defaultDeps(behavior: AppBehavior): AppDeps {");
-  lines.push("  return {");
-  lines.push("    behavior,");
-  lines.push("    validTokens: new Map(VALID_TOKENS),");
-  lines.push("    revokedTokens: new Set(REVOKED_TOKENS),");
-  lines.push("  };");
-  lines.push("}");
-  lines.push("");
-  return lines.join("\n");
+export interface CandidateProvenance {
+  candidate: string;
+  snapshotPair: string;
+  base: { id: string; commit: string; tree: string; applicationDigest: string };
+  head: { id: string; commit: string; tree: string; applicationDigest: string };
+  diffStat: string;
+  diffFull: string;
+  files: string[];
+  expectedCriteria: Record<string, boolean>;
+  sanitized: true;
 }
 
-function treeDigest(dest: string): string {
-  const walk = (d: string): string[] => {
-    let out: string[] = [];
-    for (const entry of fs.readdirSync(d, { withFileTypes: true })) {
-      const full = path.join(d, entry.name);
-      if (entry.isDirectory()) {
-        out = out.concat(walk(full));
-      } else {
-        out.push(path.relative(dest, full));
-      }
-    }
-    return out;
-  };
-  const files = walk(dest).sort();
-  const h = crypto.createHash("sha256");
-  for (const f of files) {
-    h.update(f);
-    h.update("\0");
-    h.update(fs.readFileSync(path.join(dest, f), "utf8").replace(/\r\n/g, "\n").replace(/\r/g, "\n"));
-    h.update("\0");
-  }
-  return h.digest("hex");
+export interface GenerateOptions {
+  /** Root that contains `candidates/` (defaults to the repository root). */
+  root?: string;
+  /** Directory used for throwaway Git repositories. */
+  workRoot?: string;
+  /** When false, only compute the model and Git identities; write nothing. */
+  write?: boolean;
 }
 
-function writeCandidate(c: Candidate): void {
-  const dest = path.join(CANDIDATES_DIR, c.id, "src");
-  fs.rmSync(dest, { recursive: true, force: true });
-  fs.mkdirSync(dest, { recursive: true });
+export interface GenerateResult {
+  manifests: Record<string, CandidateManifest>;
+  provenance: Record<string, CandidateProvenance>;
+  model: ReturnType<typeof buildSnapshotModel>;
+}
 
-  const rename = renameMapFor(c);
-  for (const file of sharedFilesFor(c)) {
-    const target = rename[file] ?? file;
-    fs.copyFileSync(path.join(FIXTURE_SRC, file), path.join(dest, target));
-  }
-  fs.writeFileSync(path.join(dest, "behavior.ts"), behaviorSource(c), "utf8");
-
-  const manifest = {
-    candidate: c.id,
-    snapshotPair: c.base + " -> " + c.head,
-    base: c.base,
-    head: c.head,
-    label: c.label,
-    provenance: "generated from fixture/src by scripts/gen-candidates.ts",
-    expectedCriteria: c.expected,
-    behavior: c.behavior,
-    sourceInventory: sharedFilesFor(c).map((f) => rename[f] ?? f).concat(["behavior.ts"]).sort(),
-    sanitized: true,
-    treeDigest: treeDigest(dest),
-    generatedAt: new Date(Date.now()).toISOString(),
-  };
-  fs.writeFileSync(
-    path.join(CANDIDATES_DIR, c.id, "MANIFEST.json"),
-    JSON.stringify(manifest, null, 2) + "\n",
-    "utf8"
+/** Compute the recorded Git identities and diff for one snapshot entry. */
+export function computeCandidateGitProvenance(entry: SnapshotEntry, repoDir: string): GitProvenance {
+  return computeGitProvenance(
+    repoDir,
+    entry.baseFiles,
+    entry.headFiles,
+    `${entry.def.base} (deny-all stub)`,
+    `${entry.def.head} (${entry.def.id})`
   );
 }
 
-function main(): void {
-  fs.mkdirSync(CANDIDATES_DIR, { recursive: true });
-  for (const c of CANDIDATES) {
-    writeCandidate(c);
-    const d = path.join(CANDIDATES_DIR, c.id, "src");
-    console.log(
-      "  " + c.id + ": " + c.base + " -> " + c.head + " | " + c.label + " | digest " + treeDigest(d).slice(0, 12)
-    );
-  }
-  console.log("Generated " + CANDIDATES.length + " candidate snapshots under " + CANDIDATES_DIR);
+function buildManifest(def: CandidateDef, baseFiles: FileMap, headFiles: FileMap): CandidateManifest {
+  return {
+    candidate: def.id,
+    snapshotPair: `${def.base} -> ${def.head}`,
+    base: def.base,
+    head: def.head,
+    label: def.label,
+    provenance: "generated by scripts/gen-candidates.ts from fixture/src",
+    expectedCriteria: def.expectedCriteria,
+    sourceInventory: Object.keys(headFiles).sort(),
+    sanitized: true,
+    baseApplicationDigest: applicationDigest(baseFiles),
+    headApplicationDigest: applicationDigest(headFiles),
+  };
 }
 
-main();
+function buildProvenance(
+  def: CandidateDef,
+  baseFiles: FileMap,
+  headFiles: FileMap,
+  git: GitProvenance
+): CandidateProvenance {
+  return {
+    candidate: def.id,
+    snapshotPair: `${def.base}@${git.base.commit.slice(0, 12)} -> ${def.head}@${git.head.commit.slice(0, 12)}`,
+    base: {
+      id: def.base,
+      commit: git.base.commit,
+      tree: git.base.tree,
+      applicationDigest: applicationDigest(baseFiles),
+    },
+    head: {
+      id: def.head,
+      commit: git.head.commit,
+      tree: git.head.tree,
+      applicationDigest: applicationDigest(headFiles),
+    },
+    diffStat: git.diffStat,
+    diffFull: git.diffFull,
+    files: git.files,
+    expectedCriteria: def.expectedCriteria,
+    sanitized: true,
+  };
+}
+
+function writeSnapshot(root: string, def: CandidateDef, headFiles: FileMap): void {
+  const srcDir = path.join(root, "candidates", def.id, "src");
+  fs.rmSync(srcDir, { recursive: true, force: true });
+  fs.mkdirSync(srcDir, { recursive: true });
+  for (const rel of Object.keys(headFiles).sort()) {
+    const target = path.join(srcDir, rel);
+    fs.mkdirSync(path.dirname(target), { recursive: true });
+    fs.writeFileSync(target, normalizeText(headFiles[rel]), "utf8");
+  }
+}
+
+/** Generate every candidate snapshot, manifest and provenance record. */
+export function generateAll(options: GenerateOptions = {}): GenerateResult {
+  const root = options.root ?? REPO_ROOT;
+  const workRoot = options.workRoot ?? DEFAULT_WORK_ROOT;
+  const write = options.write ?? true;
+
+  if (write) {
+    fs.mkdirSync(path.join(root, "candidates"), { recursive: true });
+  }
+  fs.rmSync(workRoot, { recursive: true, force: true });
+  fs.mkdirSync(workRoot, { recursive: true });
+
+  const model = buildSnapshotModel();
+  const manifests: Record<string, CandidateManifest> = {};
+  const provenance: Record<string, CandidateProvenance> = {};
+
+  for (const entry of model) {
+    const { def, baseFiles, headFiles } = entry;
+    const git = computeCandidateGitProvenance(entry, path.join(workRoot, def.id));
+    const manifest = buildManifest(def, baseFiles, headFiles);
+    const prov = buildProvenance(def, baseFiles, headFiles, git);
+    manifests[def.id] = manifest;
+    provenance[def.id] = prov;
+
+    if (write) {
+      writeSnapshot(root, def, headFiles);
+      fs.writeFileSync(
+        path.join(root, "candidates", def.id, "MANIFEST.json"),
+        JSON.stringify(manifest, null, 2) + "\n",
+        "utf8"
+      );
+    }
+  }
+
+  if (write) {
+    fs.writeFileSync(
+      path.join(root, "candidates", "provenance.json"),
+      JSON.stringify(provenance, null, 2) + "\n",
+      "utf8"
+    );
+  }
+
+  return { manifests, provenance, model };
+}
+
+function isMain(): boolean {
+  const entry = process.argv[1];
+  if (!entry) return false;
+  return path.resolve(entry) === fileURLToPath(import.meta.url);
+}
+
+if (isMain()) {
+  const result = generateAll();
+  for (const id of CANDIDATE_IDS) {
+    const p = result.provenance[id];
+    console.log(
+      `  ${id}: base ${p.base.commit.slice(0, 12)} tree ${p.base.tree.slice(0, 12)} | head ${p.head.commit.slice(0, 12)} tree ${p.head.tree.slice(0, 12)} | digest ${p.head.applicationDigest.slice(0, 12)}`
+    );
+  }
+  console.log(`Generated ${CANDIDATE_IDS.length} candidate snapshots under ${CANDIDATES_DIR}`);
+}

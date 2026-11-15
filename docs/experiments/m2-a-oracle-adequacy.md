@@ -41,6 +41,11 @@ criteria.
 This shows the checks discriminate the injected errors. These are model-free
 oracle controls, not new benchmark candidates.
 
+The same four defects are also exercised end-to-end: test-only faulty
+applications are run through the fresh-process HTTP driver and the affected
+criterion is rejected (`tests/faults-http.ts`), while the unmodified fixture
+passes all five criteria through the same driver.
+
 ## Adequacy conclusion
 
 The oracle:

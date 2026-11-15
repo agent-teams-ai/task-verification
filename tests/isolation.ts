@@ -86,7 +86,7 @@ describe("reviewer input isolation (actual builder outputs)", () => {
     assert.ok(paths.includes("app.ts"));
     assert.ok(paths.includes("authz.ts"));
     for (const f of paths) {
-      assert.ok(["app.ts", "audit.ts", "behavior.ts", "types.ts", "authz.ts"].includes(f));
+      assert.ok(["app.ts", "audit.ts", "behavior.ts", "types.ts", "authz.ts", "serializer.ts"].includes(f));
     }
   });
 

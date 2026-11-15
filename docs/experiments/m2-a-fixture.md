@@ -16,7 +16,7 @@ reset behavior.
 | Property | Value |
 |---|---|
 | Service | Minimal TypeScript HTTP service (`node:http`), `GET /profile` only |
-| Core application source | ~200 lines (`fixture/src/app.ts` + `behavior.ts`, `types.ts`, `audit.ts`) |
+| Application source | Six files, ≈340 lines: `app.ts`, `audit.ts`, `authz.ts`, `behavior.ts`, `serializer.ts`, `types.ts` |
 | Determinism | Fixed tokens, fixed revocation set, fixed caller identity; no randomness, no clocks in decisions |
 | JSON audit sink | Append-only in-memory `AuditSink` with explicit `reset()` and `delta()` |
 | Fixed initial state | `token-active-a`→caller-a, `token-active-b`→caller-b, `token-revoked`→caller-revoked (valid + revoked), revocation set `{token-revoked}` |
@@ -46,33 +46,61 @@ Four HTTP requests per candidate per pass:
 - `P-missing` — no Authorization header → expect 401, no profile fields
 - `P-revoked` — `Bearer token-revoked` → expect 401, no profile fields
 
-## Behavior variants
+## Base and head structure
 
-Behavior is driven by `AppBehavior` (`revokeEnforced`, `revokeFieldCorrect`,
-`serializerIncludesRole`), so all four candidates materialize from one canonical
-source with different variants:
+The canonical fixture sources in `fixture/src/` feed one authoritative snapshot
+model (`scripts/snapshot-defs.ts`). A snapshot is a file map, not a directory
+copy.
 
-| Variant | revokeEnforced | revokeFieldCorrect | serializerIncludesRole | Intended result |
-|---|---|---|---|---|
-| Correct (S1-C1 / S1-C2) | true | true | false | all criteria pass |
-| S1-C3 (revocation defect) | true | **false** | false | AC-3 violated (revoked tokens pass via wrong-field compare) |
-| S1-C4 (role leak) | true | true | **true** | AC-4 violated (`role`/`internal` serialized into responses) |
+| Source | Role |
+|---|---|
+| `app-stub.ts` | B0 `app.ts`: secure-by-default deny-all stub (no profile route) |
+| `app.ts` | H1/H4 `app.ts`: correct inline implementation |
+| `app-delegate.ts` | H2 `app.ts`: thin router delegating to the unchanged `authz.ts` helper |
+| `app-revoked-bug.ts` | H3 `app.ts`: wrong-field revocation compare (revoked tokens pass) |
+| `serializer.ts` | B0/H1–H3 redacted serializer |
+| `serializer-b1.ts` | B1 serializer, including `role` and `internal` |
+| `audit.ts`, `authz.ts`, `behavior.ts`, `types.ts` | Unchanged shared modules |
+
+`B0` and `B1` share every file except `serializer.ts`. Every head is its base
+map with only `app.ts` replaced, so unchanged helpers (including the serializer)
+remain byte-identical. There are no behavior flags; the planted defects live in
+application code.
+
+| Candidate | Base | Head `app.ts` | Intended result |
+|---|---|---|---|
+| S1-C1 | B0 | correct inline | all criteria pass |
+| S1-C2 | B0 | delegate to `authz.ts` | all criteria pass |
+| S1-C3 | B0 | wrong revocation compare | AC-3 violated (revoked token returns 200) |
+| S1-C4 | B1 | correct inline | AC-4 violated (unchanged serializer leaks `role`/`internal`) |
 
 ## Reproducibility
 
-- Candidate snapshots are generated from the canonical fixture by
-  `scripts/gen-candidates.ts` (deterministic; each candidate is self-contained,
-  imports nothing from `fixture/` or siblings).
-- Tree digests (SHA-256 over sorted file contents) are recorded in each
-  `candidates/S1-Cn/MANIFEST.json` and reproduced exactly by
-  `tests/wp1.ts` ("candidate tree digests reproduce from manifest").
-- Reconstruction from sanitized material is tested: each candidate directory is
-  a standalone materialization with its own file inventory (`app.ts`,
-  `audit.ts`, `behavior.ts`, `types.ts`).
+- One authoritative generator, `scripts/gen-candidates.ts`, builds the in-memory
+  snapshot model and derives reviewer files, Git identities, diffs, manifests
+  and application digests from it. `scripts/record-provenance.ts` is a
+  compatibility shim over the same generator.
+- The application digest (`src/digest.ts`) is SHA-256 over sorted relative
+  paths and LF-normalized content, excluding `.git`. It is recorded in each
+  `candidates/S1-Cn/MANIFEST.json` and `candidates/provenance.json`, and is
+  recomputed from the reviewer-visible files by `src/materialization.ts`.
+- Git identities use a fixed author/committer and fixed dates with
+  `core.autocrlf=false`, so commit and tree hashes reproduce across runs and
+  platforms.
+- The recorded diff forward-applies to the head file map and reverse-applies to
+  the exact base file map (`git apply` / `git apply -R`).
+- Each candidate directory is standalone: it imports nothing from `fixture/` or
+  a sibling candidate.
 
-## Verification (WP1 tests, all pass)
+## Verification (WP1 and snapshot tests, all pass)
 
-Fixture startup, request/response behavior, state reset, candidate isolation,
-B0/B1 snapshot identities, H1–H4 reconstruction, tree-digest reproducibility,
-S1-C4 B1 difference, sanitization and file-inventory checks — see `tests/wp1.ts`
-(10 tests, all pass).
+`tests/wp1.ts` (14 tests): fixture startup, request/response behavior, state
+reset, candidate isolation, B0/B1 structure, C4 unchanged serializer and AC-4
+violation, C3 AC-3 violation, C1/C2 behavioral equivalence, C2 structural
+difference and helper dependency, head-equals-base-plus-app.
+
+`tests/snapshots.ts` (8 tests): one-snapshot derivation of reviewer files,
+identities and digests; materialized files match the recorded head; recorded
+diffs forward/reverse apply; `.git` exclusion; deterministic regeneration;
+C1/C2/C3 share B0 and C4 exposes an unchanged B1 serializer; distinct heads; no
+Git metadata in snapshot directories.

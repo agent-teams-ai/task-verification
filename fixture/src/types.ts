@@ -21,26 +21,7 @@ export interface Caller {
   email: string;
 }
 
-export interface AppBehavior {
-  /**
-   * Whether revocation is enforced. When false, revoked tokens are not
-   * rejected. Governs AC-3.
-   */
-  revokeEnforced: boolean;
-  /**
-   * Whether revocation lookup compares the correct token field. When false,
-   * the lookup uses a derived key and revoked tokens may pass. Governs AC-3.
-   */
-  revokeFieldCorrect: boolean;
-  /**
-   * Whether the serialized profile includes sensitive `role`/`internal`
-   * fields. When true, every response body includes those fields. Governs AC-4.
-   */
-  serializerIncludesRole: boolean;
-}
-
 export interface AppDeps {
-  behavior: AppBehavior;
   validTokens: Map<string, Caller>;
   revokedTokens: Set<string>;
 }

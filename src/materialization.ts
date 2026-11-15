@@ -22,6 +22,7 @@ import * as crypto from "node:crypto";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
+import { applicationDigest } from "./digest.ts";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const CANDIDATES_DIR = path.join(ROOT, "candidates");
@@ -48,7 +49,7 @@ export const FROZEN_CRITERIA: { id: string; text: string }[] = [
 ];
 
 // Strict explicit allowlist: only these application files may be materialized.
-const ALLOWED_APP_FILES = ["app.ts", "audit.ts", "behavior.ts", "types.ts", "authz.ts"];
+const ALLOWED_APP_FILES = ["app.ts", "audit.ts", "behavior.ts", "types.ts", "authz.ts", "serializer.ts"];
 
 export interface MaterializationResult {
   outDir: string;
@@ -56,6 +57,10 @@ export interface MaterializationResult {
   opaqueId: string;
   baseIdentity: { id: string; commit: string; tree: string };
   headIdentity: { id: string; commit: string; tree: string };
+  /** Digest recomputed from the reviewer-visible application files. */
+  headApplicationDigest: string;
+  /** Digest recorded for the authoritative head snapshot in provenance. */
+  recordedHeadApplicationDigest: string;
 }
 
 export function opaqueId(candidateId: string): string {
@@ -233,10 +238,12 @@ export function buildReviewerMaterialization(candidateId: string, outDir: string
   // 1. Copy only allowlisted application source files.
   const srcDir = path.join(CANDIDATES_DIR, candidateId, "src");
   const inventory: string[] = [];
+  const materializedAppFiles: Record<string, string> = {};
   for (const f of fs.readdirSync(srcDir)) {
     if (!ALLOWED_APP_FILES.includes(f)) continue;
     const target = path.join(safeDir, f);
     fs.copyFileSync(path.join(srcDir, f), target);
+    materializedAppFiles[f] = fs.readFileSync(target, "utf8");
     inventory.push(f);
   }
   inventory.sort();
@@ -291,6 +298,8 @@ export function buildReviewerMaterialization(candidateId: string, outDir: string
     opaqueId: opaqueId(candidateId),
     baseIdentity: { id: cand.base.id, commit: cand.base.commit, tree: cand.base.tree },
     headIdentity: { id: cand.head.id, commit: cand.head.commit, tree: cand.head.tree },
+    headApplicationDigest: applicationDigest(materializedAppFiles),
+    recordedHeadApplicationDigest: cand.head.applicationDigest,
   };
 }
 

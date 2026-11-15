@@ -16,9 +16,11 @@ Descriptions of future work in the documents are proposals for review, not commi
 
 ## Current milestone
 
-Milestone 1 is a planning and documentation milestone only: the [Stage A/B experiment plan](docs/experiments/2026-11-12-stage-a-b-experiment-plan.md). The 2026-11-14 owner-review revision specifies up to 36 scheduled reviewer attempts (12 managed OCR sessions and 24 single `/llm` calls if conditional Stage B proceeds), plus three model-free admission controls and a deterministic evidence baseline. This explicitly revises the earlier unexecuted 39-run proposal. **None of these live review slots has been executed.** There is no verification kernel, harness or transport qualification in this repository.
+Milestone 1 is a planning and documentation milestone only: the [Stage A/B experiment plan](docs/experiments/2026-11-12-stage-a-b-experiment-plan.md). The 2026-11-14 owner-review revision specifies up to 36 scheduled reviewer attempts (12 managed OCR sessions and 24 single `/llm` calls if conditional Stage B proceeds), plus three model-free admission controls and a deterministic evidence baseline. This explicitly revises the earlier unexecuted 39-run proposal. **None of these live review slots has been executed.**
 
-The next milestone is a **model-free experimental substrate**: fixture, reviewed oracle, sealed truth, scorer, ledger, deterministic controls and bounded SDK/OCR compatibility checks. Live route/model/budget choices are gates for later live execution, not prerequisites for completing that substrate. The profiles compare experimental approaches; they do not adopt a production architecture.
+M2-A (WP0–WP2) — foundation, fixture, four candidate snapshots and the behavioral oracle — is implemented and verified on the Draft PR branch `feat/m2-a-foundation-fixture-oracle` (PR #2). It is model-free and makes no live model/API/OCR/Gateway call. See the [M2-A verification report](docs/experiments/m2-a-verification-report.md).
+
+The next milestone is the rest of the **model-free experimental substrate**: sealed truth, evidence packet and deterministic baseline (WP3–WP4), then the deterministic scorer and remaining model-free controls. Live route/model/budget choices are gates for later live execution, not prerequisites for completing that substrate. The profiles compare experimental approaches; they do not adopt a production architecture.
 
 ## Reading
 

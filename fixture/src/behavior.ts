@@ -1,13 +1,14 @@
 /**
- * Canonical fixture behavior (WP1).
+ * Deterministic initial state for the Task Verification fixture (WP1).
  *
- * Default deterministic behavior (base B0): all criteria satisfied.
- * Candidate snapshots provide their own `src/behavior.ts` variant.
+ * Base snapshot B0 uses this module unchanged; every candidate head inherits
+ * it. It contains only fixed tokens, the fixed revocation set and a factory
+ * for isolated dependency objects.
  *
  * Licensed under Apache 2.0. See LICENSE.
  */
 
-import type { AppBehavior, AppDeps } from "./types.ts";
+import type { AppDeps } from "./types.ts";
 
 /** Fixed valid tokens and their callers (deterministic initial state). */
 export const VALID_TOKENS: Map<string, { id: string; email: string }> = new Map([
@@ -22,19 +23,9 @@ export const VALID_TOKENS: Map<string, { id: string; email: string }> = new Map(
 /** Fixed revocation set (deterministic initial state). */
 export const REVOKED_TOKENS: Set<string> = new Set(["token-revoked"]);
 
-/** Build default deterministic behavior (all criteria satisfied). */
-export function defaultBehavior(): AppBehavior {
-  return {
-    revokeEnforced: true,
-    revokeFieldCorrect: true,
-    serializerIncludesRole: false,
-  };
-}
-
 /** Build deterministic initial deps. */
-export function defaultDeps(behavior: AppBehavior): AppDeps {
+export function defaultDeps(): AppDeps {
   return {
-    behavior,
     validTokens: new Map(VALID_TOKENS),
     revokedTokens: new Set(REVOKED_TOKENS),
   };

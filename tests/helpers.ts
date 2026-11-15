@@ -7,6 +7,7 @@
  * Licensed under Apache 2.0. See LICENSE.
  */
 
+import * as fs from "node:fs";
 import * as http from "node:http";
 import * as path from "node:path";
 import type { AddressInfo } from "node:net";
@@ -88,4 +89,26 @@ export function candidateAppUrl(candidateId: string): string {
 
 export function candidateBehaviorUrl(candidateId: string): string {
   return pathToFileURL(path.join(candidateSrcDir(candidateId), "behavior.ts")).href;
+}
+
+export function candidateManifestPath(candidateId: string): string {
+  return path.join(ROOT, "candidates", candidateId, "MANIFEST.json");
+}
+
+export function provenancePath(): string {
+  return path.join(ROOT, "candidates", "provenance.json");
+}
+
+/**
+ * Build an isolated fault workspace source map: the fixture's unchanged
+ * types/audit/behavior modules plus the test-only faulty app as `app.ts`.
+ */
+export function faultSourceFiles(faultPath: string): Record<string, string> {
+  const fixtureSrc = path.join(ROOT, "fixture", "src");
+  return {
+    "types.ts": fs.readFileSync(path.join(fixtureSrc, "types.ts"), "utf8"),
+    "audit.ts": fs.readFileSync(path.join(fixtureSrc, "audit.ts"), "utf8"),
+    "behavior.ts": fs.readFileSync(path.join(fixtureSrc, "behavior.ts"), "utf8"),
+    "app.ts": fs.readFileSync(faultPath, "utf8"),
+  };
 }

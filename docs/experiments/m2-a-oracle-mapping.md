@@ -57,11 +57,22 @@ initialization, deterministic reset per request.
 - Denied fields: `role`, `internal`
 - Audit event/reason: `profile.access.denied` / `missing_credential`
 
+## Execution boundary
+
+Each candidate pass runs in a fresh child process inside a throwaway workspace
+containing only the candidate's application files and the isolated runner. The
+child is launched with Node's permission model restricted to that workspace, so
+ground truth, scorer internals, sibling candidates and unapproved repository
+files are unreadable. The child returns raw request/audit observations; the
+parent evaluates the five assertion groups. See `m2-a-oracle-protocol.md`.
+
 ## Oracle outputs
 
-Machine-readable pass results are written to `.oracle-receipts/oracle-results.json`
-(versioned, reproducible provenance). See `m2-a-repeatability.md` and
-`m2-a-verification-report.md`.
+Each pass writes `.oracle-receipts/S1-C{n}-pass{1,2}.json`, and the aggregate
+`.oracle-receipts/oracle-results.json` records the versioned request matrix and
+per-candidate verdicts. Receipts persist `assertions` (per criterion) and
+`auditDeltas` (per request) as plain JSON objects, not `Map` instances. See
+`m2-a-repeatability.md` and `m2-a-verification-report.md`.
 
 ## Boundaries
 

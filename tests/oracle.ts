@@ -2,15 +2,14 @@
  * End-to-end oracle test (WP2).
  *
  * Runs Oracle O-1 (four HTTP requests x two passes) against all four
- * candidates through the live driver and verifies request/assertion totals,
- * per-candidate expected criteria, and two-pass repeatability. No live model
- * calls.
+ * candidates through the fresh-process driver and verifies request/assertion
+ * totals, per-candidate expected criteria, and two-pass repeatability. No live
+ * model calls.
  *
  * Licensed under Apache 2.0. See LICENSE.
  */
 
 import { test, describe } from "node:test";
-import * as path from "node:path";
 import assert from "node:assert/strict";
 import { runPass } from "../oracle/src/driver.ts";
 import { candidateSrcDir } from "./helpers.ts";
@@ -29,30 +28,32 @@ describe("oracle end-to-end", () => {
   test("32 HTTP requests and 40 assertion-group evaluations across two passes", async () => {
     let httpRequests = 0;
     let assertionEvals = 0;
+    const pids = new Set<number>();
     for (const id of CANDIDATES) {
       for (let pass = 1; pass <= 2; pass++) {
-        const result = await runPass(path.join(candidateSrcDir(id), "app.ts"), id, pass);
+        const result = await runPass({ candidateId: id, pass, srcDir: candidateSrcDir(id) });
         httpRequests += 4;
-        assertionEvals += result.assertions.size;
+        assertionEvals += Object.keys(result.assertions).length;
+        pids.add(result.process.pid);
         assert.strictEqual(result.passed, Object.values(EXPECTED[id]).every(Boolean));
-        // Per-criterion agreement with expected truth.
         for (const [key, expectedPass] of Object.entries(EXPECTED[id])) {
-          const actual = result.assertions.get(criterionId(key))!.passed;
+          const actual = result.assertions[criterionId(key)].passed;
           assert.strictEqual(actual, expectedPass, `${id} pass${pass} ${key}: expected ${expectedPass}`);
         }
       }
     }
     assert.strictEqual(httpRequests, 32);
     assert.strictEqual(assertionEvals, 40);
+    assert.strictEqual(pids.size, 8, "each pass must run in a fresh child process");
   });
 
   test("both passes agree for every candidate (repeatability)", async () => {
     for (const id of CANDIDATES) {
-      const p1 = await runPass(path.join(candidateSrcDir(id), "app.ts"), id, 1);
-      const p2 = await runPass(path.join(candidateSrcDir(id), "app.ts"), id, 2);
+      const p1 = await runPass({ candidateId: id, pass: 1, srcDir: candidateSrcDir(id) });
+      const p2 = await runPass({ candidateId: id, pass: 2, srcDir: candidateSrcDir(id) });
       assert.strictEqual(p1.passed, p2.passed, `${id} passes disagree`);
-      for (const [cid, a1] of p1.assertions) {
-        assert.strictEqual(a1.passed, p2.assertions.get(cid)!.passed, `${id} ${cid} passes disagree`);
+      for (const [cid, a1] of Object.entries(p1.assertions)) {
+        assert.strictEqual(a1.passed, p2.assertions[cid].passed, `${id} ${cid} passes disagree`);
       }
     }
   });
