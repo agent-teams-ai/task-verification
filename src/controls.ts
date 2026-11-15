@@ -24,6 +24,45 @@ export function createCriteriaRevision(text: string, parent: string | null): Cri
   return { revisionId, textDigest, parentRevision: parent };
 }
 
+/**
+ * A criteria removal/tombstone event in the append-only criteria history. It is
+ * NOT a lifecycle event for an attempt; it records that a criterion revision was
+ * removed and establishes the lineage a replacement revision must descend from.
+ */
+export interface CriteriaTombstone {
+  eventId: string;
+  criterionId: string;
+  removedRevisionId: string;
+  removedTextDigest: string;
+  removedAt: string;
+  lineageId: string;
+}
+
+export function createCriteriaTombstone(params: {
+  criterionId: string;
+  removedRevisionId: string;
+  removedTextDigest: string;
+  removedAt: string;
+}): CriteriaTombstone {
+  const { criterionId, removedRevisionId, removedTextDigest, removedAt } = params;
+  const lineageId = `crit-lineage-${crypto
+    .createHash("sha256")
+    .update(`${criterionId}\u0000${removedRevisionId}\u0000${removedAt}`)
+    .digest("hex")
+    .slice(0, 12)}`;
+  const eventId = `evt-${crypto.randomUUID()}`;
+  return { eventId, criterionId, removedRevisionId, removedTextDigest, removedAt, lineageId };
+}
+
+/**
+ * Create the replacement criterion revision from a real tombstone event. The
+ * replacement descends from the tombstone lineage, so identical bytes cannot
+ * resurrect the removed revision identity.
+ */
+export function createRevisionAfterTombstone(text: string, tombstone: CriteriaTombstone): CriteriaRevision {
+  return createCriteriaRevision(text, tombstone.lineageId);
+}
+
 export interface AssessmentBinding {
   assessmentId: string;
   criteriaRevision: string;

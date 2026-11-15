@@ -10,6 +10,10 @@ import {
   validateLedgerRecord,
   findDuplicateIdentities,
   verifyLedgerIntegrity,
+  acquireWriter,
+  releaseWriter,
+  isWriterActive,
+  withWriter,
   type LedgerRecord,
 } from "../src/ledger.ts";
 import {
@@ -18,6 +22,9 @@ import {
   ct2Evaluate,
   ct3Evaluate,
   isAssessmentCurrentForCriteria,
+  createCriteriaTombstone,
+  createRevisionAfterTombstone,
+  consumerAdmit,
 } from "../src/controls.ts";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -197,4 +204,163 @@ test("WP6: ledger integrity catches duplicate identities", () => {
   const errors = verifyLedgerIntegrity(records);
   assert.ok(errors.length > 0);
   assert.ok(errors.some((e) => e.includes("duplicate")));
+});
+
+// --- Lifecycle state machine, writer ownership and tombstones ---
+
+function lifeRecord(overrides: Partial<LedgerRecord>): LedgerRecord {
+  return makeRecord({ isStub: true, endTimestamp: null, ...overrides });
+}
+
+function freshLedger(name: string): string {
+  const p = path.join(ROOT, ".isolation-tmp", name);
+  fs.mkdirSync(path.dirname(p), { recursive: true });
+  if (fs.existsSync(p)) fs.unlinkSync(p);
+  return p;
+}
+
+test("WP6: planned -> started -> completed is accepted", () => {
+  const lp = freshLedger("wp6-lc-completed.jsonl");
+  const key = { runId: "run-lc", attemptId: "att-lc" };
+  appendLedgerRecord(lifeRecord({ ...key, eventType: "planned", executionState: "planned" }), { ledgerPath: lp });
+  appendLedgerRecord(lifeRecord({ ...key, eventType: "attempt_started", executionState: "started" }), { ledgerPath: lp });
+  appendLedgerRecord(lifeRecord({ ...key, eventType: "attempt_completed", executionState: "completed", endTimestamp: "2026-01-01T00:00:02Z" }), { ledgerPath: lp });
+  const recs = readLedger(lp);
+  assert.equal(recs.length, 3);
+  assert.deepEqual(verifyLedgerIntegrity(recs), []);
+  fs.unlinkSync(lp);
+});
+
+test("WP6: planned -> started -> failed is accepted", () => {
+  const lp = freshLedger("wp6-lc-failed.jsonl");
+  const key = { runId: "run-lc-f", attemptId: "att-lc-f" };
+  appendLedgerRecord(lifeRecord({ ...key, eventType: "planned", executionState: "planned" }), { ledgerPath: lp });
+  appendLedgerRecord(lifeRecord({ ...key, eventType: "attempt_started", executionState: "started" }), { ledgerPath: lp });
+  appendLedgerRecord(lifeRecord({ ...key, eventType: "attempt_failed", executionState: "failed", diagnostics: ["timeout"], endTimestamp: "2026-01-01T00:00:02Z" }), { ledgerPath: lp });
+  assert.deepEqual(verifyLedgerIntegrity(readLedger(lp)), []);
+  fs.unlinkSync(lp);
+});
+
+test("WP6: planned -> started -> unknown is accepted", () => {
+  const lp = freshLedger("wp6-lc-unknown.jsonl");
+  const key = { runId: "run-lc-u", attemptId: "att-lc-u" };
+  appendLedgerRecord(lifeRecord({ ...key, eventType: "planned", executionState: "planned" }), { ledgerPath: lp });
+  appendLedgerRecord(lifeRecord({ ...key, eventType: "attempt_started", executionState: "started" }), { ledgerPath: lp });
+  appendLedgerRecord(lifeRecord({ ...key, eventType: "attempt_unknown", executionState: "unknown", endTimestamp: "2026-01-01T00:00:02Z" }), { ledgerPath: lp });
+  assert.deepEqual(verifyLedgerIntegrity(readLedger(lp)), []);
+  fs.unlinkSync(lp);
+});
+
+test("WP6: duplicate planned and duplicate started are rejected", () => {
+  const lp = freshLedger("wp6-lc-dup.jsonl");
+  const key = { runId: "run-lc-d", attemptId: "att-lc-d" };
+  appendLedgerRecord(lifeRecord({ ...key, eventType: "planned", executionState: "planned" }), { ledgerPath: lp });
+  assert.throws(() => appendLedgerRecord(lifeRecord({ ...key, eventType: "planned", executionState: "planned" }), { ledgerPath: lp }), /duplicate planned/);
+  appendLedgerRecord(lifeRecord({ ...key, eventType: "attempt_started", executionState: "started" }), { ledgerPath: lp });
+  assert.throws(() => appendLedgerRecord(lifeRecord({ ...key, eventType: "attempt_started", executionState: "started" }), { ledgerPath: lp }), /duplicate attempt_started/);
+  fs.unlinkSync(lp);
+});
+
+test("WP6: terminal without a real started is rejected", () => {
+  const lp = freshLedger("wp6-lc-terminal-no-start.jsonl");
+  const key = { runId: "run-lc-t", attemptId: "att-lc-t" };
+  appendLedgerRecord(lifeRecord({ ...key, eventType: "planned", executionState: "planned" }), { ledgerPath: lp });
+  assert.throws(() => appendLedgerRecord(lifeRecord({ ...key, eventType: "attempt_completed", executionState: "completed" }), { ledgerPath: lp }), /requires a real prior attempt_started/);
+  fs.unlinkSync(lp);
+});
+
+test("WP6: two terminal events are rejected", () => {
+  const lp = freshLedger("wp6-lc-two-terminal.jsonl");
+  const key = { runId: "run-lc-2t", attemptId: "att-lc-2t" };
+  appendLedgerRecord(lifeRecord({ ...key, eventType: "attempt_started", executionState: "started" }), { ledgerPath: lp });
+  appendLedgerRecord(lifeRecord({ ...key, eventType: "attempt_completed", executionState: "completed" }), { ledgerPath: lp });
+  assert.throws(() => appendLedgerRecord(lifeRecord({ ...key, eventType: "attempt_failed", executionState: "failed" }), { ledgerPath: lp }), /follows terminal event/);
+  fs.unlinkSync(lp);
+});
+
+test("WP6: cancelled/superseded attempts cannot be resurrected", () => {
+  const lp = freshLedger("wp6-lc-resurrect.jsonl");
+  const key = { runId: "run-lc-r", attemptId: "att-lc-r" };
+  appendLedgerRecord(lifeRecord({ ...key, eventType: "attempt_started", executionState: "started" }), { ledgerPath: lp });
+  appendLedgerRecord(lifeRecord({ ...key, eventType: "cancelled", executionState: "cancelled" }), { ledgerPath: lp });
+  assert.throws(() => appendLedgerRecord(lifeRecord({ ...key, eventType: "attempt_started", executionState: "started" }), { ledgerPath: lp }), /follows terminal event/);
+  assert.throws(() => appendLedgerRecord(lifeRecord({ ...key, eventType: "planned", executionState: "planned" }), { ledgerPath: lp }), /follows terminal event/);
+  fs.unlinkSync(lp);
+});
+
+test("WP6: only one active writer can append", () => {
+  const lp = freshLedger("wp6-writer.jsonl");
+  assert.equal(isWriterActive(), false);
+  assert.equal(acquireWriter("writer-a"), true);
+  assert.equal(isWriterActive(), true);
+  assert.throws(() => appendLedgerRecord(lifeRecord({ runId: "run-w", attemptId: "att-w", eventType: "attempt_started", executionState: "started" }), { ledgerPath: lp }), /already owns the ledger/);
+  assert.equal(acquireWriter("writer-b"), false, "second writer must not acquire");
+  assert.equal(releaseWriter("writer-a"), true);
+  assert.equal(isWriterActive(), false);
+  if (fs.existsSync(lp)) fs.unlinkSync(lp);
+});
+
+test("WP6: append without ownership safely obtains and releases ownership", () => {
+  const lp = freshLedger("wp6-writer-safe.jsonl");
+  appendLedgerRecord(lifeRecord({ runId: "run-w2", attemptId: "att-w2", eventType: "attempt_started", executionState: "started" }), { ledgerPath: lp });
+  assert.equal(isWriterActive(), false, "anonymous append must release ownership");
+  assert.equal(readLedger(lp).length, 1);
+  fs.unlinkSync(lp);
+});
+
+test("WP6: withWriter releases ownership on throw", () => {
+  assert.throws(() => withWriter("writer-x", () => { throw new Error("boom"); }));
+  assert.equal(isWriterActive(), false);
+});
+
+test("WP6: interrupted attempt after start remains visible and incomplete", () => {
+  const lp = freshLedger("wp6-lc-interrupted.jsonl");
+  const key = { runId: "run-lc-i", attemptId: "att-lc-i" };
+  appendLedgerRecord(lifeRecord({ ...key, eventType: "attempt_started", executionState: "started", cleanupStatus: "pending" }), { ledgerPath: lp });
+  const recs = readLedger(lp);
+  assert.equal(recs.length, 1);
+  assert.equal(recs[0].executionState, "started");
+  assert.deepEqual(verifyLedgerIntegrity(recs), [], "an incomplete but valid attempt is not an integrity error");
+  fs.unlinkSync(lp);
+});
+
+test("WP6: criteria tombstone event and replacement revision lineage", () => {
+  const v1 = createCriteriaRevision("criteria text", null);
+  const tomb = createCriteriaTombstone({
+    criterionId: "AC-3",
+    removedRevisionId: v1.revisionId,
+    removedTextDigest: v1.textDigest,
+    removedAt: "2026-01-02T00:00:00Z",
+  });
+  // Append-only tombstone event.
+  const lp = freshLedger("wp6-tombstone.jsonl");
+  const rec = lifeRecord({
+    runId: "run-crit", attemptId: "crit-ac3", eventType: "criteria_removed", executionState: "cancelled",
+    criterionId: tomb.criterionId, tombstoneOf: tomb.removedRevisionId, lineage: tomb.lineageId,
+  });
+  rec.eventId = tomb.eventId;
+  appendLedgerRecord(rec, { ledgerPath: lp });
+  const read = readLedger(lp);
+  assert.equal(read[0].eventType, "criteria_removed");
+  assert.equal(read[0].tombstoneOf, v1.revisionId);
+  fs.unlinkSync(lp);
+
+  // Replacement revision descends from the tombstone lineage.
+  const v3 = createRevisionAfterTombstone("criteria text", tomb);
+  assert.notEqual(v3.revisionId, v1.revisionId, "identical bytes must not resurrect v1");
+  assert.equal(v3.parentRevision, tomb.lineageId);
+
+  // Delayed v1 attempt remains cancelled/superseded and cannot become current.
+  const delayedV1 = {
+    assessmentId: "delayed", criteriaRevision: v1.revisionId, candidateSnapshot: "snap",
+    admitted: true, reportedCriterionIds: ["AC-1", "AC-2", "AC-3", "AC-4", "AC-5"], admittedCriterionIds: ["AC-3"],
+  };
+  assert.equal(consumerAdmit(delayedV1, v3, "snap", ["AC-1", "AC-2", "AC-3", "AC-4", "AC-5"], true, true).admitted, false);
+
+  // v3 stub admitted only after full coverage + current revision validation.
+  const v3Stub = {
+    assessmentId: "v3-stub", criteriaRevision: v3.revisionId, candidateSnapshot: "snap",
+    admitted: true, reportedCriterionIds: ["AC-1", "AC-2", "AC-3", "AC-4", "AC-5"], admittedCriterionIds: ["AC-1"],
+  };
+  assert.equal(consumerAdmit(v3Stub, v3, "snap", ["AC-1", "AC-2", "AC-3", "AC-4", "AC-5"], true, false).admitted, true);
 });

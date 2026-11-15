@@ -106,6 +106,68 @@ export interface SemanticSupport {
   supporting: boolean;
 }
 
+// --- Reported-claim accounting (WP5) ---
+// Independent accounting of the ORIGINAL reported claim, kept separate from
+// Evidence admission, mechanical reference validity, semantic support and the
+// admitted semantic conclusion. Truth comparison is suspended when the Truth
+// binding is invalid; it is never inferred from reference validity.
+
+export type ParsedReportedClaim = "satisfied" | "violated" | "unknown";
+
+export type ReportedClaimComparison =
+  | "false-satisfaction"
+  | "false-violation"
+  | "agrees"
+  | "unknown-claim"
+  | "truth-suspended";
+
+export interface ReportedClaimAccountingEntry {
+  criterionId: string;
+  originalReportedClaim: string | null;
+  parsedClaim: ParsedReportedClaim;
+  truthOutcome: boolean | null;
+  comparison: ReportedClaimComparison;
+  admittedConclusion: import("./result-contract.ts").AdmittedConclusion | null;
+  referenceValid: boolean | null;
+  executionState: import("./result-contract.ts").ExecutionState;
+  /** True when the original claim is retained as a reported-claim observation. */
+  accounted: boolean;
+  /** True when an admissible semantic conclusion exists (execution valid + admitted). */
+  admitted: boolean;
+}
+
+export interface ReportedClaimAccounting {
+  attempted: number;
+  completed: number;
+  reportedSatisfied: number;
+  reportedViolated: number;
+  falseSatisfaction: number;
+  falseViolation: number;
+  correctReportedClaims: number;
+  unparseableUnknownClaims: number;
+  admittedSemanticConclusions: number;
+  rejectedUnadmittedConclusions: number;
+  truthComparisonSuspended: number;
+  entries: ReportedClaimAccountingEntry[];
+}
+
+/**
+ * Parse an original reported claim into a polarity without inventing one.
+ * Accepts the canonical tokens and unambiguous prose; anything else is unknown.
+ */
+export function parseReportedClaim(claim: string | null | undefined): ParsedReportedClaim {
+  if (claim === null || claim === undefined) return "unknown";
+  const normalized = claim.trim().toLowerCase();
+  if (normalized === "") return "unknown";
+  if (normalized === "satisfied") return "satisfied";
+  if (normalized === "violated") return "violated";
+  const hasViolated = /\bviolated\b/.test(normalized);
+  const hasSatisfied = /\bsatisfied\b/.test(normalized);
+  if (hasViolated && !hasSatisfied) return "violated";
+  if (hasSatisfied && !hasViolated) return "satisfied";
+  return "unknown";
+}
+
 export interface ScorerResult {
   scorerVersion: string;
   rubricVersion: string;
@@ -119,6 +181,8 @@ export interface ScorerResult {
   diagnostics: string[];
   // Profile A finding scoring — structured output, no invented B-style verdicts.
   profileA: ProfileAOutput;
+  // Independent original reported-claim accounting (WP5).
+  reportedClaims: ReportedClaimAccounting;
 }
 
 export interface ProfileAFindingOutput {
@@ -304,7 +368,19 @@ export function scoreResult(input: ScorerInput): ScorerResult {
   // reason and diagnostic. Profile A silence means no finding, not an inconclusive
   // B-style assessment. Profile A satisfaction and criterion coverage marked not
   // applicable.
-  const profileAOutput: ProfileAOutput = computeProfileAOutput(rc, tb.truthOutcomes);
+  const profileAOutput: ProfileAOutput = computeProfileAOutput(
+    rc,
+    tb.truthOutcomes,
+    input.artifactRegistry,
+    input.referenceRubrics,
+    truthBindingValid,
+  );
+  const reportedClaims = computeReportedClaimAccounting(
+    rc,
+    tb.truthOutcomes,
+    truthBindingValid,
+    input.artifactRegistry,
+  );
   const semanticSupport: SemanticSupport[] = [];
   for (const a of rc.assessments) {
     for (const ref of a.references) {
@@ -397,12 +473,156 @@ export function scoreResult(input: ScorerInput): ScorerResult {
     executionValid,
     diagnostics,
     profileA: profileAOutput,
+    reportedClaims,
+  };
+}
+
+interface ResolvedFindingReference {
+  reference: string;
+  exists: boolean;
+  tiedToCandidate: boolean;
+  mechanicallyValid: boolean;
+  supportsBehavior: boolean;
+  reason: string;
+}
+
+function resolveFindingReferences(
+  refs: string[] | undefined,
+  rc: import("./result-contract.ts").ResultContract,
+  registry: ArtifactRegistry | undefined,
+  rubrics: Record<string, RubricDecision>,
+): ResolvedFindingReference[] {
+  const out: ResolvedFindingReference[] = [];
+  for (const ref of refs ?? []) {
+    const rubric = rubrics[ref];
+    if (registry) {
+      const artifact = registry.artifacts[ref];
+      if (!artifact) {
+        out.push({ reference: ref, exists: false, tiedToCandidate: false, mechanicallyValid: false, supportsBehavior: false, reason: "reference not in artifact registry" });
+        continue;
+      }
+      const tied = artifact.candidateBinding === rc.candidate.repositoryMaterializationId &&
+        artifact.snapshotDigest === rc.candidate.runtimeSnapshotDigest;
+      const mechanicallyValid = artifact.allowedSource && artifact.current && artifact.applicable && tied;
+      const supportsBehavior = rubric ? isReferenceSupporting(rubric) : false;
+      const reason = !artifact.allowedSource ? "source not allowed"
+        : !artifact.current ? "artifact not current"
+        : !artifact.applicable ? "artifact not applicable"
+        : !tied ? "candidate/snapshot binding mismatch"
+        : !supportsBehavior ? "reference does not support claimed behavior"
+        : "resolved and supporting";
+      out.push({ reference: ref, exists: true, tiedToCandidate: tied, mechanicallyValid, supportsBehavior, reason });
+    } else {
+      // Legacy path: rubric-provided booleans, no immutable registry.
+      const exists = rubric?.referenceExists ?? false;
+      const tied = rubric?.tiedToCandidate ?? false;
+      const mechanicallyValid = exists && tied;
+      const supportsBehavior = rubric ? isReferenceSupporting(rubric) : false;
+      out.push({
+        reference: ref,
+        exists,
+        tiedToCandidate: tied,
+        mechanicallyValid,
+        supportsBehavior,
+        reason: !exists ? "reference missing" : !tied ? "not tied to candidate" : !supportsBehavior ? "does not support behavior" : "resolved and supporting",
+      });
+    }
+  }
+  return out;
+}
+
+function computeReportedClaimAccounting(
+  rc: import("./result-contract.ts").ResultContract,
+  truthOutcomes: Record<string, boolean>,
+  truthBindingValid: boolean,
+  registry: ArtifactRegistry | undefined,
+): ReportedClaimAccounting {
+  const executionValid = rc.execution.state === "completed" || rc.execution.state === "partial";
+  const entries: ReportedClaimAccountingEntry[] = [];
+  let reportedSatisfied = 0;
+  let reportedViolated = 0;
+  let falseSatisfaction = 0;
+  let falseViolation = 0;
+  let correctReportedClaims = 0;
+  let unparseableUnknownClaims = 0;
+  let admittedSemanticConclusions = 0;
+  let rejectedUnadmittedConclusions = 0;
+  let truthComparisonSuspended = 0;
+
+  for (const a of rc.assessments) {
+    const parsedClaim = parseReportedClaim(a.originalReportedClaim);
+    if (parsedClaim === "satisfied") reportedSatisfied++;
+    else if (parsedClaim === "violated") reportedViolated++;
+    else unparseableUnknownClaims++;
+
+    const hasTruth = truthBindingValid && Object.prototype.hasOwnProperty.call(truthOutcomes, a.expectedCriterionId);
+    const truthOutcome = hasTruth ? truthOutcomes[a.expectedCriterionId] : null;
+
+    let comparison: ReportedClaimComparison;
+    if (!hasTruth) {
+      comparison = "truth-suspended";
+      truthComparisonSuspended++;
+    } else if (parsedClaim === "unknown") {
+      comparison = "unknown-claim";
+    } else if (parsedClaim === "satisfied" && truthOutcome === false) {
+      comparison = "false-satisfaction";
+      falseSatisfaction++;
+    } else if (parsedClaim === "violated" && truthOutcome === true) {
+      comparison = "false-violation";
+      falseViolation++;
+    } else {
+      comparison = "agrees";
+      correctReportedClaims++;
+    }
+
+    // Mechanical reference validity is a separate dimension and never erases the
+    // original claim accounting.
+    let referenceValid: boolean | null = null;
+    if (a.references.length > 0) {
+      const resolved = resolveFindingReferences(a.references, rc, registry, {});
+      referenceValid = resolved.some((r) => r.mechanicallyValid);
+    }
+
+    const admitted = executionValid && a.admittedConclusion !== null;
+    if (admitted) admittedSemanticConclusions++;
+    else rejectedUnadmittedConclusions++;
+
+    entries.push({
+      criterionId: a.expectedCriterionId,
+      originalReportedClaim: a.originalReportedClaim,
+      parsedClaim,
+      truthOutcome,
+      comparison,
+      admittedConclusion: a.admittedConclusion,
+      referenceValid,
+      executionState: rc.execution.state,
+      accounted: a.originalReportedClaim !== null && a.originalReportedClaim !== undefined,
+      admitted,
+    });
+  }
+
+  return {
+    attempted: rc.assessments.length,
+    completed: executionValid ? rc.assessments.length : 0,
+    reportedSatisfied,
+    reportedViolated,
+    falseSatisfaction,
+    falseViolation,
+    correctReportedClaims,
+    unparseableUnknownClaims,
+    admittedSemanticConclusions,
+    rejectedUnadmittedConclusions,
+    truthComparisonSuspended,
+    entries,
   };
 }
 
 function computeProfileAOutput(
   rc: import("./result-contract.ts").ResultContract,
   truthOutcomes: Record<string, boolean>,
+  registry: ArtifactRegistry | undefined,
+  rubrics: Record<string, RubricDecision>,
+  truthBindingValid: boolean,
 ): ProfileAOutput {
   const findings: ProfileAFindingOutput[] = [];
   let deliveredCount = 0;
@@ -412,8 +632,7 @@ function computeProfileAOutput(
   let skippedCount = 0;
 
   for (const f of rc.findings) {
-    const skip = f.skipped;
-    if (skip) {
+    if (f.skipped) {
       skippedCount++;
       findings.push({
         findingId: f.nativeComment || `finding-${findings.length}`,
@@ -431,78 +650,77 @@ function computeProfileAOutput(
       continue;
     }
 
-    // Delivered (non-skipped) finding.
     deliveredCount++;
     const nativeComment = f.nativeComment || "unnamed finding";
-    const normalized = f.normalizedFinding;
     const criterionMappingRaw = f.criterionMapping;
-
-    // Determine mapping status.
-    let mappingStatus: "mapped" | "unmapped" | "out-of-scope" = "unmapped";
-    let criterionMapping: string | null = null;
-    let referenceValidity: "valid" | "invalid" | "unknown" = "unknown";
-    let semanticSupport: "supported" | "unsupported" | "neutral" = "unsupported";
-    let truthComparison: "matches" | "contradicts" | "neutral" | "n/a" = "n/a";
     const findingDiagnostics: string[] = [];
 
-    // Check if there's a criterion mapping.
+    // Resolve the finding's real references independently of Truth.
+    const resolvedRefs = resolveFindingReferences(f.references, rc, registry, rubrics);
+    for (const r of resolvedRefs) {
+      findingDiagnostics.push(`reference ${r.reference}: ${r.reason}`);
+    }
+
+    let mappingStatus: "mapped" | "unmapped" | "out-of-scope" = "unmapped";
+    let criterionMapping: string | null = null;
+
     if (criterionMappingRaw !== null && criterionMappingRaw !== undefined) {
-      // Check if the mapped criterion exists in truth outcomes.
       const mappedId = criterionMappingRaw;
-      if (truthOutcomes.hasOwnProperty(mappedId)) {
+      if (Object.prototype.hasOwnProperty.call(truthOutcomes, mappedId)) {
         mappingStatus = "mapped";
         criterionMapping = mappedId;
         mappedCount++;
-
-        // Truth comparison: if mapped to a truth-satisfied criterion, this is a
-        // false allegation. If mapped to a truth-violated criterion, it may count
-        // as supported detection.
-        if (truthOutcomes[mappedId] === true) {
-          // Finding mapped to truth-satisfied criterion → false allegation.
-          truthComparison = "contradicts"; // or "matches" depending on the finding content
-          referenceValidity = "valid";
-          // The finding's claim opposes the truth → unsupported semantically.
-          semanticSupport = "unsupported";
-          findingDiagnostics.push(`mapped to truth-satisfied criterion ${mappedId} → false allegation`);
-        } else {
-          // Mapped to truth-violated criterion → may count as supported detection.
-          truthComparison = "matches";
-          referenceValidity = "valid";
-          semanticSupport = "supported";
-          findingDiagnostics.push(`mapped to truth-violated criterion ${mappedId} → supported detection`);
-        }
-      } else {
-        // Mapped to a criterion not in truth outcomes → out-of-scope.
+      } else if (rc.criteria.expectedCriterionIds.includes(mappedId)) {
+        // Known criterion but no Truth outcome — cannot compare.
         mappingStatus = "out-of-scope";
         outOfScopeCount++;
-        truthComparison = "neutral";
-        referenceValidity = "invalid";
-        semanticSupport = "neutral";
-        findingDiagnostics.push(`mapped to criterion ${mappedId} not in truth outcomes → out-of-scope`);
+        criterionMapping = mappedId;
+      } else {
+        mappingStatus = "out-of-scope";
+        outOfScopeCount++;
+        criterionMapping = mappedId;
+        findingDiagnostics.push(`mapped to criterion ${mappedId} not in truth inventory → out-of-scope`);
       }
     } else {
-      // No criterion mapping → unmapped.
       unmappedCount++;
-      // Unmapped findings must remain visible and must not automatically be
-      // treated as false allegations.
-      truthComparison = "neutral";
-      referenceValidity = "unknown";
-      // Check if there are references that might give some semantic info.
-      if (rc.assessments.length > 0 && rc.assessments[0].references.length > 0) {
-        semanticSupport = "unsupported";
-        truthComparison = "neutral";
-        findingDiagnostics.push("unmapped finding with no criterion mapping");
+      findingDiagnostics.push("no criterion mapping");
+    }
+
+    // Reference validity is purely mechanical.
+    let referenceValidity: "valid" | "invalid" | "unknown";
+    if (resolvedRefs.length === 0) referenceValidity = "unknown";
+    else if (resolvedRefs.some((r) => r.mechanicallyValid)) referenceValidity = "valid";
+    else referenceValidity = "invalid";
+
+    // Semantic support requires a real, mechanically valid, supporting reference.
+    const anySupporting = resolvedRefs.some((r) => r.mechanicallyValid && r.supportsBehavior);
+    let semanticSupport: "supported" | "unsupported" | "neutral";
+    if (mappingStatus !== "mapped" || resolvedRefs.length === 0) semanticSupport = "neutral";
+    else if (anySupporting) semanticSupport = "supported";
+    else semanticSupport = "unsupported";
+
+    // Truth comparison only for mapped findings; never implies reference validity.
+    let truthComparison: "matches" | "contradicts" | "neutral" | "n/a" = "neutral";
+    if (mappingStatus === "mapped" && truthBindingValid) {
+      if (truthOutcomes[criterionMapping!] === true) {
+        truthComparison = "contradicts"; // false allegation regardless of reference
+        findingDiagnostics.push(`mapped to truth-satisfied criterion ${criterionMapping} → false allegation`);
       } else {
-        semanticSupport = "neutral";
-        truthComparison = "neutral";
-        findingDiagnostics.push("unmapped finding with no criterion mapping or references");
+        truthComparison = "matches";
+        findingDiagnostics.push(
+          anySupporting
+            ? `mapped to truth-violated criterion ${criterionMapping} → supported detection`
+            : `mapped to truth-violated criterion ${criterionMapping} → detection without a supporting reference`,
+        );
       }
+    } else if (mappingStatus === "mapped") {
+      findingDiagnostics.push("truth binding invalid → truth comparison suspended");
     }
 
     findings.push({
       findingId: nativeComment,
       nativeComment,
-      normalizedFinding: normalized,
+      normalizedFinding: f.normalizedFinding,
       skipped: false,
       skipReason: null,
       mappingStatus,
@@ -514,15 +732,13 @@ function computeProfileAOutput(
     });
   }
 
-  // Profile A silence means no finding, not an inconclusive B-style assessment.
-  // If there are no findings at all, delivery count is 0.
   const totalFound = findings.length;
   const overallStatus =
     totalFound > 0
       ? mappedCount > 0 || unmappedCount > 0
         ? "partial"
         : "inconclusive"
-      : "complete"; // no findings = complete (nothing to report)
+      : "complete";
 
   return {
     deliveredCount,

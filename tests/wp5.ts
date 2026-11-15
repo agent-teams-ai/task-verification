@@ -17,6 +17,67 @@ function makeTruthBinding(rc: any, truthOutcomes: Record<string, boolean>): Trut
   };
 }
 
+type RegistryOverride = Partial<import("../src/scorer.ts").ArtifactEntry>;
+
+function makeRegistry(rc: any, overrides: Record<string, RegistryOverride> = {}): import("../src/scorer.ts").ArtifactRegistry {
+  const artifacts: Record<string, import("../src/scorer.ts").ArtifactEntry> = {};
+  for (const [ref, ov] of Object.entries(overrides)) {
+    artifacts[ref] = {
+      artifactId: ref,
+      digest: `digest-${ref}`,
+      candidateBinding: rc.candidate.repositoryMaterializationId,
+      snapshotDigest: rc.candidate.runtimeSnapshotDigest,
+      criterionId: null,
+      allowedSource: true,
+      current: true,
+      applicable: true,
+      ...ov,
+    };
+  }
+  return { artifacts };
+}
+
+const SUPPORTING_RUBRIC: import("../src/scorer.ts").RubricDecision = {
+  referenceExists: true,
+  tiedToCandidate: true,
+  supportsBehavior: true,
+  coversSubclauses: true,
+  relevantCurrentApplicable: true,
+  contradictsClaim: false,
+};
+
+const UNSUPPORTING_RUBRIC: import("../src/scorer.ts").RubricDecision = {
+  referenceExists: true,
+  tiedToCandidate: true,
+  supportsBehavior: false,
+  coversSubclauses: false,
+  relevantCurrentApplicable: true,
+  contradictsClaim: false,
+};
+
+function makeClaimRc(params: {
+  claim: string | null;
+  admitted: any;
+  references?: string[];
+  state?: string;
+  findings?: any[];
+}): any {
+  return buildResultContract({
+    subject: { fixtureTaskId: "task-1", expectedSubjectInventory: ["AC-1"] },
+    candidate: { repositoryMaterializationId: "S1-FIX-5ba5153fec57", baseTreeIdentity: "b", headTreeIdentity: "h", runtimeSnapshotDigest: "d", opaqueFixtureId: "o" },
+    criteria: { authoredCriteriaRevision: "crit-v1", criteriaTextDigest: "d", expectedCriterionIds: ["AC-1"], criterionToCheckMapping: {}, policyVersion: "v1", policyDigest: "pd" },
+    profile: { profileId: "pb", configurationIdentity: "c", promptIdentity: "p", inputIdentity: "i", requestedModel: null, observedModel: null, reasoningConfiguration: {}, adapterEntryIdentity: "a" },
+    assessments: [{ expectedCriterionId: "AC-1", present: true, originalReportedClaim: params.claim, admittedConclusion: params.admitted, references: params.references ?? [], explanation: null, diagnostics: [] }],
+    findings: params.findings ?? [],
+    coverage: computeCoverage(["AC-1"], ["AC-1"]),
+    execution: { state: (params.state ?? "completed") as any, slotId: "s", runId: "r", attemptId: "a", requestId: "req", sdkEffectCode: null, diagnostics: [], pendingEffects: [], cleanupStatus: "clean" },
+    rawArtifact: { available: true, rawText: "raw", rawBytesDigest: "d", rawUnavailableCause: null },
+    evidence: { producer: "p", candidateBinding: "c", checkDefinition: "cd", inputScope: "is", environment: "e", observationOutcome: "pass", completeness: "complete", timestamps: [], references: [], applicability: "applicable", provenance: "prov" },
+    usage: { inputTokens: null, outputTokens: null, totalTokens: null, durationMs: null, cost: null, currency: null, requestedModel: null, observedModel: null, capacityObservations: [] },
+    capacity: { durableFactCapacity: null, retentionPolicy: null },
+  });
+}
+
 test("WP5: result contract validates", () => {
   const rc = buildResultContract({
     subject: { fixtureTaskId: "task-1", expectedSubjectInventory: ["AC-1"] },
@@ -300,6 +361,7 @@ test("WP5: Profile A finding mapped to truth-violated criterion is supported det
         skipReason: null,
         qualityFlags: [],
         criterionMapping: "AC-1",
+        references: ["ref-valid"],
       },
     ],
     coverage: computeCoverage(["AC-1"], ["AC-1"]),
@@ -310,12 +372,21 @@ test("WP5: Profile A finding mapped to truth-violated criterion is supported det
     capacity: { durableFactCapacity: null, retentionPolicy: null },
   });
   // truthOutcomes: { "AC-1": false } means the criterion is violated (not satisfied).
-  const result = scoreResult({ resultContract: rc, truthBinding: makeTruthBinding(rc, { "AC-1": false }), referenceRubrics: {}, executionBinding: "preserve-claim" });
-  // Finding mapped to truth-violated criterion → supported detection.
+  const result = scoreResult({
+    resultContract: rc,
+    truthBinding: makeTruthBinding(rc, { "AC-1": false }),
+    referenceRubrics: {
+      "ref-valid": { referenceExists: true, tiedToCandidate: true, supportsBehavior: true, coversSubclauses: true, relevantCurrentApplicable: true, contradictsClaim: false },
+    },
+    artifactRegistry: makeRegistry(rc, { "ref-valid": {} }),
+    executionBinding: "preserve-claim",
+  });
+  // Finding mapped to truth-violated criterion with a valid supporting reference → supported detection.
   const finding = result.profileA.findings[0];
   assert.equal(finding.mappingStatus, "mapped", "finding should be mapped to AC-1");
-  assert.equal(finding.truthComparison, "matches", "finding on violated criterion should match");
-  assert.equal(finding.semanticSupport, "supported", "finding on violated criterion should be supported detection");
+  assert.equal(finding.truthComparison, "matches", "finding on violated criterion should match truth");
+  assert.equal(finding.referenceValidity, "valid", "real reference must resolve");
+  assert.equal(finding.semanticSupport, "supported", "valid supporting reference → supported detection");
   assert.equal(result.profileA.summary.mapped, 1, "one mapped finding");
   assert.equal(result.profileA.summary.outOfScope, 0, "no out-of-scope findings");
 });
@@ -345,11 +416,11 @@ test("WP5: Profile A finding mapped to truth-satisfied criterion is false allega
     capacity: { durableFactCapacity: null, retentionPolicy: null },
   });
   const result = scoreResult({ resultContract: rc, truthBinding: makeTruthBinding(rc, { "AC-1": true }), referenceRubrics: {}, executionBinding: "preserve-claim" });
-  // Finding mapped to truth-satisfied criterion → false allegation.
+  // Finding mapped to truth-satisfied criterion → false allegation, even with no reference.
   const finding = result.profileA.findings[0];
   assert.equal(finding.mappingStatus, "mapped", "finding should be mapped to AC-1");
   assert.equal(finding.truthComparison, "contradicts", "finding on satisfied criterion should contradict (false allegation)");
-  assert.equal(finding.semanticSupport, "unsupported", "finding on satisfied criterion should be unsupported");
+  assert.notEqual(finding.semanticSupport, "supported", "false allegation must never be supported");
   assert.equal(result.profileA.summary.mapped, 1, "one mapped finding");
 });
 
@@ -471,4 +542,174 @@ test("WP5: Profile A no findings / silence means no finding", () => {
   assert.equal(result.profileA.deliveredCount, 0, "no findings = deliveredCount=0");
   assert.equal(result.profileA.findings.length, 0, "no findings in output");
   assert.equal(result.profileA.summary.overallStatus, "complete", "silence = complete status");
+});
+
+// --- Reported-claim accounting (WP5) ---
+
+test("WP5 accounting: false satisfaction with missing reference", () => {
+  const rc = makeClaimRc({ claim: "satisfied", admitted: "satisfied", references: [] });
+  const r = scoreResult({ resultContract: rc, truthBinding: makeTruthBinding(rc, { "AC-1": false }), referenceRubrics: {} });
+  const e = r.reportedClaims.entries[0];
+  assert.equal(e.parsedClaim, "satisfied");
+  assert.equal(e.comparison, "false-satisfaction");
+  assert.equal(r.reportedClaims.falseSatisfaction, 1);
+  assert.equal(e.referenceValid, null, "no reference means no mechanical validity claim");
+});
+
+test("WP5 accounting: false satisfaction with invalid reference", () => {
+  const rc = makeClaimRc({ claim: "satisfied", admitted: "satisfied", references: ["missing-ref"] });
+  const r = scoreResult({ resultContract: rc, truthBinding: makeTruthBinding(rc, { "AC-1": false }), referenceRubrics: {}, artifactRegistry: makeRegistry(rc, {}) });
+  const e = r.reportedClaims.entries[0];
+  assert.equal(e.comparison, "false-satisfaction", "invalid reference must not erase the false satisfaction");
+  assert.equal(e.referenceValid, false);
+  assert.equal(r.reportedClaims.falseSatisfaction, 1);
+});
+
+test("WP5 accounting: false satisfaction with unavailable evidence", () => {
+  const rc = makeClaimRc({ claim: "satisfied", admitted: "satisfied", references: ["ref-x"] });
+  const r = scoreResult({ resultContract: rc, truthBinding: makeTruthBinding(rc, { "AC-1": false }), referenceRubrics: {}, artifactRegistry: makeRegistry(rc, { "ref-x": { applicable: false } }) });
+  const e = r.reportedClaims.entries[0];
+  assert.equal(e.comparison, "false-satisfaction");
+  assert.equal(e.referenceValid, false, "inapplicable evidence is not valid");
+});
+
+test("WP5 accounting: false violation with invalid reference", () => {
+  const rc = makeClaimRc({ claim: "violated", admitted: "violated", references: ["nope"] });
+  const r = scoreResult({ resultContract: rc, truthBinding: makeTruthBinding(rc, { "AC-1": true }), referenceRubrics: {}, artifactRegistry: makeRegistry(rc, {}) });
+  const e = r.reportedClaims.entries[0];
+  assert.equal(e.comparison, "false-violation");
+  assert.equal(e.referenceValid, false);
+});
+
+test("WP5 accounting: correct claim with unsupported reference", () => {
+  const rc = makeClaimRc({ claim: "violated", admitted: "violated", references: ["ref-u"] });
+  const r = scoreResult({ resultContract: rc, truthBinding: makeTruthBinding(rc, { "AC-1": false }), referenceRubrics: { "ref-u": UNSUPPORTING_RUBRIC }, artifactRegistry: makeRegistry(rc, { "ref-u": {} }) });
+  const e = r.reportedClaims.entries[0];
+  assert.equal(e.comparison, "agrees");
+  assert.equal(e.referenceValid, true, "reference resolves");
+  assert.equal(r.semanticSupport[0].supporting, false, "but is not semantically supporting");
+  assert.equal(r.reportedClaims.correctReportedClaims, 1);
+});
+
+test("WP5 accounting: failed execution with captured false claim", () => {
+  const rc = makeClaimRc({ claim: "satisfied", admitted: "satisfied", references: [], state: "failed" });
+  const r = scoreResult({ resultContract: rc, truthBinding: makeTruthBinding(rc, { "AC-1": false }), referenceRubrics: {}, executionBinding: "preserve-claim" });
+  const e = r.reportedClaims.entries[0];
+  assert.equal(e.comparison, "false-satisfaction", "captured claim is still accounted");
+  assert.equal(e.accounted, true);
+  assert.equal(e.admitted, false, "no admissible semantic verdict");
+  assert.equal(r.reportedClaims.falseSatisfaction, 1);
+  assert.equal(r.reportedClaims.admittedSemanticConclusions, 0);
+  assert.equal(r.reportedClaims.rejectedUnadmittedConclusions, 1);
+});
+
+test("WP5 accounting: failed execution without a parseable claim", () => {
+  const rc = makeClaimRc({ claim: null, admitted: null, references: [], state: "failed" });
+  const r = scoreResult({ resultContract: rc, truthBinding: makeTruthBinding(rc, { "AC-1": false }), referenceRubrics: {}, executionBinding: "preserve-claim" });
+  const e = r.reportedClaims.entries[0];
+  assert.equal(e.parsedClaim, "unknown");
+  assert.equal(e.accounted, false);
+  assert.equal(r.reportedClaims.unparseableUnknownClaims, 1);
+  assert.equal(r.reportedClaims.reportedSatisfied, 0);
+});
+
+test("WP5 accounting: unknown execution with a captured claim", () => {
+  const rc = makeClaimRc({ claim: "violated", admitted: "inconclusive", references: [], state: "unknown" });
+  const r = scoreResult({ resultContract: rc, truthBinding: makeTruthBinding(rc, { "AC-1": true }), referenceRubrics: {}, executionBinding: "preserve-claim" });
+  const e = r.reportedClaims.entries[0];
+  assert.equal(e.comparison, "false-violation");
+  assert.equal(e.accounted, true);
+  assert.equal(e.admitted, false);
+});
+
+test("WP5 accounting: invalid Truth binding suspends comparison but keeps claim", () => {
+  const rc = makeClaimRc({ claim: "satisfied", admitted: "satisfied", references: [] });
+  const tb = { ...makeTruthBinding(rc, { "AC-1": false }), headApplicationDigest: "WRONG" };
+  const r = scoreResult({ resultContract: rc, truthBinding: tb, referenceRubrics: {} });
+  const e = r.reportedClaims.entries[0];
+  assert.equal(e.comparison, "truth-suspended");
+  assert.equal(e.truthOutcome, null);
+  assert.equal(e.parsedClaim, "satisfied", "original claim is preserved");
+  assert.equal(e.accounted, true);
+  assert.equal(r.reportedClaims.truthComparisonSuspended, 1);
+  assert.equal(r.reportedClaims.falseSatisfaction, 0, "no Truth comparison when binding invalid");
+});
+
+test("WP5 accounting: unparseable raw output is unknown, never invented", () => {
+  const rc = makeClaimRc({ claim: "the code maybe possibly broken??", admitted: "inconclusive", references: [] });
+  const r = scoreResult({ resultContract: rc, truthBinding: makeTruthBinding(rc, { "AC-1": true }), referenceRubrics: {} });
+  const e = r.reportedClaims.entries[0];
+  assert.equal(e.parsedClaim, "unknown");
+  assert.equal(e.comparison, "unknown-claim");
+  assert.equal(r.reportedClaims.correctReportedClaims, 0);
+  assert.equal(r.reportedClaims.falseSatisfaction, 0);
+});
+
+// --- Profile A reference-aware scoring ---
+
+test("WP5 Profile A: truth-satisfied mapped finding stays false allegation with invalid reference", () => {
+  const rc = makeClaimRc({
+    claim: "satisfied", admitted: "satisfied", references: [],
+    findings: [{ nativeComment: "AC-1 broken", normalizedFinding: "AC-1 broken", skipped: false, skipReason: null, qualityFlags: [], criterionMapping: "AC-1", references: ["bad-ref"] }],
+  });
+  const r = scoreResult({ resultContract: rc, truthBinding: makeTruthBinding(rc, { "AC-1": true }), referenceRubrics: {}, artifactRegistry: makeRegistry(rc, {}) });
+  const f = r.profileA.findings[0];
+  assert.equal(f.referenceValidity, "invalid");
+  assert.equal(f.truthComparison, "contradicts", "invalid reference cannot become valid");
+  assert.notEqual(f.semanticSupport, "supported");
+});
+
+test("WP5 Profile A: supported detection requires a real valid reference", () => {
+  const rc = makeClaimRc({
+    claim: "violated", admitted: "violated", references: [],
+    findings: [{ nativeComment: "AC-1 fails", normalizedFinding: "AC-1 fails", skipped: false, skipReason: null, qualityFlags: [], criterionMapping: "AC-1", references: ["good-ref"] }],
+  });
+  const r = scoreResult({ resultContract: rc, truthBinding: makeTruthBinding(rc, { "AC-1": false }), referenceRubrics: { "good-ref": SUPPORTING_RUBRIC }, artifactRegistry: makeRegistry(rc, { "good-ref": {} }) });
+  const f = r.profileA.findings[0];
+  assert.equal(f.referenceValidity, "valid");
+  assert.equal(f.semanticSupport, "supported");
+  assert.equal(f.truthComparison, "matches");
+});
+
+test("WP5 Profile A: wrong-candidate and wrong-snapshot references are invalid", () => {
+  const rc = makeClaimRc({
+    claim: "violated", admitted: "violated", references: [],
+    findings: [{ nativeComment: "AC-1 fails", normalizedFinding: "AC-1 fails", skipped: false, skipReason: null, qualityFlags: [], criterionMapping: "AC-1", references: ["wrong-candidate", "wrong-snapshot"] }],
+  });
+  const r = scoreResult({
+    resultContract: rc,
+    truthBinding: makeTruthBinding(rc, { "AC-1": false }),
+    referenceRubrics: { "wrong-candidate": SUPPORTING_RUBRIC, "wrong-snapshot": SUPPORTING_RUBRIC },
+    artifactRegistry: makeRegistry(rc, {
+      "wrong-candidate": { candidateBinding: "S1-FIX-000000000000" },
+      "wrong-snapshot": { snapshotDigest: "other-snapshot" },
+    }),
+  });
+  const f = r.profileA.findings[0];
+  assert.equal(f.referenceValidity, "invalid");
+  assert.equal(f.semanticSupport, "unsupported", "truth violation does not make an invalid reference support");
+});
+
+test("WP5 Profile A: missing reference is invalid, not silently valid", () => {
+  const rc = makeClaimRc({
+    claim: "violated", admitted: "violated", references: [],
+    findings: [{ nativeComment: "AC-1 fails", normalizedFinding: "AC-1 fails", skipped: false, skipReason: null, qualityFlags: [], criterionMapping: "AC-1", references: ["absent"] }],
+  });
+  const r = scoreResult({ resultContract: rc, truthBinding: makeTruthBinding(rc, { "AC-1": false }), referenceRubrics: { absent: SUPPORTING_RUBRIC }, artifactRegistry: makeRegistry(rc, {}) });
+  const f = r.profileA.findings[0];
+  assert.equal(f.referenceValidity, "invalid");
+  assert.equal(f.semanticSupport, "unsupported");
+});
+
+test("WP5 Profile A: unmapped genuine finding remains neutral and visible", () => {
+  const rc = makeClaimRc({
+    claim: "satisfied", admitted: "satisfied", references: [],
+    findings: [{ nativeComment: "unrelated leak", normalizedFinding: "leak in X", skipped: false, skipReason: null, qualityFlags: [], criterionMapping: null }],
+  });
+  const r = scoreResult({ resultContract: rc, truthBinding: makeTruthBinding(rc, { "AC-1": true }), referenceRubrics: {} });
+  const f = r.profileA.findings[0];
+  assert.equal(f.mappingStatus, "unmapped");
+  assert.equal(f.truthComparison, "neutral");
+  assert.equal(f.semanticSupport, "neutral");
+  assert.equal(r.profileA.summary.unmapped, 1);
 });

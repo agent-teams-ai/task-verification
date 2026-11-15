@@ -76,6 +76,12 @@ export interface FindingRecord {
   skipReason: string | null;
   qualityFlags: string[];
   criterionMapping: string | null;
+  /**
+   * Mechanical source references the finding relies on. Optional for backward
+   * compatibility; when present the scorer resolves each against the immutable
+   * artifact registry instead of trusting Truth agreement.
+   */
+  references?: string[];
 }
 
 // --- Coverage ---
@@ -312,6 +318,8 @@ export function validateResultContract(rc: ResultContract): string[] {
       errors.push(`findings[${i}].skipReason must be string when skipped`);
     if (f.criterionMapping !== null && typeof f.criterionMapping !== "string")
       errors.push(`findings[${i}].criterionMapping must be string or null`);
+    if (f.references !== undefined && !Array.isArray(f.references))
+      errors.push(`findings[${i}].references must be an array when present`);
   }
 
   // 12. Coverage arrays and cross-field consistency

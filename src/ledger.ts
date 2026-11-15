@@ -6,13 +6,16 @@
  * effects. Never silently omitted. Never rewritten to turn failure into
  * success; corrections are new linked records.
  *
- * SINGLE-WRITER CONTRACT: This implementation supports a single writer
- * within a single process. The `acquireWriter`/`releaseWriter` functions
- * manage an in-process lock only. Cross-process concurrency is NOT
- * supported; callers in multi-process environments must serialize access
- * externally (e.g., via file locking at the OS level). `appendFileSync`
- * is NOT a write lock — it is a blocking I/O call that provides no
- * inter-process mutual exclusion.
+ * SINGLE-WRITER CONTRACT: this implementation supports a single writer within a
+ * single process. `acquireWriter`/`releaseWriter`/`withWriter` manage an
+ * in-process ownership lock. Cross-process concurrency is NOT supported;
+ * callers in multi-process environments must serialize access externally.
+ * `appendFileSync` is NOT a write lock.
+ *
+ * PER-ATTEMPT LIFECYCLE: an attempt moves through an explicit state machine.
+ * `planned` at most once, `attempt_started` at most once (optionally after
+ * `planned`, or directly), and at most one terminal event which itself requires
+ * a real prior `attempt_started`. No event may follow a terminal event.
  *
  * Licensed under Apache 2.0. See LICENSE.
  */
@@ -33,7 +36,8 @@ export type LedgerEventType =
   | "attempt_failed"
   | "attempt_unknown"
   | "cancelled"
-  | "superseded";
+  | "superseded"
+  | "criteria_removed";
 
 export interface LedgerRecord {
   schemaVersion: string;
@@ -73,19 +77,40 @@ export interface LedgerRecord {
   isStub: boolean;
   supersededBy: string | null;
   supersedes: string | null;
+  /** Present on `criteria_removed` tombstone events. */
+  criterionId?: string | null;
+  /** Revision identity being tombstoned. */
+  tombstoneOf?: string | null;
+  /** Revision lineage this tombstone establishes. */
+  lineage?: string | null;
 }
 
 export interface LedgerAppendOptions {
   ledgerPath?: string;
+  /**
+   * When provided, the caller must already own the ledger writer lock under this
+   * id (or the ledger must be free). When omitted, the append safely acquires
+   * and releases a private in-process ownership for the duration of the append.
+   */
+  writerId?: string;
 }
+
+const TERMINAL_EVENTS: ReadonlySet<LedgerEventType> = new Set([
+  "attempt_completed",
+  "attempt_failed",
+  "attempt_unknown",
+  "cancelled",
+  "superseded",
+]);
+
+const ANONYMOUS_WRITER = "__ledger_anonymous_append__";
 
 // --- Single-writer contract (in-process only) ---
 let activeWriter: string | null = null;
 
 export function acquireWriter(writerId: string): boolean {
-  if (activeWriter !== null && activeWriter !== writerId) {
-    return false;
-  }
+  if (!writerId) throw new Error("writerId must be non-empty");
+  if (activeWriter !== null && activeWriter !== writerId) return false;
   activeWriter = writerId;
   return true;
 }
@@ -100,6 +125,35 @@ export function releaseWriter(writerId: string): boolean {
 
 export function isWriterActive(): boolean {
   return activeWriter !== null;
+}
+
+export function activeWriterId(): string | null {
+  return activeWriter;
+}
+
+/**
+ * Run `fn` while owning the ledger writer lock. The lock is released even if
+ * `fn` throws. Re-entrant for the same writer id.
+ */
+export function withWriter<T>(writerId: string, fn: () => T): T {
+  if (!acquireWriter(writerId)) {
+    throw new Error(`ledger writer ${activeWriter} already owns the ledger`);
+  }
+  try {
+    return fn();
+  } finally {
+    releaseWriter(writerId);
+  }
+}
+
+function ensureWriter(writerId: string | undefined): { id: string; acquired: boolean } {
+  const id = writerId ?? ANONYMOUS_WRITER;
+  if (activeWriter === id) return { id, acquired: false };
+  if (activeWriter !== null) {
+    throw new Error(`ledger writer ${activeWriter} already owns the ledger`);
+  }
+  activeWriter = id;
+  return { id, acquired: true };
 }
 
 /**
@@ -129,8 +183,22 @@ export function validateLedgerRecord(record: LedgerRecord): string[] {
   if (!record.eventId.match(/^evt-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/)) {
     errors.push("eventId must be a UUID v4 format string");
   }
-  const validEventTypes: LedgerEventType[] = ["planned", "attempt_started", "attempt_completed", "attempt_failed", "attempt_unknown", "cancelled", "superseded"];
+  const validEventTypes: LedgerEventType[] = [
+    "planned",
+    "attempt_started",
+    "attempt_completed",
+    "attempt_failed",
+    "attempt_unknown",
+    "cancelled",
+    "superseded",
+    "criteria_removed",
+  ];
   if (!validEventTypes.includes(record.eventType)) errors.push(`invalid eventType: ${record.eventType}`);
+
+  if (record.eventType === "criteria_removed") {
+    if (!record.criterionId) errors.push("criteria_removed requires criterionId");
+    if (!record.tombstoneOf) errors.push("criteria_removed requires tombstoneOf (the removed revision identity)");
+  }
   return errors;
 }
 
@@ -151,107 +219,142 @@ export function findDuplicateEventIds(records: LedgerRecord[]): string[] {
 }
 
 /**
- * Check for duplicate attempt creation (same run/attempt with a "planned" or "attempt_started" event).
- * Multiple lifecycle events for the same attempt are allowed.
- * Returns list of duplicate attempt identity strings.
+ * Check for duplicate attempt-creation events: a second `planned` or a second
+ * `attempt_started` for the same run/attempt. `planned` followed by
+ * `attempt_started` is a valid lifecycle and is NOT reported here.
  */
 export function findDuplicateAttemptStarts(records: LedgerRecord[]): string[] {
-  const seen = new Set<string>();
+  const planned = new Set<string>();
+  const started = new Set<string>();
   const dups: string[] = [];
   for (const r of records) {
-    if (r.eventType === "planned" || r.eventType === "attempt_started") {
-      const key = `${r.runId}::${r.attemptId}`;
-      if (seen.has(key)) {
+    const key = `${r.runId}::${r.attemptId}`;
+    if (r.eventType === "planned") {
+      if (planned.has(key)) {
         if (!dups.includes(key)) dups.push(key);
       }
-      seen.add(key);
+      planned.add(key);
+    } else if (r.eventType === "attempt_started") {
+      if (started.has(key)) {
+        if (!dups.includes(key)) dups.push(key);
+      }
+      started.add(key);
     }
   }
   return dups;
 }
 
 /**
- * Legacy alias for backward compatibility with existing tests.
- * Now checks for duplicate attempt starts (not all events).
+ * Legacy alias for backward compatibility. Checks duplicate attempt starts.
  */
 export function findDuplicateIdentities(records: LedgerRecord[]): string[] {
   return findDuplicateAttemptStarts(records);
 }
 
+interface AttemptLifecycleState {
+  planned: number;
+  started: number;
+  terminal: LedgerRecord[];
+}
+
+function attemptKey(r: LedgerRecord): string {
+  return `${r.runId}::${r.attemptId}`;
+}
+
+function lifecycleState(prior: LedgerRecord[]): AttemptLifecycleState {
+  const state: AttemptLifecycleState = { planned: 0, started: 0, terminal: [] };
+  for (const r of prior) {
+    if (r.eventType === "criteria_removed") continue;
+    if (r.eventType === "planned") state.planned++;
+    else if (r.eventType === "attempt_started") state.started++;
+    else if (TERMINAL_EVENTS.has(r.eventType)) state.terminal.push(r);
+  }
+  return state;
+}
+
+/**
+ * Validate a single lifecycle transition of `record` against the prior records
+ * of the same attempt. Returns a list of errors (empty = allowed).
+ */
+export function checkLifecycleTransition(prior: LedgerRecord[], record: LedgerRecord): string[] {
+  if (record.eventType === "criteria_removed") return [];
+  const errors: string[] = [];
+  const key = attemptKey(record);
+  const attemptPrior = prior.filter((r) => attemptKey(r) === key);
+  const state = lifecycleState(attemptPrior);
+
+  // No event may follow a terminal state (no resurrection or contradiction).
+  if (state.terminal.length > 0) {
+    const last = state.terminal[state.terminal.length - 1];
+    errors.push(`${key}: event ${record.eventType} follows terminal event ${last.eventType}`);
+    return errors;
+  }
+
+  switch (record.eventType) {
+    case "planned":
+      if (state.planned > 0) errors.push(`${key}: duplicate planned`);
+      if (state.started > 0) errors.push(`${key}: planned after attempt_started`);
+      break;
+    case "attempt_started":
+      if (state.started > 0) errors.push(`${key}: duplicate attempt_started`);
+      break;
+    case "attempt_completed":
+    case "attempt_failed":
+    case "attempt_unknown":
+    case "cancelled":
+    case "superseded":
+      if (state.started === 0) {
+        errors.push(`${key}: terminal event ${record.eventType} requires a real prior attempt_started`);
+      }
+      break;
+  }
+  return errors;
+}
+
 /**
  * Append a record to the ledger.
  * Rejects duplicate event IDs and invalid lifecycle transitions.
+ * Enforces the in-process single-writer contract.
  * Event ID is preserved from the caller — never overwritten.
  */
 export function appendLedgerRecord(record: LedgerRecord, options?: LedgerAppendOptions): void {
   const ledgerPath = options?.ledgerPath ?? DEFAULT_LEDGER_PATH;
+
   const errors = validateLedgerRecord(record);
   if (errors.length > 0) {
     throw new Error(`invalid ledger record: ${errors.join("; ")}`);
   }
 
-  // Do NOT overwrite eventId — it must be stable and generated once before validation.
-
-  // Set schemaVersion if not provided (already validated above).
-  if (!record.schemaVersion) {
-    record.schemaVersion = "ledger-event-v1";
-  }
-
-  // Read existing ledger.
-  let existingRecords: LedgerRecord[];
+  const ownership = ensureWriter(options?.writerId);
   try {
-    existingRecords = readLedger(ledgerPath);
-  } catch (err) {
-    throw new Error(`failed to read ledger: ${err instanceof Error ? err.message : String(err)}`);
-  }
-
-  // Set sequence based on existing records (monotonic).
-  record.sequence = existingRecords.length + 1;
-
-  // Check for duplicate event IDs.
-  const existingEventIds = existingRecords.map((r) => r.eventId);
-  if (existingEventIds.includes(record.eventId)) {
-    throw new Error(`duplicate eventId: ${record.eventId}`);
-  }
-
-  // Check for duplicate attempt starts (not all events).
-  const dupStarts = findDuplicateAttemptStarts([...existingRecords, record]);
-  if (dupStarts.length > 0) {
-    throw new Error(`duplicate attempt start: ${dupStarts.join(", ")}`);
-  }
-
-  // Validate lifecycle transitions per attempt.
-  const attemptKey = `${record.runId}::${record.attemptId}`;
-  const attemptRecords = existingRecords.filter((r) => `${r.runId}::${r.attemptId}` === attemptKey);
-
-  // Terminal events require a prior start.
-  const terminalEvents = ["attempt_completed", "attempt_failed", "attempt_unknown", "cancelled", "superseded"];
-  if (terminalEvents.includes(record.eventType)) {
-    const hasStart = attemptRecords.some((r) => r.eventType === "attempt_started" || r.eventType === "planned");
-    if (!hasStart) {
-      throw new Error(`terminal event ${record.eventType} requires prior start for ${attemptKey}`);
+    let existingRecords: LedgerRecord[];
+    try {
+      existingRecords = readLedger(ledgerPath);
+    } catch (err) {
+      throw new Error(`failed to read ledger: ${err instanceof Error ? err.message : String(err)}`);
     }
-  }
 
-  // Cancelled/superseded attempts cannot be resurrected.
-  if (record.eventType === "attempt_started" || record.eventType === "planned") {
-    const wasCancelled = attemptRecords.some((r) => r.eventType === "cancelled" || r.eventType === "superseded");
-    if (wasCancelled) {
-      throw new Error(`cannot resurrect cancelled/superseded attempt: ${attemptKey}`);
+    // Check for duplicate event IDs.
+    if (existingRecords.some((r) => r.eventId === record.eventId)) {
+      throw new Error(`duplicate eventId: ${record.eventId}`);
     }
-  }
 
-  // Monotonic sequence check.
-  if (existingRecords.length > 0) {
-    const lastSeq = Math.max(...existingRecords.map((r) => r.sequence));
-    if (record.sequence <= lastSeq) {
-      // Allow if explicitly set higher; otherwise auto-increment.
-      record.sequence = lastSeq + 1;
+    // Validate lifecycle transition against prior records of this attempt.
+    const transitionErrors = checkLifecycleTransition(existingRecords, record);
+    if (transitionErrors.length > 0) {
+      throw new Error(transitionErrors.join("; "));
     }
-  }
 
-  const line = JSON.stringify(record) + "\n";
-  fs.appendFileSync(ledgerPath, line, "utf8");
+    // Monotonic sequence: never reuse or move backwards. Event identity is the
+    // eventId; sequence is derived append order.
+    const lastSeq = existingRecords.reduce((max, r) => Math.max(max, r.sequence), 0);
+    record.sequence = lastSeq + 1;
+
+    const line = JSON.stringify(record) + "\n";
+    fs.appendFileSync(ledgerPath, line, "utf8");
+  } finally {
+    if (ownership.acquired) releaseWriter(ownership.id);
+  }
 }
 
 /**
@@ -278,66 +381,31 @@ export function readLedger(ledgerPath?: string): LedgerRecord[] {
 
 /**
  * Replay ledger integrity: verify monotonic criteria revisions, no duplicate
- * identities, valid event lifecycle transitions, schema validity.
- * Also checks for resurrection of cancelled/superseded attempts.
+ * identities, valid event lifecycle transitions, schema validity, and no
+ * resurrection of cancelled/superseded attempts.
  */
 export function verifyLedgerIntegrity(records: LedgerRecord[]): string[] {
   const errors: string[] = [];
 
-  // Check duplicate event IDs.
-  const dupEvents = findDuplicateEventIds(records);
-  for (const d of dupEvents) errors.push(`duplicate eventId: ${d}`);
-
-  // Check duplicate attempt starts.
-  const dupStarts = findDuplicateAttemptStarts(records);
-  for (const d of dupStarts) errors.push(`duplicate identity: ${d}`);
+  for (const d of findDuplicateEventIds(records)) errors.push(`duplicate eventId: ${d}`);
+  for (const d of findDuplicateAttemptStarts(records)) errors.push(`duplicate identity: ${d}`);
 
   for (const r of records) {
-    const recErrors = validateLedgerRecord(r);
-    for (const e of recErrors) errors.push(`${r.runId}/${r.attemptId}: ${e}`);
+    for (const e of validateLedgerRecord(r)) errors.push(`${attemptKey(r)}: ${e}`);
   }
 
-  // Check event lifecycle transitions per attempt.
-  const attempts = new Map<string, LedgerRecord[]>();
-  for (const r of records) {
-    const key = `${r.runId}::${r.attemptId}`;
-    if (!attempts.has(key)) attempts.set(key, []);
-    attempts.get(key)!.push(r);
-  }
-
-  for (const [attemptKey, attemptRecords] of attempts) {
-    // Sort by sequence.
-    const sorted = [...attemptRecords].sort((a, b) => a.sequence - b.sequence);
-
-    // Check terminal events require prior start.
-    for (let i = 0; i < sorted.length; i++) {
-      const r = sorted[i];
-      const terminalEvents = ["attempt_completed", "attempt_failed", "attempt_unknown", "cancelled", "superseded"];
-      if (terminalEvents.includes(r.eventType)) {
-        const hasPriorStart = sorted.slice(0, i).some((prev) => prev.eventType === "attempt_started" || prev.eventType === "planned");
-        if (!hasPriorStart) {
-          errors.push(`${attemptKey}: terminal event ${r.eventType} requires prior start`);
-        }
-      }
+  // Replay transitions in sequence order, enforcing per-attempt monotonicity.
+  const sorted = [...records].sort((a, b) => a.sequence - b.sequence);
+  const seenPerAttempt = new Map<string, LedgerRecord[]>();
+  for (const r of sorted) {
+    const key = attemptKey(r);
+    const prior = seenPerAttempt.get(key) ?? [];
+    if (prior.length > 0 && r.sequence <= prior[prior.length - 1].sequence) {
+      errors.push(`${key}: sequence not monotonic`);
     }
-
-    // Check cancelled/superseded cannot be resurrected.
-    const cancelledIndex = sorted.findIndex((r) => r.eventType === "cancelled" || r.eventType === "superseded");
-    if (cancelledIndex !== -1) {
-      const afterCancelled = sorted.slice(cancelledIndex + 1);
-      for (const r of afterCancelled) {
-        if (r.eventType === "attempt_started" || r.eventType === "planned") {
-          errors.push(`${attemptKey}: cannot resurrect cancelled/superseded attempt`);
-        }
-      }
-    }
-
-    // Check monotonic sequence.
-    for (let i = 1; i < sorted.length; i++) {
-      if (sorted[i].sequence <= sorted[i - 1].sequence) {
-        errors.push(`${attemptKey}: sequence not monotonic`);
-      }
-    }
+    for (const e of checkLifecycleTransition(prior, r)) errors.push(e);
+    prior.push(r);
+    seenPerAttempt.set(key, prior);
   }
 
   return errors;
