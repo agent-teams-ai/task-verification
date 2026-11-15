@@ -1,3 +1,4 @@
+import * as crypto from "node:crypto";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import * as fs from "node:fs";
@@ -28,7 +29,7 @@ function makeRecord(overrides: Partial<LedgerRecord> = {}): LedgerRecord {
     slotId: "slot-1",
     runId: "run-1",
     attemptId: "attempt-1",
-    eventId: "evt-12345678-1234-1234-1234-123456789012",
+    eventId: "evt-" + (crypto.randomUUID()),
     eventType: "attempt_started",
     opaqueCandidateId: "S1-FIX-5ba5153fec57",
     profile: "profile-b",

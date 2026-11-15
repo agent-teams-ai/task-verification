@@ -29,6 +29,8 @@ export interface AssessmentBinding {
   criteriaRevision: string;
   candidateSnapshot: string;
   admitted: boolean;
+  reportedCriterionIds?: string[];
+  admittedCriterionIds?: string[];
 }
 
 export function isAssessmentCurrentForCriteria(
@@ -98,6 +100,8 @@ export interface AdmissionDecision {
   lifecycleValid: boolean;
   coverageComplete: boolean;
   evidenceApplicable: boolean;
+  reportedIdsValid: boolean;
+  admittedIdsValid: boolean;
 }
 
 export function consumerAdmit(
@@ -107,29 +111,51 @@ export function consumerAdmit(
   expectedCriterionIds: string[],
   evidenceApplicable: boolean,
   cancelledOrSuperseded: boolean,
+  lifecycleValid: boolean = !cancelledOrSuperseded,
 ): AdmissionDecision {
   const criteriaMatch = assessment.criteriaRevision === currentCriteriaRevision.revisionId;
   const snapshotMatch = assessment.candidateSnapshot === currentSnapshot;
-  const lifecycleValid = !cancelledOrSuperseded;
-  const coverageComplete = expectedCriterionIds.length > 0;
+  const lcValid = lifecycleValid && !cancelledOrSuperseded;
+
+  // Real coverage check: reported IDs must exactly match expected inventory.
+  const reportedIds = assessment.reportedCriterionIds ?? [];
+  const admittedIds = assessment.admittedCriterionIds ?? [];
+
+  const reportedSet = new Set(reportedIds);
+  const expectedSet = new Set(expectedCriterionIds);
+
+  // Coverage is complete only if every expected ID is reported, no duplicates, no unknowns.
+  const reportedHasAll = expectedCriterionIds.every((id) => reportedSet.has(id));
+  const reportedNoDuplicates = reportedIds.length === reportedSet.size;
+  const reportedNoUnknowns = reportedIds.every((id) => expectedSet.has(id));
+  const coverageComplete = reportedHasAll && reportedNoDuplicates && reportedNoUnknowns && expectedCriterionIds.length > 0;
+
+  // Admitted IDs must be a subset of reported IDs and match expected inventory.
+  const admittedHasNoUnknowns = admittedIds.every((id) => expectedSet.has(id));
+  const admittedSubsetOfReported = admittedIds.every((id) => reportedSet.has(id));
+  const admittedIdsValid = admittedHasNoUnknowns && admittedSubsetOfReported;
+
   const evidenceApp = evidenceApplicable;
 
-  const admitted = criteriaMatch && snapshotMatch && lifecycleValid && coverageComplete && evidenceApp;
+  const admitted = criteriaMatch && snapshotMatch && lcValid && coverageComplete && evidenceApp && admittedIdsValid;
 
   let reason = "admitted";
   if (!criteriaMatch) reason = "criteria revision mismatch";
   else if (!snapshotMatch) reason = "snapshot mismatch";
-  else if (!lifecycleValid) reason = "cancelled or superseded";
+  else if (!lcValid) reason = "cancelled or superseded";
   else if (!coverageComplete) reason = "incomplete coverage";
   else if (!evidenceApp) reason = "evidence not applicable";
+  else if (!admittedIdsValid) reason = "invalid admitted IDs";
 
   return {
     admitted,
     reason,
     criteriaMatch,
     snapshotMatch,
-    lifecycleValid,
+    lifecycleValid: lcValid,
     coverageComplete,
     evidenceApplicable: evidenceApp,
+    reportedIdsValid: coverageComplete,
+    admittedIdsValid,
   };
 }
