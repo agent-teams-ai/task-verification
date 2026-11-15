@@ -67,9 +67,14 @@ export interface AssessmentBinding {
   assessmentId: string;
   criteriaRevision: string;
   candidateSnapshot: string;
+  /** Whether this assessment was admitted by its producer. False can never be overridden. */
   admitted: boolean;
   reportedCriterionIds?: string[];
   admittedCriterionIds?: string[];
+  /** Mechanical reference validity, when the policy requires references. */
+  referenceValidity?: boolean | null;
+  /** Semantic reference sufficiency, when the policy requires support. */
+  referenceSufficiency?: boolean | null;
 }
 
 export function isAssessmentCurrentForCriteria(
@@ -141,6 +146,9 @@ export interface AdmissionDecision {
   evidenceApplicable: boolean;
   reportedIdsValid: boolean;
   admittedIdsValid: boolean;
+  assessmentAdmitted: boolean;
+  referencesValid: boolean;
+  referencesSufficient: boolean;
 }
 
 export function consumerAdmit(
@@ -155,6 +163,14 @@ export function consumerAdmit(
   const criteriaMatch = assessment.criteriaRevision === currentCriteriaRevision.revisionId;
   const snapshotMatch = assessment.candidateSnapshot === currentSnapshot;
   const lcValid = lifecycleValid && !cancelledOrSuperseded;
+
+  // A producer that did not admit the assessment can never be overridden here.
+  const assessmentAdmitted = assessment.admitted === true;
+
+  // Reference validity/sufficiency are only enforced when explicitly supplied;
+  // null/undefined means the policy does not require them for this control.
+  const referencesValid = assessment.referenceValidity !== false;
+  const referencesSufficient = assessment.referenceSufficiency !== false;
 
   // Real coverage check: reported IDs must exactly match expected inventory.
   const reportedIds = assessment.reportedCriterionIds ?? [];
@@ -176,15 +192,27 @@ export function consumerAdmit(
 
   const evidenceApp = evidenceApplicable;
 
-  const admitted = criteriaMatch && snapshotMatch && lcValid && coverageComplete && evidenceApp && admittedIdsValid;
+  const admitted =
+    criteriaMatch &&
+    snapshotMatch &&
+    lcValid &&
+    assessmentAdmitted &&
+    coverageComplete &&
+    evidenceApp &&
+    admittedIdsValid &&
+    referencesValid &&
+    referencesSufficient;
 
   let reason = "admitted";
   if (!criteriaMatch) reason = "criteria revision mismatch";
   else if (!snapshotMatch) reason = "snapshot mismatch";
   else if (!lcValid) reason = "cancelled or superseded";
+  else if (!assessmentAdmitted) reason = "assessment not admitted";
   else if (!coverageComplete) reason = "incomplete coverage";
   else if (!evidenceApp) reason = "evidence not applicable";
   else if (!admittedIdsValid) reason = "invalid admitted IDs";
+  else if (!referencesValid) reason = "invalid reference";
+  else if (!referencesSufficient) reason = "insufficient reference support";
 
   return {
     admitted,
@@ -196,5 +224,8 @@ export function consumerAdmit(
     evidenceApplicable: evidenceApp,
     reportedIdsValid: coverageComplete,
     admittedIdsValid,
+    assessmentAdmitted,
+    referencesValid,
+    referencesSufficient,
   };
 }

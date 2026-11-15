@@ -8,38 +8,64 @@
  * original polarity and execution state as SEPARATE dimensions — never
  * collapsed into a single score.
  *
+ * Mechanical reference validity is resolved from the immutable artifact
+ * registry. Caller-supplied rubric booleans are never used as proof that a
+ * reference exists or is bound to the declared candidate/snapshot.
+ *
  * Licensed under Apache 2.0. See LICENSE.
  */
 
-export const SCORER_VERSION = "scorer-v1";
+import { consumerAdmit, type AdmissionDecision, type AssessmentBinding } from "./controls.ts";
+import type {
+  AdmittedConclusion,
+  ExecutionState,
+  ResultContract,
+} from "./result-contract.ts";
+
+export const SCORER_VERSION = "scorer-v2";
 export const RUBRIC_VERSION = "rubric-v1";
 
 // --- Rubric ---
 
 export interface RubricDecision {
-  referenceExists: boolean;
-  tiedToCandidate: boolean;
+  /** @deprecated Mechanical existence is resolved from the artifact registry. */
+  referenceExists?: boolean;
+  /** @deprecated Mechanical binding is resolved from the artifact registry. */
+  tiedToCandidate?: boolean;
   supportsBehavior: boolean;
   coversSubclauses: boolean;
   relevantCurrentApplicable: boolean;
   contradictsClaim: boolean;
 }
 
+/** Human-review provenance for a semantic-support decision. */
+export interface RubricReview {
+  rubricVersion: string;
+  reference: string;
+  decision: RubricDecision;
+  rationale: string;
+  reviewer: string;
+  /** True when the reviewer was blinded to profile/repetition labels. */
+  blinded: boolean;
+  reviewedAt: string | null;
+}
+
 export function evaluateRubric(params: {
-  referenceExists: boolean;
-  tiedToCandidate: boolean;
   supportsBehavior: boolean;
   coversSubclauses: boolean;
   relevantCurrentApplicable: boolean;
   contradictsClaim: boolean;
 }): RubricDecision {
-  return { ...params };
+  return {
+    supportsBehavior: params.supportsBehavior,
+    coversSubclauses: params.coversSubclauses,
+    relevantCurrentApplicable: params.relevantCurrentApplicable,
+    contradictsClaim: params.contradictsClaim,
+  };
 }
 
 export function isReferenceSupporting(r: RubricDecision): boolean {
   return (
-    r.referenceExists &&
-    r.tiedToCandidate &&
     r.supportsBehavior &&
     r.coversSubclauses &&
     r.relevantCurrentApplicable &&
@@ -76,20 +102,31 @@ export interface ArtifactEntry {
 }
 
 export interface ScorerInput {
-  resultContract: import("./result-contract.ts").ResultContract;
-  truthBinding: TruthBinding; // for joining truth AFTER output is fixed
-  referenceRubrics: Record<string, RubricDecision>; // per reference id
-  // Execution state binding — separates technical failure from semantic verdict.
-  executionBinding?: "preserve-claim" | "no-verdict";
-  // Mechanical reference resolver — resolves references against immutable artifact registry.
+  resultContract: ResultContract;
+  truthBinding: TruthBinding;
+  /** Frozen semantic-support rubric, per reference id. */
+  referenceRubrics: Record<string, RubricDecision>;
+  /** Human-review provenance for rubric decisions. */
+  rubricReviews?: Record<string, RubricReview>;
+  /** Immutable artifact registry used for mechanical reference resolution. */
   artifactRegistry?: ArtifactRegistry;
+  /** @deprecated Retained for call compatibility; execution state governs admission. */
+  executionBinding?: "preserve-claim" | "no-verdict";
+  /** When true, an invalid Truth binding throws instead of returning errors. */
+  strictTruthBinding?: boolean;
 }
 
 export interface LabelAgreement {
   criterionId: string;
-  admittedConclusion: string | null;
+  /** Null when execution is not admissible or the Truth binding is invalid. */
+  admittedConclusion: AdmittedConclusion | null;
+  /** Parsed polarity of the ORIGINAL reported claim. */
+  reportedClaim: ParsedReportedClaim;
   truthOutcome: boolean | null;
-  agrees: boolean | null; // null if truth unavailable
+  /** Null when no admitted comparison is possible. */
+  agrees: boolean | null;
+  /** True when an admissible semantic conclusion exists. */
+  admitted: boolean;
 }
 
 export interface ReferenceValidity {
@@ -98,17 +135,19 @@ export interface ReferenceValidity {
   exists: boolean;
   tiedToCandidate: boolean;
   valid: boolean;
+  reason: string;
 }
 
 export interface SemanticSupport {
   criterionId: string;
   reference: string;
   supporting: boolean;
+  reason: string;
 }
 
 // --- Reported-claim accounting (WP5) ---
 // Independent accounting of the ORIGINAL reported claim, kept separate from
-// Evidence admission, mechanical reference validity, semantic support and the
+// evidence admission, mechanical reference validity, semantic support and the
 // admitted semantic conclusion. Truth comparison is suspended when the Truth
 // binding is invalid; it is never inferred from reference validity.
 
@@ -127,9 +166,9 @@ export interface ReportedClaimAccountingEntry {
   parsedClaim: ParsedReportedClaim;
   truthOutcome: boolean | null;
   comparison: ReportedClaimComparison;
-  admittedConclusion: import("./result-contract.ts").AdmittedConclusion | null;
+  admittedConclusion: AdmittedConclusion | null;
   referenceValid: boolean | null;
-  executionState: import("./result-contract.ts").ExecutionState;
+  executionState: ExecutionState;
   /** True when the original claim is retained as a reported-claim observation. */
   accounted: boolean;
   /** True when an admissible semantic conclusion exists (execution valid + admitted). */
@@ -172,12 +211,18 @@ export interface ScorerResult {
   scorerVersion: string;
   rubricVersion: string;
   candidateId: string;
+  truthBindingValid: boolean;
+  truthBindingErrors: string[];
   labelAgreement: LabelAgreement[];
   referenceValidity: ReferenceValidity[];
   semanticSupport: SemanticSupport[];
+  rubricReviews: RubricReview[];
   coverage: import("./result-contract.ts").CoverageRecord;
   polarityPreserved: boolean;
   executionValid: boolean;
+  executionState: ExecutionState;
+  /** Shared deterministic consumer-admission decision for this result. */
+  admission: AdmissionDecision;
   diagnostics: string[];
   // Profile A finding scoring — structured output, no invented B-style verdicts.
   profileA: ProfileAOutput;
@@ -189,355 +234,207 @@ export interface ProfileAFindingOutput {
   findingId: string;
   nativeComment: string;
   normalizedFinding: string | null;
+  /** False for skipped findings and findings dropped by normalization. */
+  delivered: boolean;
   skipped: boolean;
   skipReason: string | null;
+  /** True when a raw native comment had no normalized finding. */
+  normalizationDropped: boolean;
   mappingStatus: "mapped" | "unmapped" | "out-of-scope" | "invalid";
-  criterionMapping: string | null; // criterion ID if mapped, null otherwise
+  criterionMapping: string | null;
+  /** True when another delivered finding maps to the same criterion. */
+  duplicateMapping: boolean;
   referenceValidity: "valid" | "invalid" | "unknown";
   semanticSupport: "supported" | "unsupported" | "neutral";
   truthComparison: "matches" | "contradicts" | "neutral" | "n/a";
+  qualityFlags: string[];
   diagnostics: string[];
 }
 
 export interface ProfileAOutput {
   deliveredCount: number;
   findings: ProfileAFindingOutput[];
+  /** Profile A does not produce criterion satisfaction verdicts. */
+  satisfaction: "not-applicable";
+  /** Profile A does not produce criterion coverage. */
+  criterionCoverage: "not-applicable";
   summary: {
+    delivered: number;
     mapped: number;
     unmapped: number;
     outOfScope: number;
     skipped: number;
+    normalizationDropped: number;
+    falseAllegations: number;
+    supportedDetections: number;
+    duplicateMappings: number;
     overallStatus: "complete" | "partial" | "inconclusive";
   };
 }
 
-function executionBindingToAgrees(
-  binding: "preserve-claim" | "no-verdict",
-  claim: string | null,
-): boolean | null {
-  // "preserve-claim": keep the original claim visible; verdict suspended.
-  // "no-verdict": no verdict, no claim preservation.
-  if (binding === "no-verdict") return null;
-  // binding === "preserve-claim":
-  // If there is an actual parseable claim, label it as a reported-claim metric
-  // (return null for the agreement verdict, but the claim itself is preserved).
-  // If there is no claim (null/undefined), the verdict is also suspended.
-  if (claim !== null && claim !== undefined) {
-    // There is an original reported claim — preserve it, do not invent a verdict.
-    return null;
-  }
-  // No parseable claim; verdict suspended.
-  return null;
+// --- Helpers ---
+
+function sameSet(a: readonly string[], b: readonly string[]): boolean {
+  if (a.length !== b.length) return false;
+  const set = new Set(a);
+  if (set.size !== a.length) return false;
+  return b.every((v) => set.has(v));
 }
 
-export function scoreResult(input: ScorerInput): ScorerResult {
-  const rc = input.resultContract;
-  const diagnostics: string[] = [];
-  const referenceValidity: ReferenceValidity[] = [];
-  const tb = input.truthBinding;
+/** Completed/partial attempts are admissible; cancelled/superseded/failed/unknown are not. */
+export function isAdmissibleExecution(state: ExecutionState, supersededBy?: string | null): boolean {
+  if (supersededBy !== null && supersededBy !== undefined && supersededBy !== "") return false;
+  return state === "completed" || state === "partial";
+}
 
-  // --- Truth binding validation ---
-  // Ground Truth must only be joined after reviewer output is frozen and recorded.
-  // Validate all Truth binding fields against the ResultContract.
-  const truthBindingErrors: string[] = [];
+/**
+ * Validate a Truth binding against the ResultContract. Returns structured
+ * errors; an empty array means the binding may be joined.
+ */
+export function validateTruthBinding(rc: ResultContract, tb: TruthBinding): string[] {
+  const errors: string[] = [];
+  if (tb === null || typeof tb !== "object") return ["truth binding must be an object"];
 
-  // 1. Match Truth candidate to ResultContract candidate.
   if (tb.canonicalCandidateId !== rc.candidate.repositoryMaterializationId) {
-    truthBindingErrors.push(
+    errors.push(
       `truth candidate "${tb.canonicalCandidateId}" does not match result contract candidate "${rc.candidate.repositoryMaterializationId}"`,
     );
   }
-
-  // 2. Match the approved anonymized identity.
   if (tb.anonymizedCandidateId !== rc.candidate.opaqueFixtureId) {
-    truthBindingErrors.push(
+    errors.push(
       `truth anonymized candidate "${tb.anonymizedCandidateId}" does not match result contract opaqueFixtureId "${rc.candidate.opaqueFixtureId}"`,
     );
   }
-
-  // 3. Match the head snapshot digest.
   if (tb.headApplicationDigest !== rc.candidate.runtimeSnapshotDigest) {
-    truthBindingErrors.push(
+    errors.push(
       `truth head digest "${tb.headApplicationDigest}" does not match result contract snapshot "${rc.candidate.runtimeSnapshotDigest}"`,
     );
   }
-
-  // 4. Match criteria revision.
   if (tb.criteriaRevision !== rc.criteria.authoredCriteriaRevision) {
-    truthBindingErrors.push(
+    errors.push(
       `truth criteria revision "${tb.criteriaRevision}" does not match result contract criteria "${rc.criteria.authoredCriteriaRevision}"`,
     );
   }
 
-  // 5. Validate exact criterion inventory and unique labels.
-  const expectedSet = new Set(rc.criteria.expectedCriterionIds);
-  if (tb.expectedCriterionInventory.length !== rc.criteria.expectedCriterionIds.length ||
-      !tb.expectedCriterionInventory.every((id) => expectedSet.has(id))) {
-    truthBindingErrors.push(
-      `truth criterion inventory does not match result contract expected criteria`,
-    );
-  }
-
-  // 6. Reject duplicate, missing or unknown Truth criteria.
-  const truthOutcomeKeys = Object.keys(tb.truthOutcomes);
-  const truthOutcomeSet = new Set(truthOutcomeKeys);
-  if (truthOutcomeKeys.length !== truthOutcomeSet.size) {
-    truthBindingErrors.push("truth outcomes contain duplicate criterion IDs");
-  }
-  for (const id of truthOutcomeKeys) {
-    if (!expectedSet.has(id)) {
-      truthBindingErrors.push(`truth outcome contains unknown criterion: ${id}`);
+  if (!Array.isArray(tb.expectedCriterionInventory)) {
+    errors.push("truth expectedCriterionInventory must be an array");
+  } else {
+    if (new Set(tb.expectedCriterionInventory).size !== tb.expectedCriterionInventory.length) {
+      errors.push("truth expectedCriterionInventory contains duplicates");
     }
-  }
-  for (const id of rc.criteria.expectedCriterionIds) {
-    if (!truthOutcomeSet.has(id)) {
-      truthBindingErrors.push(`truth outcome missing criterion: ${id}`);
+    if (!sameSet(tb.expectedCriterionInventory, rc.criteria.expectedCriterionIds)) {
+      errors.push("truth criterion inventory does not match result contract expected criteria");
     }
   }
 
-  // Add all truth binding errors to diagnostics.
-  for (const err of truthBindingErrors) {
-    diagnostics.push(err);
-  }
-
-  const truthBindingValid = truthBindingErrors.length === 0;
-
-  // --- Execution state check first ---
-  const execState = rc.execution.state;
-  const executionFailedOrUnknown = execState === "failed" || execState === "unknown";
-
-  // Label agreement: only compute when execution did not fail/unknown.
-  // When execution failed/unknown, we preserve the original claim as a reported-claim
-  // metric rather than computing an admitted label-agreement verdict.
-  const labelAgreement: LabelAgreement[] = rc.assessments.map((a) => {
-    const truth = tb.truthOutcomes[a.expectedCriterionId];
-    const admitted = a.admittedConclusion;
-
-    if (!truthBindingValid) {
-      // Truth binding is invalid — suspend the label-agreement verdict.
-      // The original claim is retained for reported-claim accounting.
-      const claim = a.originalReportedClaim;
-      return {
-        criterionId: a.expectedCriterionId,
-        admittedConclusion: admitted,
-        truthOutcome: truth ?? null,
-        // Label as null when truth binding is invalid — the verdict is suspended,
-        // not "incorrect". The original claim is retained for reported-claim accounting.
-        agrees: executionBindingToAgrees(input.executionBinding || "preserve-claim", claim),
-      };
+  if (tb.truthOutcomes === null || typeof tb.truthOutcomes !== "object" || Array.isArray(tb.truthOutcomes)) {
+    errors.push("truth truthOutcomes must be an object");
+  } else {
+    const expected = new Set(rc.criteria.expectedCriterionIds);
+    for (const [id, value] of Object.entries(tb.truthOutcomes)) {
+      if (!expected.has(id)) errors.push(`truth outcome contains unknown criterion: ${id}`);
+      if (typeof value !== "boolean") errors.push(`truth outcome for ${id} must be boolean`);
     }
-
-    if (executionFailedOrUnknown) {
-      // For failed/unknown execution: preserve the original reported claim as a
-      // separately identifiable observation; do NOT compute an invented admitted
-      // semantic verdict. Record the execution state as a diagnostic.
-      const claim = a.originalReportedClaim;
-      return {
-        criterionId: a.expectedCriterionId,
-        admittedConclusion: admitted,
-        truthOutcome: truth ?? null,
-        // Label as null when execution failed/unknown — the verdict is suspended,
-        // not "incorrect". The original claim is retained for reported-claim accounting.
-        agrees: executionBindingToAgrees(input.executionBinding || "preserve-claim", claim),
-      };
-    }
-
-    // Agreement: admitted satisfied ↔ truth true; admitted violated ↔ truth false.
-    let agrees: boolean | null = null;
-    if (truth !== undefined && admitted !== null) {
-      if (admitted === "satisfied") agrees = truth === true;
-      else if (admitted === "violated") agrees = truth === false;
-      else agrees = null; // inconclusive
-    }
-    return {
-      criterionId: a.expectedCriterionId,
-      admittedConclusion: admitted,
-      truthOutcome: truth ?? null,
-      agrees,
-    };
-  });
-
-  // --- Profile A finding scoring ---
-  // Iterate over delivered FindingRecord entries. Preserve native comments,
-  // normalized findings, skipped status and quality flags. Distinguish mapped,
-  // unmapped and out-of-scope findings. Unmapped findings remain visible and
-  // must not automatically be treated as false allegations. A delivered finding
-  // mapped to a truth-satisfied criterion counts as a false allegation. A supported
-  // finding mapped to a truth-violated criterion may count as supported detection.
-  // A skipped finding must not be counted as a delivered finding; preserve its
-  // reason and diagnostic. Profile A silence means no finding, not an inconclusive
-  // B-style assessment. Profile A satisfaction and criterion coverage marked not
-  // applicable.
-  const profileAOutput: ProfileAOutput = computeProfileAOutput(
-    rc,
-    tb.truthOutcomes,
-    input.artifactRegistry,
-    input.referenceRubrics,
-    truthBindingValid,
-  );
-  const reportedClaims = computeReportedClaimAccounting(
-    rc,
-    tb.truthOutcomes,
-    truthBindingValid,
-    input.artifactRegistry,
-  );
-  const semanticSupport: SemanticSupport[] = [];
-  for (const a of rc.assessments) {
-    for (const ref of a.references) {
-      // Mechanical validation: resolve against artifact registry if available.
-      let mechExists = false;
-      let mechTied = false;
-      let mechValid = false;
-      if (input.artifactRegistry) {
-        const artifact = input.artifactRegistry.artifacts[ref];
-        if (artifact) {
-          mechExists = true;
-          mechTied = artifact.candidateBinding === rc.candidate.repositoryMaterializationId &&
-                     artifact.snapshotDigest === rc.candidate.runtimeSnapshotDigest;
-          mechValid = mechExists && mechTied && artifact.allowedSource && artifact.current && artifact.applicable;
-        }
-      } else {
-        // Fall back to rubric-provided booleans (legacy path).
-        const rubric = input.referenceRubrics[ref];
-        mechExists = rubric?.referenceExists ?? false;
-        mechTied = rubric?.tiedToCandidate ?? false;
-        mechValid = mechExists && mechTied;
-      }
-      const rubric = input.referenceRubrics[ref];
-      referenceValidity.push({
-        criterionId: a.expectedCriterionId,
-        reference: ref,
-        exists: mechExists,
-        tiedToCandidate: mechTied,
-        valid: mechValid,
-      });
-      semanticSupport.push({
-        criterionId: a.expectedCriterionId,
-        reference: ref,
-        supporting: rubric ? isReferenceSupporting(rubric) : false,
-      });
-    }
-    // Empty references → unsupported.
-    if (a.references.length === 0 && a.admittedConclusion !== null) {
-      diagnostics.push(`${a.expectedCriterionId}: no references, unsupported`);
-    }
-  }
-
-  // Polarity preserved: original reported claim must not be overwritten.
-  const polarityPreserved = rc.assessments.every(
-    (a) => a.originalReportedClaim === null || typeof a.originalReportedClaim === "string",
-  );
-
-  // Execution valid.
-  const executionValid = rc.execution.state === "completed" || rc.execution.state === "partial";
-
-  // Coverage diagnostics.
-  if (rc.coverage.missingIds.length > 0) {
-    diagnostics.push(`missing IDs: ${rc.coverage.missingIds.join(", ")}`);
-  }
-  if (rc.coverage.duplicateIds.length > 0) {
-    diagnostics.push(`duplicate IDs: ${rc.coverage.duplicateIds.join(", ")}`);
-  }
-  if (rc.coverage.unknownIds.length > 0) {
-    diagnostics.push(`unknown IDs: ${rc.coverage.unknownIds.join(", ")}`);
-  }
-  if (rc.coverage.invalidIds.length > 0) {
-    diagnostics.push(`invalid IDs: ${rc.coverage.invalidIds.join(", ")}`);
-  }
-
-  // Profile B with complete inventory but >= 80% inconclusive → flagged.
-  const totalAssessments = rc.assessments.length;
-  const inconclusiveCount = rc.assessments.filter((a) => a.admittedConclusion === "inconclusive").length;
-  if (totalAssessments > 0 && rc.coverage.wholeInventoryAdmitted && inconclusiveCount / totalAssessments >= 0.8) {
-    diagnostics.push("profile B yields few usable assessments (>=80% inconclusive)");
-  }
-
-  // Failed/unknown execution must not acquire invented semantic verdict.
-  if (rc.execution.state === "failed" || rc.execution.state === "unknown") {
-    for (const a of rc.assessments) {
-      if (a.admittedConclusion !== null) {
-        diagnostics.push(`${a.expectedCriterionId}: execution ${rc.execution.state} but has admitted conclusion`);
+    for (const id of rc.criteria.expectedCriterionIds) {
+      if (!Object.prototype.hasOwnProperty.call(tb.truthOutcomes, id)) {
+        errors.push(`truth outcome missing criterion: ${id}`);
       }
     }
   }
 
-  return {
-    scorerVersion: SCORER_VERSION,
-    rubricVersion: RUBRIC_VERSION,
-    candidateId: rc.candidate.repositoryMaterializationId,
-    labelAgreement,
-    referenceValidity,
-    semanticSupport,
-    coverage: rc.coverage,
-    polarityPreserved,
-    executionValid,
-    diagnostics,
-    profileA: profileAOutput,
-    reportedClaims,
-  };
+  if (typeof tb.truthVersion !== "string" || tb.truthVersion.trim() === "") {
+    errors.push("missing truthVersion");
+  }
+  if (typeof tb.truthDigest !== "string" || tb.truthDigest.trim() === "") {
+    errors.push("missing truthDigest");
+  }
+
+  return errors;
 }
 
-interface ResolvedFindingReference {
+interface ResolvedReference {
   reference: string;
   exists: boolean;
   tiedToCandidate: boolean;
   mechanicallyValid: boolean;
-  supportsBehavior: boolean;
   reason: string;
+}
+
+/**
+ * Resolve one reference mechanically against the immutable artifact registry.
+ * Never trusts caller-provided `referenceExists` / `tiedToCandidate` booleans.
+ */
+function resolveReference(
+  ref: string,
+  rc: ResultContract,
+  registry: ArtifactRegistry | undefined,
+): ResolvedReference {
+  if (!registry) {
+    return {
+      reference: ref,
+      exists: false,
+      tiedToCandidate: false,
+      mechanicallyValid: false,
+      reason: "no artifact registry",
+    };
+  }
+  const artifact = registry.artifacts[ref];
+  if (!artifact) {
+    return {
+      reference: ref,
+      exists: false,
+      tiedToCandidate: false,
+      mechanicallyValid: false,
+      reason: "reference not in artifact registry",
+    };
+  }
+  const tied =
+    artifact.candidateBinding === rc.candidate.repositoryMaterializationId &&
+    artifact.snapshotDigest === rc.candidate.runtimeSnapshotDigest;
+  const mechanicallyValid = tied && artifact.allowedSource && artifact.current && artifact.applicable;
+
+  let reason = "resolved and mechanically valid";
+  if (!artifact.allowedSource) reason = "source not allowed";
+  else if (!artifact.current) reason = "artifact not current";
+  else if (!artifact.applicable) reason = "artifact not applicable";
+  else if (!tied) reason = "candidate/snapshot binding mismatch";
+
+  return {
+    reference: ref,
+    exists: true,
+    tiedToCandidate: tied,
+    mechanicallyValid,
+    reason,
+  };
+}
+
+interface ResolvedFindingReference extends ResolvedReference {
+  supportsBehavior: boolean;
 }
 
 function resolveFindingReferences(
   refs: string[] | undefined,
-  rc: import("./result-contract.ts").ResultContract,
+  rc: ResultContract,
   registry: ArtifactRegistry | undefined,
   rubrics: Record<string, RubricDecision>,
 ): ResolvedFindingReference[] {
   const out: ResolvedFindingReference[] = [];
   for (const ref of refs ?? []) {
+    const resolved = resolveReference(ref, rc, registry);
     const rubric = rubrics[ref];
-    if (registry) {
-      const artifact = registry.artifacts[ref];
-      if (!artifact) {
-        out.push({ reference: ref, exists: false, tiedToCandidate: false, mechanicallyValid: false, supportsBehavior: false, reason: "reference not in artifact registry" });
-        continue;
-      }
-      const tied = artifact.candidateBinding === rc.candidate.repositoryMaterializationId &&
-        artifact.snapshotDigest === rc.candidate.runtimeSnapshotDigest;
-      const mechanicallyValid = artifact.allowedSource && artifact.current && artifact.applicable && tied;
-      const supportsBehavior = rubric ? isReferenceSupporting(rubric) : false;
-      const reason = !artifact.allowedSource ? "source not allowed"
-        : !artifact.current ? "artifact not current"
-        : !artifact.applicable ? "artifact not applicable"
-        : !tied ? "candidate/snapshot binding mismatch"
-        : !supportsBehavior ? "reference does not support claimed behavior"
-        : "resolved and supporting";
-      out.push({ reference: ref, exists: true, tiedToCandidate: tied, mechanicallyValid, supportsBehavior, reason });
-    } else {
-      // Legacy path: rubric-provided booleans, no immutable registry.
-      const exists = rubric?.referenceExists ?? false;
-      const tied = rubric?.tiedToCandidate ?? false;
-      const mechanicallyValid = exists && tied;
-      const supportsBehavior = rubric ? isReferenceSupporting(rubric) : false;
-      out.push({
-        reference: ref,
-        exists,
-        tiedToCandidate: tied,
-        mechanicallyValid,
-        supportsBehavior,
-        reason: !exists ? "reference missing" : !tied ? "not tied to candidate" : !supportsBehavior ? "does not support behavior" : "resolved and supporting",
-      });
-    }
+    const supportsBehavior = resolved.mechanicallyValid && rubric ? isReferenceSupporting(rubric) : false;
+    out.push({ ...resolved, supportsBehavior });
   }
   return out;
 }
 
 function computeReportedClaimAccounting(
-  rc: import("./result-contract.ts").ResultContract,
+  rc: ResultContract,
   truthOutcomes: Record<string, boolean>,
   truthBindingValid: boolean,
   registry: ArtifactRegistry | undefined,
+  admissible: boolean,
 ): ReportedClaimAccounting {
-  const executionValid = rc.execution.state === "completed" || rc.execution.state === "partial";
   const entries: ReportedClaimAccountingEntry[] = [];
   let reportedSatisfied = 0;
   let reportedViolated = 0;
@@ -575,15 +472,15 @@ function computeReportedClaimAccounting(
       correctReportedClaims++;
     }
 
-    // Mechanical reference validity is a separate dimension and never erases the
-    // original claim accounting.
+    // Mechanical reference validity is a separate dimension and never erases
+    // the original claim accounting.
     let referenceValid: boolean | null = null;
     if (a.references.length > 0) {
       const resolved = resolveFindingReferences(a.references, rc, registry, {});
       referenceValid = resolved.some((r) => r.mechanicallyValid);
     }
 
-    const admitted = executionValid && a.admittedConclusion !== null;
+    const admitted = admissible && a.admittedConclusion !== null;
     if (admitted) admittedSemanticConclusions++;
     else rejectedUnadmittedConclusions++;
 
@@ -603,7 +500,7 @@ function computeReportedClaimAccounting(
 
   return {
     attempted: rc.assessments.length,
-    completed: executionValid ? rc.assessments.length : 0,
+    completed: admissible ? rc.assessments.length : 0,
     reportedSatisfied,
     reportedViolated,
     falseSatisfaction,
@@ -618,44 +515,75 @@ function computeReportedClaimAccounting(
 }
 
 function computeProfileAOutput(
-  rc: import("./result-contract.ts").ResultContract,
+  rc: ResultContract,
   truthOutcomes: Record<string, boolean>,
   registry: ArtifactRegistry | undefined,
   rubrics: Record<string, RubricDecision>,
   truthBindingValid: boolean,
 ): ProfileAOutput {
   const findings: ProfileAFindingOutput[] = [];
+  const mappedFindings: { findingId: string; criterionId: string }[] = [];
   let deliveredCount = 0;
   let mappedCount = 0;
   let unmappedCount = 0;
   let outOfScopeCount = 0;
   let skippedCount = 0;
+  let normalizationDroppedCount = 0;
+  let falseAllegations = 0;
+  let supportedDetections = 0;
 
-  for (const f of rc.findings) {
+  for (let i = 0; i < rc.findings.length; i++) {
+    const f = rc.findings[i];
+    const findingId = f.findingId ?? `finding-${i}`;
+    const nativeComment = f.nativeComment;
+
     if (f.skipped) {
       skippedCount++;
       findings.push({
-        findingId: f.nativeComment || `finding-${findings.length}`,
-        nativeComment: f.nativeComment,
+        findingId,
+        nativeComment,
         normalizedFinding: f.normalizedFinding,
+        delivered: false,
         skipped: true,
         skipReason: f.skipReason,
-        mappingStatus: "unmapped",
-        criterionMapping: null,
+        normalizationDropped: false,
+        mappingStatus: "invalid",
+        criterionMapping: f.criterionMapping,
+        duplicateMapping: false,
         referenceValidity: "unknown",
         semanticSupport: "neutral",
         truthComparison: "n/a",
-        diagnostics: f.skipReason !== null ? [`skipped: ${f.skipReason}`] : ["skipped"],
+        qualityFlags: f.qualityFlags,
+        diagnostics: [f.skipReason ? `skipped: ${f.skipReason}` : "skipped"],
+      });
+      continue;
+    }
+
+    const normalizationDropped = f.normalizedFinding === null && nativeComment.trim().length > 0;
+    if (normalizationDropped) {
+      normalizationDroppedCount++;
+      findings.push({
+        findingId,
+        nativeComment,
+        normalizedFinding: null,
+        delivered: false,
+        skipped: false,
+        skipReason: null,
+        normalizationDropped: true,
+        mappingStatus: "invalid",
+        criterionMapping: f.criterionMapping,
+        duplicateMapping: false,
+        referenceValidity: "unknown",
+        semanticSupport: "neutral",
+        truthComparison: "n/a",
+        qualityFlags: f.qualityFlags,
+        diagnostics: ["normalization dropped the raw native finding"],
       });
       continue;
     }
 
     deliveredCount++;
-    const nativeComment = f.nativeComment || "unnamed finding";
-    const criterionMappingRaw = f.criterionMapping;
     const findingDiagnostics: string[] = [];
-
-    // Resolve the finding's real references independently of Truth.
     const resolvedRefs = resolveFindingReferences(f.references, rc, registry, rubrics);
     for (const r of resolvedRefs) {
       findingDiagnostics.push(`reference ${r.reference}: ${r.reason}`);
@@ -663,92 +591,322 @@ function computeProfileAOutput(
 
     let mappingStatus: "mapped" | "unmapped" | "out-of-scope" = "unmapped";
     let criterionMapping: string | null = null;
-
-    if (criterionMappingRaw !== null && criterionMappingRaw !== undefined) {
-      const mappedId = criterionMappingRaw;
-      if (Object.prototype.hasOwnProperty.call(truthOutcomes, mappedId)) {
+    if (f.criterionMapping !== null && f.criterionMapping !== undefined) {
+      const mappedId = f.criterionMapping;
+      if (rc.criteria.expectedCriterionIds.includes(mappedId)) {
         mappingStatus = "mapped";
         criterionMapping = mappedId;
         mappedCount++;
-      } else if (rc.criteria.expectedCriterionIds.includes(mappedId)) {
-        // Known criterion but no Truth outcome — cannot compare.
-        mappingStatus = "out-of-scope";
-        outOfScopeCount++;
-        criterionMapping = mappedId;
+        mappedFindings.push({ findingId, criterionId: mappedId });
       } else {
         mappingStatus = "out-of-scope";
-        outOfScopeCount++;
         criterionMapping = mappedId;
-        findingDiagnostics.push(`mapped to criterion ${mappedId} not in truth inventory → out-of-scope`);
+        outOfScopeCount++;
+        findingDiagnostics.push(`mapped to criterion ${mappedId} not in the frozen inventory → out-of-scope`);
       }
     } else {
       unmappedCount++;
       findingDiagnostics.push("no criterion mapping");
     }
 
-    // Reference validity is purely mechanical.
     let referenceValidity: "valid" | "invalid" | "unknown";
     if (resolvedRefs.length === 0) referenceValidity = "unknown";
     else if (resolvedRefs.some((r) => r.mechanicallyValid)) referenceValidity = "valid";
     else referenceValidity = "invalid";
 
-    // Semantic support requires a real, mechanically valid, supporting reference.
     const anySupporting = resolvedRefs.some((r) => r.mechanicallyValid && r.supportsBehavior);
     let semanticSupport: "supported" | "unsupported" | "neutral";
     if (mappingStatus !== "mapped" || resolvedRefs.length === 0) semanticSupport = "neutral";
     else if (anySupporting) semanticSupport = "supported";
     else semanticSupport = "unsupported";
 
-    // Truth comparison only for mapped findings; never implies reference validity.
     let truthComparison: "matches" | "contradicts" | "neutral" | "n/a" = "neutral";
     if (mappingStatus === "mapped" && truthBindingValid) {
       if (truthOutcomes[criterionMapping!] === true) {
-        truthComparison = "contradicts"; // false allegation regardless of reference
+        truthComparison = "contradicts";
+        falseAllegations++;
         findingDiagnostics.push(`mapped to truth-satisfied criterion ${criterionMapping} → false allegation`);
       } else {
         truthComparison = "matches";
-        findingDiagnostics.push(
-          anySupporting
-            ? `mapped to truth-violated criterion ${criterionMapping} → supported detection`
-            : `mapped to truth-violated criterion ${criterionMapping} → detection without a supporting reference`,
-        );
+        if (anySupporting) {
+          supportedDetections++;
+          findingDiagnostics.push(
+            `mapped to truth-violated criterion ${criterionMapping} → supported detection`,
+          );
+        } else {
+          findingDiagnostics.push(
+            `mapped to truth-violated criterion ${criterionMapping} → detection without a supporting reference`,
+          );
+        }
       }
     } else if (mappingStatus === "mapped") {
       findingDiagnostics.push("truth binding invalid → truth comparison suspended");
     }
 
     findings.push({
-      findingId: nativeComment,
+      findingId,
       nativeComment,
       normalizedFinding: f.normalizedFinding,
+      delivered: true,
       skipped: false,
       skipReason: null,
+      normalizationDropped: false,
       mappingStatus,
       criterionMapping,
+      duplicateMapping: false,
       referenceValidity,
       semanticSupport,
       truthComparison,
+      qualityFlags: f.qualityFlags,
       diagnostics: findingDiagnostics,
     });
   }
 
-  const totalFound = findings.length;
-  const overallStatus =
-    totalFound > 0
-      ? mappedCount > 0 || unmappedCount > 0
+  // Duplicate/conflicting mappings: a criterion may not be claimed by more than
+  // one delivered finding. Keep both visible and flag them.
+  const byCriterion = new Map<string, string[]>();
+  for (const m of mappedFindings) {
+    const list = byCriterion.get(m.criterionId) ?? [];
+    list.push(m.findingId);
+    byCriterion.set(m.criterionId, list);
+  }
+  let duplicateMappings = 0;
+  for (const [criterionId, ids] of byCriterion) {
+    if (ids.length > 1) {
+      duplicateMappings += ids.length;
+      for (const finding of findings) {
+        if (ids.includes(finding.findingId)) {
+          finding.duplicateMapping = true;
+          finding.diagnostics.push(
+            `duplicate/conflicting mapping: criterion ${criterionId} claimed by ${ids.join(", ")}`,
+          );
+        }
+      }
+    }
+  }
+
+  const overallStatus: "complete" | "partial" | "inconclusive" =
+    deliveredCount === 0 && skippedCount === 0 && normalizationDroppedCount === 0
+      ? "complete"
+      : deliveredCount > 0
         ? "partial"
-        : "inconclusive"
-      : "complete";
+        : "partial";
 
   return {
     deliveredCount,
     findings,
+    satisfaction: "not-applicable",
+    criterionCoverage: "not-applicable",
     summary: {
+      delivered: deliveredCount,
       mapped: mappedCount,
       unmapped: unmappedCount,
       outOfScope: outOfScopeCount,
       skipped: skippedCount,
+      normalizationDropped: normalizationDroppedCount,
+      falseAllegations,
+      supportedDetections,
+      duplicateMappings,
       overallStatus,
     },
+  };
+}
+
+export function scoreResult(input: ScorerInput): ScorerResult {
+  const rc = input.resultContract;
+  const diagnostics: string[] = [];
+  const referenceValidity: ReferenceValidity[] = [];
+  const semanticSupport: SemanticSupport[] = [];
+  const tb = input.truthBinding;
+
+  // --- Truth binding validation (post-hoc join) ---
+  const truthBindingErrors = validateTruthBinding(rc, tb);
+  const truthBindingValid = truthBindingErrors.length === 0;
+  for (const err of truthBindingErrors) diagnostics.push(`truth binding: ${err}`);
+  if (input.strictTruthBinding && !truthBindingValid) {
+    throw new Error(`invalid truth binding: ${truthBindingErrors.join("; ")}`);
+  }
+
+  // --- Execution admissibility ---
+  const execState = rc.execution.state;
+  const supersededBy = rc.execution.supersededBy ?? null;
+  const admissible = isAdmissibleExecution(execState, supersededBy);
+  if (!admissible) {
+    diagnostics.push(
+      `execution ${execState}${supersededBy ? ` (superseded by ${supersededBy})` : ""}: no admitted semantic verdict; original claim preserved`,
+    );
+  }
+
+  // --- Label agreement (only for admissible execution) ---
+  const labelAgreement: LabelAgreement[] = rc.assessments.map((a) => {
+    const truth = truthBindingValid ? tb.truthOutcomes[a.expectedCriterionId] ?? null : null;
+    const parsed = parseReportedClaim(a.originalReportedClaim);
+
+    if (!admissible) {
+      return {
+        criterionId: a.expectedCriterionId,
+        admittedConclusion: null,
+        reportedClaim: parsed,
+        truthOutcome: truth,
+        agrees: null,
+        admitted: false,
+      };
+    }
+
+    const admittedConclusion = a.admittedConclusion;
+    let agrees: boolean | null = null;
+    if (truthBindingValid && truth !== null && admittedConclusion !== null) {
+      if (admittedConclusion === "satisfied") agrees = truth === true;
+      else if (admittedConclusion === "violated") agrees = truth === false;
+      else agrees = null;
+    }
+    return {
+      criterionId: a.expectedCriterionId,
+      admittedConclusion,
+      reportedClaim: parsed,
+      truthOutcome: truth,
+      agrees,
+      admitted: admittedConclusion !== null,
+    };
+  });
+
+  // --- Mechanical reference validity + semantic support (separate dimensions) ---
+  for (const a of rc.assessments) {
+    for (const ref of a.references) {
+      const resolved = resolveReference(ref, rc, input.artifactRegistry);
+      referenceValidity.push({
+        criterionId: a.expectedCriterionId,
+        reference: ref,
+        exists: resolved.exists,
+        tiedToCandidate: resolved.tiedToCandidate,
+        valid: resolved.mechanicallyValid,
+        reason: resolved.reason,
+      });
+      const rubric = input.referenceRubrics[ref];
+      const supporting = resolved.mechanicallyValid && rubric ? isReferenceSupporting(rubric) : false;
+      semanticSupport.push({
+        criterionId: a.expectedCriterionId,
+        reference: ref,
+        supporting,
+        reason: !resolved.mechanicallyValid
+          ? resolved.reason
+          : !rubric
+            ? "no semantic rubric decision"
+            : supporting
+              ? "supports behavior and covers subclauses"
+              : "does not fully support the claimed behavior",
+      });
+    }
+    if (a.references.length === 0 && a.admittedConclusion !== null) {
+      diagnostics.push(`${a.expectedCriterionId}: no references, unsupported`);
+    }
+  }
+
+  // --- Profile A finding scoring ---
+  const profileAOutput = computeProfileAOutput(
+    rc,
+    tb.truthOutcomes,
+    input.artifactRegistry,
+    input.referenceRubrics,
+    truthBindingValid,
+  );
+
+  // --- Reported-claim accounting ---
+  const reportedClaims = computeReportedClaimAccounting(
+    rc,
+    tb.truthOutcomes,
+    truthBindingValid,
+    input.artifactRegistry,
+    admissible,
+  );
+
+  // --- Shared consumer admission ---
+  const evidenceApplicable = rc.evidence.applicability === "applicable";
+  const lifecycleValid = execState !== "cancelled" && supersededBy === null;
+  const cancelledOrSuperseded = !lifecycleValid;
+  const binding: AssessmentBinding = {
+    assessmentId: rc.contractId,
+    criteriaRevision: rc.criteria.authoredCriteriaRevision,
+    candidateSnapshot: rc.candidate.runtimeSnapshotDigest,
+    admitted: admissible && rc.assessments.every((a) => a.admittedConclusion !== null),
+    reportedCriterionIds: rc.coverage.presentIds,
+    admittedCriterionIds: rc.assessments
+      .filter((a) => a.admittedConclusion !== null)
+      .map((a) => a.expectedCriterionId),
+  };
+  const admission = consumerAdmit(
+    binding,
+    {
+      revisionId: rc.criteria.authoredCriteriaRevision,
+      textDigest: rc.criteria.criteriaTextDigest,
+      parentRevision: null,
+    },
+    rc.candidate.runtimeSnapshotDigest,
+    rc.criteria.expectedCriterionIds,
+    evidenceApplicable,
+    cancelledOrSuperseded,
+    admissible,
+  );
+  if (!admission.admitted) diagnostics.push(`consumer admission rejected: ${admission.reason}`);
+
+  // --- Polarity preserved ---
+  const polarityPreserved = rc.assessments.every(
+    (a) => a.originalReportedClaim === null || typeof a.originalReportedClaim === "string",
+  );
+
+  // --- Coverage diagnostics ---
+  if (rc.coverage.missingIds.length > 0) {
+    diagnostics.push(`missing IDs: ${rc.coverage.missingIds.join(", ")}`);
+  }
+  if (rc.coverage.duplicateIds.length > 0) {
+    diagnostics.push(`duplicate IDs: ${rc.coverage.duplicateIds.join(", ")}`);
+  }
+  if (rc.coverage.unknownIds.length > 0) {
+    diagnostics.push(`unknown IDs: ${rc.coverage.unknownIds.join(", ")}`);
+  }
+  if (rc.coverage.invalidIds.length > 0) {
+    diagnostics.push(`invalid IDs: ${rc.coverage.invalidIds.join(", ")}`);
+  }
+
+  // --- Profile B with complete inventory but >= 80% inconclusive → flagged ---
+  const totalAssessments = rc.assessments.length;
+  const inconclusiveCount = rc.assessments.filter((a) => a.admittedConclusion === "inconclusive").length;
+  if (
+    totalAssessments > 0 &&
+    rc.coverage.wholeInventoryAdmitted &&
+    inconclusiveCount / totalAssessments >= 0.8
+  ) {
+    diagnostics.push("profile B yields few usable assessments (>=80% inconclusive)");
+  }
+
+  // --- Rubric review provenance ---
+  const rubricReviews: RubricReview[] = Object.entries(input.rubricReviews ?? {}).map(([reference, review]) => ({
+    rubricVersion: review.rubricVersion || RUBRIC_VERSION,
+    reference: review.reference || reference,
+    decision: review.decision,
+    rationale: review.rationale,
+    reviewer: review.reviewer,
+    blinded: review.blinded === true,
+    reviewedAt: review.reviewedAt ?? null,
+  }));
+
+  return {
+    scorerVersion: SCORER_VERSION,
+    rubricVersion: RUBRIC_VERSION,
+    candidateId: rc.candidate.repositoryMaterializationId,
+    truthBindingValid,
+    truthBindingErrors,
+    labelAgreement,
+    referenceValidity,
+    semanticSupport,
+    rubricReviews,
+    coverage: rc.coverage,
+    polarityPreserved,
+    executionValid: admissible,
+    executionState: execState,
+    admission,
+    diagnostics,
+    profileA: profileAOutput,
+    reportedClaims,
   };
 }

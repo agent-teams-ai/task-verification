@@ -70,6 +70,8 @@ export interface AssessmentRecord {
 // --- Findings (Profile A) ---
 
 export interface FindingRecord {
+  /** Stable delivered-finding identity. Optional for backward compatibility. */
+  findingId?: string;
   nativeComment: string;
   normalizedFinding: string | null;
   skipped: boolean;
@@ -111,6 +113,8 @@ export interface ExecutionRecord {
   diagnostics: string[];
   pendingEffects: string[];
   cleanupStatus: "clean" | "pending" | "failed" | "unknown";
+  /** Present when the attempt was superseded by a later attempt. */
+  supersededBy?: string | null;
 }
 
 // --- Raw artifact ---
@@ -178,288 +182,372 @@ export interface ResultContract {
   capacity: CapacityRecord;
 }
 
+// --- Validation helpers ---
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isNonEmptyString(value: unknown): value is string {
+  return typeof value === "string" && value.trim().length > 0;
+}
+
+function isStringArray(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every((v) => typeof v === "string");
+}
+
+function isFiniteNonNegativeOrNull(value: unknown): boolean {
+  return value === null || (typeof value === "number" && Number.isFinite(value) && value >= 0);
+}
+
+function isIsoTimestamp(value: unknown): boolean {
+  return typeof value === "string" && value.trim().length > 0 && !Number.isNaN(Date.parse(value));
+}
+
+/** Git tree/commit ids are 40 hex chars; sha256 digests are 64. Accept either. */
+function isDigestLike(value: unknown): boolean {
+  return typeof value === "string" && /^[0-9a-f]{7,64}$/i.test(value);
+}
+
+function isNullableString(value: unknown): boolean {
+  return value === null || typeof value === "string";
+}
+
+const EXECUTION_STATES: readonly ExecutionState[] = ["completed", "partial", "cancelled", "failed", "unknown"];
+const CLEANUP_STATES = ["clean", "pending", "failed", "unknown"] as const;
+const ADMITTED_CONCLUSIONS: readonly AdmittedConclusion[] = ["satisfied", "violated", "inconclusive"];
+const APPLICABILITY_VALUES = ["applicable", "stale", "unavailable", "invalid", "not-applicable"] as const;
+
+function sameMultiset(a: readonly string[], b: readonly string[]): boolean {
+  if (a.length !== b.length) return false;
+  const counts = new Map<string, number>();
+  for (const v of a) counts.set(v, (counts.get(v) ?? 0) + 1);
+  for (const v of b) {
+    const n = counts.get(v) ?? 0;
+    if (n === 0) return false;
+    counts.set(v, n - 1);
+  }
+  return true;
+}
+
+function sameSet(a: readonly string[], b: readonly string[]): boolean {
+  if (a.length !== b.length) return false;
+  const set = new Set(a);
+  if (set.size !== a.length) return false;
+  return b.every((v) => set.has(v));
+}
+
 /**
- * Validate a result contract. Returns list of errors (empty = valid).
- * 
- * Validates all required fields for result-contract-v1, including:
- * - Contract ID and schema version
- * - Subject identity and expected subject inventory
- * - Candidate repository/materialization identity
- * - Base/head tree identity and runtime digest formats
- * - Criteria revision/text digest
- * - Exact expected criterion inventory
- * - Criterion-to-check mapping
- * - Policy version and digest
- * - Profile and configuration/prompt/input identities
- * - Requested/observed model values preserving unknown as null
- * - Assessment record shape and admitted conclusion enums
- * - Original claim preservation
- * - Reference arrays and diagnostics
- * - Finding record shape, skipped reason and criterion mapping
- * - Coverage arrays and cross-field consistency
- * - Execution state and cleanup-state enums
- * - Raw artifact availability/digest/cause consistency
- * - Evidence metadata and applicability values
- * - Usage fields: finite non-negative values or null
- * - Capacity values and explicit unknowns
- * 
- * Key validation rules:
- * - Coverage is recomputed from actual assessment IDs rather than blindly trusted
- * - missing/duplicate/unknown/invalid IDs are distinguished by cross-field analysis
- * - wholeInventoryAdmitted must agree with recomputed result
- * - Usage fields must be finite non-negative or null
- * - Capacity values and explicit unknowns are preserved
+ * Validate a result contract.
+ *
+ * Returns a list of structured errors (empty = valid). The function never
+ * throws on malformed nested input; every section is checked defensively.
+ *
+ * Coverage is recomputed from the actual assessment IDs and compared to the
+ * stored coverage record. Missing, duplicate, unknown and invalid IDs are
+ * distinguished. `wholeInventoryAdmitted` must agree with the recomputation.
  */
-export function validateResultContract(rc: ResultContract): string[] {
+export function validateResultContract(input: unknown): string[] {
   const errors: string[] = [];
+  if (!isRecord(input)) return ["result contract must be an object"];
+  const rc = input;
 
-  // 1. Contract ID and schema version
-  if (rc.version !== RESULT_CONTRACT_VERSION) errors.push(`bad version: ${rc.version}`);
-  if (!rc.contractId) errors.push("missing contractId");
+  // 1. Contract identity and schema version.
+  if (!isNonEmptyString(rc.contractId)) errors.push("missing or invalid contractId");
+  if (rc.version !== RESULT_CONTRACT_VERSION) errors.push(`bad version: ${String(rc.version)}`);
 
-  // 2. Subject identity and expected subject inventory
-  if (!rc.subject?.fixtureTaskId) errors.push("missing subject.fixtureTaskId");
-  if (!rc.subject?.expectedSubjectInventory) errors.push("missing subject.expectedSubjectInventory");
-  if (!Array.isArray(rc.subject?.expectedSubjectInventory))
-    errors.push("subject.expectedSubjectInventory must be array");
-  if (rc.subject.expectedSubjectInventory.some((id) => typeof id !== "string"))
-    errors.push("subject.expectedSubjectInventory must contain strings");
-
-  // 3. Candidate repository/materialization identity
-  if (!rc.candidate?.repositoryMaterializationId)
-    errors.push("missing candidate.repositoryMaterializationId");
-  if (!rc.candidate?.baseTreeIdentity)
-    errors.push("missing candidate.baseTreeIdentity");
-  if (!rc.candidate?.headTreeIdentity)
-    errors.push("missing candidate.headTreeIdentity");
-  if (!rc.candidate?.runtimeSnapshotDigest)
-    errors.push("missing candidate.runtimeSnapshotDigest");
-  // Validate runtimeSnapshotDigest format (must be string if present)
-  if (rc.candidate.runtimeSnapshotDigest !== undefined && rc.candidate.runtimeSnapshotDigest !== null && typeof rc.candidate.runtimeSnapshotDigest !== "string") {
-    errors.push("candidate.runtimeSnapshotDigest must be a string if present");
-  }
-
-  // 4. Criteria revision/text digest
-  if (!rc.criteria?.authoredCriteriaRevision)
-    errors.push("missing criteria.authoredCriteriaRevision");
-  if (!rc.criteria?.criteriaTextDigest)
-    errors.push("missing criteria.criteriaTextDigest");
-  if (rc.criteria.criteriaTextDigest && typeof rc.criteria.criteriaTextDigest !== "string") {
-    errors.push("criteria.criteriaTextDigest must be a string");
-  }
-
-  // 5. Exact expected criterion inventory
-  if (!rc.criteria?.expectedCriterionIds)
-    errors.push("missing criteria.expectedCriterionIds");
-  if (!Array.isArray(rc.criteria.expectedCriterionIds))
-    errors.push("criteria.expectedCriterionIds must be array");
-
-  // 6. Criterion-to-check mapping
-  if (!rc.criteria?.criterionToCheckMapping)
-    errors.push("missing criteria.criterionToCheckMapping");
-  if (typeof rc.criteria.criterionToCheckMapping !== "object" || Array.isArray(rc.criteria.criterionToCheckMapping))
-    errors.push("criteria.criterionToCheckMapping must be an object");
-
-  // 7. Policy version and digest
-  if (!rc.criteria?.policyVersion) errors.push("missing criteria.policyVersion");
-  if (!rc.criteria?.policyDigest) errors.push("missing criteria.policyDigest");
-  if (rc.criteria.policyDigest && typeof rc.criteria.policyDigest !== "string") {
-    errors.push("criteria.policyDigest must be a string");
-  }
-
-  // 8. Profile and configuration/prompt/input identities
-  if (!rc.profile?.profileId) errors.push("missing profile.profileId");
-  if (!rc.profile?.configurationIdentity)
-    errors.push("missing profile.configurationIdentity");
-  if (!rc.profile?.promptIdentity) errors.push("missing profile.promptIdentity");
-  if (!rc.profile?.inputIdentity) errors.push("missing profile.inputIdentity");
-  if (rc.profile.requestedModel !== null && rc.profile.requestedModel !== undefined) {
-    if (typeof rc.profile.requestedModel !== "string")
-      errors.push("profile.requestedModel must be string or null");
-  }
-  if (rc.profile.observedModel !== null && rc.profile.observedModel !== undefined) {
-    if (typeof rc.profile.observedModel !== "string")
-      errors.push("profile.observedModel must be string or null");
-  }
-
-  // 9. Assessment record shape and original claim preservation
-  if (!Array.isArray(rc.assessments)) errors.push("assessments must be array");
-  for (let i = 0; i < rc.assessments.length; i++) {
-    const a = rc.assessments[i];
-    if (!a.expectedCriterionId)
-      errors.push(`assessments[${i}].expectedCriterionId is required`);
-    if (a.present === undefined) errors.push(`assessments[${i}].present is required`);
-    if (a.originalReportedClaim !== null && typeof a.originalReportedClaim !== "string")
-      errors.push(`assessments[${i}].originalReportedClaim must be string or null`);
-    if (a.admittedConclusion !== null && !["satisfied", "violated", "inconclusive"].includes(a.admittedConclusion))
-      errors.push(`assessments[${i}].admittedConclusion must be satisfied/violated/inconclusive or null`);
-    if (!Array.isArray(a.references)) errors.push(`assessments[${i}].references must be array`);
-    if (a.diagnostics && !Array.isArray(a.diagnostics))
-      errors.push(`assessments[${i}].diagnostics must be array or undefined`);
-  }
-
-  // 10. Reference arrays and diagnostics cross-check
-  for (let i = 0; i < rc.assessments.length; i++) {
-    const a = rc.assessments[i];
-    // If criterion is present, there should be at least some reference or diagnostics
-    if (a.present && a.references.length === 0 && (!a.diagnostics || a.diagnostics.length === 0)) {
-      errors.push(`assessments[${i}]: present criterion with no references or diagnostics`);
+  // 2. Subject identity and expected subject inventory.
+  if (!isRecord(rc.subject)) {
+    errors.push("subject must be an object");
+  } else {
+    const s = rc.subject;
+    if (!isNonEmptyString(s.fixtureTaskId)) errors.push("missing or invalid subject.fixtureTaskId");
+    if (!isStringArray(s.expectedSubjectInventory)) {
+      errors.push("subject.expectedSubjectInventory must be an array of strings");
+    } else if (new Set(s.expectedSubjectInventory).size !== s.expectedSubjectInventory.length) {
+      errors.push("subject.expectedSubjectInventory contains duplicates");
     }
   }
 
-  // 11. Finding record shape, skipped reason and criterion mapping
-  if (!Array.isArray(rc.findings)) errors.push("findings must be array");
-  for (let i = 0; i < rc.findings.length; i++) {
-    const f = rc.findings[i];
-    if (typeof f.nativeComment !== "string")
-      errors.push(`findings[${i}].nativeComment must be string`);
-    if (f.skipped === undefined) errors.push(`findings[${i}].skipped is required`);
-    if (f.skipped && typeof f.skipReason !== "string")
-      errors.push(`findings[${i}].skipReason must be string when skipped`);
-    if (f.criterionMapping !== null && typeof f.criterionMapping !== "string")
-      errors.push(`findings[${i}].criterionMapping must be string or null`);
-    if (f.references !== undefined && !Array.isArray(f.references))
-      errors.push(`findings[${i}].references must be an array when present`);
+  // 3. Candidate repository/materialization identity.
+  if (!isRecord(rc.candidate)) {
+    errors.push("candidate must be an object");
+  } else {
+    const c = rc.candidate;
+    if (!isNonEmptyString(c.repositoryMaterializationId)) {
+      errors.push("missing or invalid candidate.repositoryMaterializationId");
+    }
+    if (!isDigestLike(c.baseTreeIdentity)) errors.push("candidate.baseTreeIdentity must be a hex digest");
+    if (!isDigestLike(c.headTreeIdentity)) errors.push("candidate.headTreeIdentity must be a hex digest");
+    if (!isDigestLike(c.runtimeSnapshotDigest)) errors.push("candidate.runtimeSnapshotDigest must be a hex digest");
+    if (!isNonEmptyString(c.opaqueFixtureId)) errors.push("missing or invalid candidate.opaqueFixtureId");
   }
 
-  // 12. Coverage arrays and cross-field consistency
-  if (!rc.coverage) errors.push("missing coverage");
-  else {
-    const { expectedIds, presentIds, missingIds, duplicateIds, unknownIds, invalidIds, wholeInventoryAdmitted } = rc.coverage;
-
-    // Validate arrays are actually arrays
-    if (!Array.isArray(expectedIds)) errors.push("coverage.expectedIds must be array");
-    if (!Array.isArray(presentIds)) errors.push("coverage.presentIds must be array");
-    if (!Array.isArray(missingIds)) errors.push("coverage.missingIds must be array");
-    if (!Array.isArray(duplicateIds)) errors.push("coverage.duplicateIds must be array");
-    if (!Array.isArray(unknownIds)) errors.push("coverage.unknownIds must be array");
-    if (!Array.isArray(invalidIds)) errors.push("coverage.invalidIds must be array");
-
-    // Recompute coverage from assessment IDs rather than blindly trusting stored coverage.
-    // Collect all expected criterion IDs from assessments.
-    const assessedCriterionIds: string[] = [];
-    for (const a of rc.assessments) {
-      assessedCriterionIds.push(a.expectedCriterionId);
+  // 4. Criteria identity, exact inventory, mapping and policy.
+  if (!isRecord(rc.criteria)) {
+    errors.push("criteria must be an object");
+  } else {
+    const cr = rc.criteria;
+    if (!isNonEmptyString(cr.authoredCriteriaRevision)) {
+      errors.push("missing or invalid criteria.authoredCriteriaRevision");
     }
-
-    // Distinguish missing, duplicate, unknown and invalid IDs.
-    const expectedSet = new Set(expectedIds);
-    const presentSet = new Set(presentIds);
-
-    // Missing: expected IDs not present in presentIds
-    for (const id of expectedIds) {
-      if (!presentSet.has(id)) {
-        // Already checked by recomputation below
+    if (!isDigestLike(cr.criteriaTextDigest)) errors.push("criteria.criteriaTextDigest must be a hex digest");
+    if (!isStringArray(cr.expectedCriterionIds)) {
+      errors.push("criteria.expectedCriterionIds must be an array of strings");
+    } else if (new Set(cr.expectedCriterionIds).size !== cr.expectedCriterionIds.length) {
+      errors.push("criteria.expectedCriterionIds contains duplicates");
+    }
+    if (!isRecord(cr.criterionToCheckMapping)) {
+      errors.push("criteria.criterionToCheckMapping must be an object");
+    } else {
+      for (const [key, value] of Object.entries(cr.criterionToCheckMapping)) {
+        if (!isStringArray(value)) {
+          errors.push(`criteria.criterionToCheckMapping[${key}] must be an array of strings`);
+        }
       }
     }
+    if (!isNonEmptyString(cr.policyVersion)) errors.push("missing or invalid criteria.policyVersion");
+    if (!isDigestLike(cr.policyDigest)) errors.push("criteria.policyDigest must be a hex digest");
+  }
 
-    // Check for IDs in present that are not in expected (unknown)
-    const unknownFromPresent = presentIds.filter((id) => !expectedSet.has(id));
-    for (const id of unknownFromPresent) {
-      if (!unknownIds.includes(id)) {
-        errors.push(`coverage: ID ${id} present but not in unknownIds`);
+  // 5. Profile and configuration/prompt/input identities.
+  if (!isRecord(rc.profile)) {
+    errors.push("profile must be an object");
+  } else {
+    const p = rc.profile;
+    if (!isNonEmptyString(p.profileId)) errors.push("missing or invalid profile.profileId");
+    if (!isNonEmptyString(p.configurationIdentity)) {
+      errors.push("missing or invalid profile.configurationIdentity");
+    }
+    if (!isNonEmptyString(p.promptIdentity)) errors.push("missing or invalid profile.promptIdentity");
+    if (!isNonEmptyString(p.inputIdentity)) errors.push("missing or invalid profile.inputIdentity");
+    if (!isNullableString(p.requestedModel)) errors.push("profile.requestedModel must be string or null");
+    if (!isNullableString(p.observedModel)) errors.push("profile.observedModel must be string or null");
+    if (!isRecord(p.reasoningConfiguration)) errors.push("profile.reasoningConfiguration must be an object");
+    if (!isNonEmptyString(p.adapterEntryIdentity)) {
+      errors.push("missing or invalid profile.adapterEntryIdentity");
+    }
+  }
+
+  // 6. Assessment records: shape, enums, original claim preservation.
+  const assessmentIds: string[] = [];
+  if (!Array.isArray(rc.assessments)) {
+    errors.push("assessments must be an array");
+  } else {
+    for (let i = 0; i < rc.assessments.length; i++) {
+      const a: unknown = rc.assessments[i];
+      if (!isRecord(a)) {
+        errors.push(`assessments[${i}] must be an object`);
+        continue;
+      }
+      if (!isNonEmptyString(a.expectedCriterionId)) {
+        errors.push(`assessments[${i}].expectedCriterionId is required`);
+      } else {
+        assessmentIds.push(a.expectedCriterionId);
+      }
+      if (typeof a.present !== "boolean") errors.push(`assessments[${i}].present must be boolean`);
+      if (!isNullableString(a.originalReportedClaim)) {
+        errors.push(`assessments[${i}].originalReportedClaim must be string or null`);
+      }
+      if (
+        a.admittedConclusion !== null &&
+        !ADMITTED_CONCLUSIONS.includes(a.admittedConclusion as AdmittedConclusion)
+      ) {
+        errors.push(`assessments[${i}].admittedConclusion must be satisfied/violated/inconclusive or null`);
+      }
+      if (!isStringArray(a.references)) errors.push(`assessments[${i}].references must be an array of strings`);
+      if (!isNullableString(a.explanation)) errors.push(`assessments[${i}].explanation must be string or null`);
+      if (!isStringArray(a.diagnostics)) errors.push(`assessments[${i}].diagnostics must be an array of strings`);
+    }
+  }
+
+  // 7. Finding records: shape, skipped reason, criterion mapping.
+  if (!Array.isArray(rc.findings)) {
+    errors.push("findings must be an array");
+  } else {
+    for (let i = 0; i < rc.findings.length; i++) {
+      const f: unknown = rc.findings[i];
+      if (!isRecord(f)) {
+        errors.push(`findings[${i}] must be an object`);
+        continue;
+      }
+      if (f.findingId !== undefined && !isNonEmptyString(f.findingId)) {
+        errors.push(`findings[${i}].findingId must be a non-empty string when present`);
+      }
+      if (!isNonEmptyString(f.nativeComment)) errors.push(`findings[${i}].nativeComment must be a string`);
+      if (!isNullableString(f.normalizedFinding)) {
+        errors.push(`findings[${i}].normalizedFinding must be string or null`);
+      }
+      if (typeof f.skipped !== "boolean") errors.push(`findings[${i}].skipped must be boolean`);
+      if (!isNullableString(f.skipReason)) errors.push(`findings[${i}].skipReason must be string or null`);
+      if (f.skipped === true && !isNonEmptyString(f.skipReason)) {
+        errors.push(`findings[${i}].skipReason must be a non-empty string when skipped`);
+      }
+      if (!isStringArray(f.qualityFlags)) errors.push(`findings[${i}].qualityFlags must be an array of strings`);
+      if (!isNullableString(f.criterionMapping)) {
+        errors.push(`findings[${i}].criterionMapping must be string or null`);
+      }
+      if (f.references !== undefined && !isStringArray(f.references)) {
+        errors.push(`findings[${i}].references must be an array of strings when present`);
       }
     }
+  }
 
-    // Check for duplicates in presentIds
-    const seen = new Set<string>();
-    const duplicatesFromPresent: string[] = [];
-    for (const id of presentIds) {
-      if (seen.has(id)) {
-        if (!duplicatesFromPresent.includes(id)) duplicatesFromPresent.push(id);
-      }
-      seen.add(id);
+  // 8. Coverage: recompute from actual assessment IDs and compare.
+  if (!isRecord(rc.coverage)) {
+    errors.push("missing coverage");
+  } else {
+    const cov = rc.coverage;
+    const arrayFields = [
+      "expectedIds",
+      "presentIds",
+      "individuallyValidIds",
+      "missingIds",
+      "duplicateIds",
+      "unknownIds",
+      "invalidIds",
+    ] as const;
+    for (const field of arrayFields) {
+      if (!isStringArray(cov[field])) errors.push(`coverage.${field} must be an array of strings`);
     }
-    for (const id of duplicatesFromPresent) {
-      if (!duplicateIds.includes(id)) {
-        errors.push(`coverage: ID ${id} in present but not in duplicateIds`);
-      }
+    if (typeof cov.wholeInventoryAdmitted !== "boolean") {
+      errors.push("coverage.wholeInventoryAdmitted must be boolean");
     }
 
-    // Verify wholeInventoryAdmitted agrees with recomputed result.
-    // Whole inventory admitted only when all expected IDs are present exactly once,
-    // with no missing, duplicate, unknown, or invalid IDs.
-    const missingFromPresent = expectedIds.filter((id) => !presentSet.has(id));
-    const invalidFromPresent = presentIds.filter((id) => !expectedSet.has(id) && !unknownIds.includes(id) && !duplicateIds.includes(id));
-    const recomputedWholeInventoryAdmitted =
-      missingFromPresent.length === 0 &&
-      duplicatesFromPresent.length === 0 &&
-      unknownFromPresent.length === 0 &&
-      invalidFromPresent.length === 0 &&
-      presentIds.length === expectedIds.length;
+    const expected = isRecord(rc.criteria) && isStringArray(rc.criteria.expectedCriterionIds)
+      ? rc.criteria.expectedCriterionIds
+      : [];
+    const recomputed = computeCoverage(expected, assessmentIds);
 
-    if (wholeInventoryAdmitted !== recomputedWholeInventoryAdmitted) {
+    if (isStringArray(cov.expectedIds) && !sameMultiset(cov.expectedIds, expected)) {
+      errors.push("coverage.expectedIds disagrees with criteria.expectedCriterionIds");
+    }
+    if (isStringArray(cov.presentIds) && !sameMultiset(cov.presentIds, assessmentIds)) {
+      errors.push("coverage.presentIds disagrees with assessment IDs");
+    }
+    if (isStringArray(cov.missingIds) && !sameSet(cov.missingIds, recomputed.missingIds)) {
+      errors.push("coverage.missingIds disagrees with recomputed missing IDs");
+    }
+    if (isStringArray(cov.duplicateIds) && !sameSet(cov.duplicateIds, recomputed.duplicateIds)) {
+      errors.push("coverage.duplicateIds disagrees with recomputed duplicate IDs");
+    }
+    if (isStringArray(cov.unknownIds) && !sameSet(cov.unknownIds, recomputed.unknownIds)) {
+      errors.push("coverage.unknownIds disagrees with recomputed unknown IDs");
+    }
+    if (isStringArray(cov.invalidIds) && !sameSet(cov.invalidIds, recomputed.invalidIds)) {
+      errors.push("coverage.invalidIds disagrees with recomputed invalid IDs");
+    }
+    if (isStringArray(cov.individuallyValidIds) && !sameMultiset(cov.individuallyValidIds, recomputed.individuallyValidIds)) {
+      errors.push("coverage.individuallyValidIds disagrees with recomputed individually valid IDs");
+    }
+    if (typeof cov.wholeInventoryAdmitted === "boolean" && cov.wholeInventoryAdmitted !== recomputed.wholeInventoryAdmitted) {
       errors.push(
-        `coverage: wholeInventoryAdmitted(${wholeInventoryAdmitted}) disagrees with recomputed result(${recomputedWholeInventoryAdmitted})`,
+        `coverage: wholeInventoryAdmitted(${cov.wholeInventoryAdmitted}) disagrees with recomputed result(${recomputed.wholeInventoryAdmitted})`,
       );
     }
+  }
 
-    // Validate invalidIds are not hardcoded to empty if validation can identify invalid values
-    // (this is informational - actual invalid ID detection is done via cross-field analysis above)
-
-    // Check for IDs in invalidIds that should be present
-    for (const id of invalidIds) {
-      if (expectedSet.has(id)) {
-        errors.push(`coverage: invalid ID ${id} is in expected criterion list`);
-      }
+  // 9. Execution state, identity fields and cleanup state.
+  if (!isRecord(rc.execution)) {
+    errors.push("execution must be an object");
+  } else {
+    const e = rc.execution;
+    if (!EXECUTION_STATES.includes(e.state as ExecutionState)) {
+      errors.push(`invalid execution state: ${String(e.state)}`);
+    }
+    if (!isNonEmptyString(e.slotId)) errors.push("missing or invalid execution.slotId");
+    if (!isNonEmptyString(e.runId)) errors.push("missing or invalid execution.runId");
+    if (!isNonEmptyString(e.attemptId)) errors.push("missing or invalid execution.attemptId");
+    if (!isNonEmptyString(e.requestId)) errors.push("missing or invalid execution.requestId");
+    if (!isNullableString(e.sdkEffectCode)) errors.push("execution.sdkEffectCode must be string or null");
+    if (!isStringArray(e.diagnostics)) errors.push("execution.diagnostics must be an array of strings");
+    if (!isStringArray(e.pendingEffects)) errors.push("execution.pendingEffects must be an array of strings");
+    if (!CLEANUP_STATES.includes(e.cleanupStatus as (typeof CLEANUP_STATES)[number])) {
+      errors.push(`invalid execution.cleanupStatus: ${String(e.cleanupStatus)}`);
+    }
+    if (e.supersededBy !== undefined && !isNullableString(e.supersededBy)) {
+      errors.push("execution.supersededBy must be string or null when present");
     }
   }
 
-  // 13. Execution state and cleanup-state enums
-  const validExecutionStates: ExecutionState[] = ["completed", "partial", "cancelled", "failed", "unknown"];
-  if (!validExecutionStates.includes(rc.execution?.state))
-    errors.push(`invalid execution state: ${rc.execution?.state}`);
-
-  if (rc.execution?.cleanupStatus) {
-    const validCleanupStates: ("clean" | "pending" | "failed" | "unknown")[] = ["clean", "pending", "failed", "unknown"];
-    if (!validCleanupStates.includes(rc.execution.cleanupStatus))
-      errors.push(`invalid execution.cleanupStatus: ${rc.execution.cleanupStatus}`);
+  // 10. Raw artifact availability/digest/cause consistency.
+  if (!isRecord(rc.rawArtifact)) {
+    errors.push("rawArtifact must be an object");
+  } else {
+    const r = rc.rawArtifact;
+    if (typeof r.available !== "boolean") errors.push("rawArtifact.available must be boolean");
+    if (!isNullableString(r.rawText)) errors.push("rawArtifact.rawText must be string or null");
+    if (!isNullableString(r.rawBytesDigest)) errors.push("rawArtifact.rawBytesDigest must be string or null");
+    if (r.rawBytesDigest !== null && r.rawBytesDigest !== undefined && !isDigestLike(r.rawBytesDigest)) {
+      errors.push("rawArtifact.rawBytesDigest must be a hex digest");
+    }
+    if (!isNullableString(r.rawUnavailableCause)) {
+      errors.push("rawArtifact.rawUnavailableCause must be string or null");
+    }
+    if (r.available === true && r.rawText === null && r.rawBytesDigest === null) {
+      errors.push("rawArtifact: available=true requires rawText or rawBytesDigest");
+    }
+    if (r.available === false && !isNonEmptyString(r.rawUnavailableCause)) {
+      errors.push("rawArtifact: available=false requires rawUnavailableCause");
+    }
   }
 
-  // 14. Raw artifact availability/digest/cause consistency
-  if (rc.rawArtifact?.available === true && !rc.rawArtifact.rawText && rc.rawArtifact.rawBytesDigest === null) {
-    errors.push("rawArtifact: available=true requires rawText or rawBytesDigest");
-  }
-  if (rc.rawArtifact?.available === false && rc.rawArtifact.rawUnavailableCause === null) {
-    errors.push("rawArtifact: available=false requires rawUnavailableCause");
-  }
-  if (rc.rawArtifact?.rawBytesDigest && typeof rc.rawArtifact.rawBytesDigest !== "string") {
-    errors.push("rawArtifact.rawBytesDigest must be a string");
-  }
-
-  // 15. Evidence metadata and applicability values
-  if (rc.evidence) {
-    if (rc.evidence.producer === undefined) errors.push("evidence.producer is required");
-    if (rc.evidence.applicability && typeof rc.evidence.applicability !== "string")
-      errors.push("evidence.applicability must be string");
-  }
-
-  // 16. Usage fields: finite non-negative values or null
-  if (rc.usage) {
-    if (rc.usage.inputTokens !== null && (typeof rc.usage.inputTokens !== "number" || rc.usage.inputTokens < 0))
-      errors.push("usage.inputTokens must be finite non-negative or null");
-    if (rc.usage.outputTokens !== null && (typeof rc.usage.outputTokens !== "number" || rc.usage.outputTokens < 0))
-      errors.push("usage.outputTokens must be finite non-negative or null");
-    if (rc.usage.totalTokens !== null && (typeof rc.usage.totalTokens !== "number" || rc.usage.totalTokens < 0))
-      errors.push("usage.totalTokens must be finite non-negative or null");
-    if (rc.usage.durationMs !== null && (typeof rc.usage.durationMs !== "number" || rc.usage.durationMs < 0))
-      errors.push("usage.durationMs must be finite non-negative or null");
-    if (rc.usage.cost !== null && (typeof rc.usage.cost !== "number" || rc.usage.cost < 0))
-      errors.push("usage.cost must be finite non-negative or null");
-    if (rc.usage.currency !== null && typeof rc.usage.currency !== "string")
-      errors.push("usage.currency must be string or null");
-    if (rc.usage.requestedModel !== null && typeof rc.usage.requestedModel !== "string")
-      errors.push("usage.requestedModel must be string or null");
-    if (rc.usage.observedModel !== null && typeof rc.usage.observedModel !== "string")
-      errors.push("usage.observedModel must be string or null");
+  // 11. Evidence metadata and applicability values.
+  if (!isRecord(rc.evidence)) {
+    errors.push("evidence must be an object");
+  } else {
+    const ev = rc.evidence;
+    for (const field of [
+      "producer",
+      "candidateBinding",
+      "checkDefinition",
+      "inputScope",
+      "environment",
+      "observationOutcome",
+      "completeness",
+      "applicability",
+      "provenance",
+    ] as const) {
+      if (!isNonEmptyString(ev[field])) errors.push(`missing or invalid evidence.${field}`);
+    }
+    if (!isStringArray(ev.timestamps) || !ev.timestamps.every((t) => isIsoTimestamp(t))) {
+      errors.push("evidence.timestamps must be an array of ISO timestamps");
+    }
+    if (!isStringArray(ev.references)) errors.push("evidence.references must be an array of strings");
+    if (!APPLICABILITY_VALUES.includes(ev.applicability as (typeof APPLICABILITY_VALUES)[number])) {
+      errors.push(`invalid evidence.applicability: ${String(ev.applicability)}`);
+    }
   }
 
-  // 17. Capacity values and explicit unknowns
-  if (rc.capacity) {
-    if (rc.capacity.durableFactCapacity !== null && typeof rc.capacity.durableFactCapacity !== "string")
+  // 12. Usage: finite non-negative values or null.
+  if (!isRecord(rc.usage)) {
+    errors.push("usage must be an object");
+  } else {
+    const u = rc.usage;
+    for (const field of ["inputTokens", "outputTokens", "totalTokens", "durationMs", "cost"] as const) {
+      if (!isFiniteNonNegativeOrNull(u[field])) {
+        errors.push(`usage.${field} must be finite non-negative or null`);
+      }
+    }
+    if (!isNullableString(u.currency)) errors.push("usage.currency must be string or null");
+    if (!isNullableString(u.requestedModel)) errors.push("usage.requestedModel must be string or null");
+    if (!isNullableString(u.observedModel)) errors.push("usage.observedModel must be string or null");
+    if (!isStringArray(u.capacityObservations)) {
+      errors.push("usage.capacityObservations must be an array of strings");
+    }
+  }
+
+  // 13. Capacity values and explicit unknowns.
+  if (!isRecord(rc.capacity)) {
+    errors.push("capacity must be an object");
+  } else {
+    const cap = rc.capacity;
+    if (!isNullableString(cap.durableFactCapacity)) {
       errors.push("capacity.durableFactCapacity must be string or null");
-    if (rc.capacity.retentionPolicy !== null && typeof rc.capacity.retentionPolicy !== "string")
+    }
+    if (!isNullableString(cap.retentionPolicy)) {
       errors.push("capacity.retentionPolicy must be string or null");
+    }
   }
 
   return errors;
@@ -491,36 +579,48 @@ export function buildResultContract(params: {
 
 /**
  * Compute coverage from expected and present IDs.
+ *
+ * - missing: expected IDs absent from present
+ * - duplicate: valid IDs appearing more than once
+ * - unknown: valid IDs not in expected
+ * - invalid: present values that are not non-empty strings
+ * - individuallyValid: expected, non-duplicate, valid IDs
  */
-export function computeCoverage(
-  expectedIds: string[],
-  presentIds: string[],
-): CoverageRecord {
-  const expectedSet = new Set(expectedIds);
-  const presentSet = new Set(presentIds);
-  const missingIds = expectedIds.filter((id) => !presentSet.has(id));
-  const unknownIds = presentIds.filter((id) => !expectedSet.has(id));
-  // Duplicates: IDs appearing more than once in presentIds.
+export function computeCoverage(expectedIds: string[], presentIds: string[]): CoverageRecord {
+  const expected = Array.isArray(expectedIds) ? expectedIds : [];
+  const present = Array.isArray(presentIds) ? presentIds : [];
+  const expectedSet = new Set(expected);
+  const presentSet = new Set(present.filter((id) => typeof id === "string"));
+
+  const missingIds = expected.filter((id) => !presentSet.has(id));
+  const unknownIds = present.filter((id) => typeof id === "string" && id.trim().length > 0 && !expectedSet.has(id));
+  const invalidIds = present.filter((id) => typeof id !== "string" || id.trim().length === 0);
+
   const seen = new Set<string>();
   const duplicateIds: string[] = [];
-  for (const id of presentIds) {
+  for (const id of present) {
+    if (typeof id !== "string" || id.trim().length === 0) continue;
     if (seen.has(id)) {
       if (!duplicateIds.includes(id)) duplicateIds.push(id);
     }
     seen.add(id);
   }
-  const individuallyValidIds = presentIds.filter((id) => expectedSet.has(id) && !duplicateIds.includes(id));
-  const invalidIds: string[] = [];
+
+  const individuallyValidIds = present.filter(
+    (id) => typeof id === "string" && id.trim().length > 0 && expectedSet.has(id) && !duplicateIds.includes(id),
+  ) as string[];
+
   const wholeInventoryAdmitted =
+    expected.length > 0 &&
     missingIds.length === 0 &&
     duplicateIds.length === 0 &&
     unknownIds.length === 0 &&
     invalidIds.length === 0 &&
-    presentIds.length === expectedIds.length;
+    present.length === expected.length;
 
   return {
-    expectedIds,
-    presentIds,
+    expectedIds: [...expected],
+    presentIds: [...present],
     individuallyValidIds,
     missingIds,
     duplicateIds,

@@ -18,6 +18,7 @@ import { runProfileB, runProfileA, type DispatchRecord, type NativeComment } fro
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const WS_ROOT = path.join(ROOT, ".isolation-tmp", "wp8");
+const H = (s: string): string => crypto.createHash("sha256").update(s).digest("hex");
 
 const SUPPORTING: RubricDecision = { referenceExists: true, tiedToCandidate: true, supportsBehavior: true, coversSubclauses: true, relevantCurrentApplicable: true, contradictsClaim: false };
 
@@ -147,7 +148,7 @@ function runScenario(opts: ScenarioOptions): ScenarioResult {
     },
     criteria: {
       authoredCriteriaRevision: truth.criteriaRevision,
-      criteriaTextDigest: truth.criteriaRevision,
+      criteriaTextDigest: H(truth.criteriaRevision),
       expectedCriterionIds: [...CRITERIA],
       criterionToCheckMapping: {},
       policyVersion: "baseline-policy-v1",
@@ -158,7 +159,7 @@ function runScenario(opts: ScenarioOptions): ScenarioResult {
     findings: opts.findings ?? [],
     coverage: computeCoverage([...CRITERIA], [...CRITERIA]),
     execution,
-    rawArtifact: { available: true, rawText: "raw", rawBytesDigest: "digest", rawUnavailableCause: null },
+    rawArtifact: { available: true, rawText: "raw", rawBytesDigest: H("raw"), rawUnavailableCause: null },
     evidence: { producer: "oracle-O-1", candidateBinding: anonId, checkDefinition: packet.checkDefinitionDigest, inputScope: packet.inputsScope, environment: packet.environment, observationOutcome: "complete", completeness: packet.completeness, timestamps: packet.observationTime ? [packet.observationTime] : [], references: [], applicability: "applicable", provenance: packet.producer },
     usage: { inputTokens: null, outputTokens: null, totalTokens: null, durationMs: null, cost: null, currency: null, requestedModel: null, observedModel: null, capacityObservations: [] },
     capacity: { durableFactCapacity: null, retentionPolicy: null },
@@ -203,7 +204,7 @@ function runScenario(opts: ScenarioOptions): ScenarioResult {
     subjectInventory: [...CRITERIA], criterionInventory: [...CRITERIA],
     baseTreeIdentity: mat.baseIdentity.tree, headTreeIdentity: mat.headIdentity.tree,
     runtimeSnapshotDigest: snapshotDigest, criteriaRevision: truth.criteriaRevision,
-    policyDigest: packet.checkDefinitionDigest, promptDigest: "prompt", inputDigest: "input",
+    policyDigest: packet.checkDefinitionDigest, promptDigest: H("prompt"), inputDigest: H("input"),
     requestedModel: null, observedModel: null, reasoningConfiguration: {}, adapterEntryIdentity: "adapter",
     startTimestamp: "2026-01-01T00:00:00Z", endTimestamp: null, requestIds: ["req-1"],
     rawArtifactRefs: [], rawUnavailableCause: null, usage: {}, diagnostics: [], admissionState: "admitted",
@@ -408,9 +409,9 @@ test("WP8: interrupted ledger recovery leaves a visible incomplete attempt", () 
     schemaVersion: "ledger-event-v1", sequence: 1, slotId: "s", runId: "r", attemptId: "a",
     eventId: `evt-${crypto.randomUUID()}`, eventType: "attempt_started", executionState: "started",
     opaqueCandidateId: "S1-FIX-000000000000", profile: "profile-b", repetition: 1, seed: null,
-    subjectInventory: [], criterionInventory: [], baseTreeIdentity: "b", headTreeIdentity: "h",
-    runtimeSnapshotDigest: "d", criteriaRevision: "crit-v1", policyDigest: "p", promptDigest: "p",
-    inputDigest: "i", requestedModel: null, observedModel: null, reasoningConfiguration: {},
+    subjectInventory: [], criterionInventory: [], baseTreeIdentity: H("base"), headTreeIdentity: H("head"),
+    runtimeSnapshotDigest: H("snapshot"), criteriaRevision: "crit-v1", policyDigest: H("policy"), promptDigest: H("prompt"),
+    inputDigest: H("input"), requestedModel: null, observedModel: null, reasoningConfiguration: {},
     adapterEntryIdentity: "a", startTimestamp: "2026-01-01T00:00:00Z", endTimestamp: null,
     requestIds: [], rawArtifactRefs: [], rawUnavailableCause: null, usage: {}, diagnostics: [],
     admissionState: "pending", cleanupStatus: "pending", isStub: true, supersededBy: null, supersedes: null,

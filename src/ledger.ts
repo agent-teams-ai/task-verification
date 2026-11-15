@@ -27,6 +27,8 @@ import { fileURLToPath } from "node:url";
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 export const DEFAULT_LEDGER_PATH = path.join(ROOT, "runs.jsonl");
 
+export const LEDGER_SCHEMA_VERSION = "ledger-event-v1";
+
 export type LedgerExecutionState = "planned" | "started" | "completed" | "failed" | "unknown" | "cancelled";
 
 export type LedgerEventType =
@@ -103,6 +105,39 @@ const TERMINAL_EVENTS: ReadonlySet<LedgerEventType> = new Set([
   "superseded",
 ]);
 
+const EVENT_EXECUTION: Record<LedgerEventType, readonly LedgerExecutionState[]> = {
+  planned: ["planned"],
+  attempt_started: ["started"],
+  attempt_completed: ["completed"],
+  attempt_failed: ["failed"],
+  attempt_unknown: ["unknown"],
+  cancelled: ["cancelled"],
+  superseded: ["cancelled"],
+  criteria_removed: ["cancelled"],
+};
+
+const VALID_EVENT_TYPES: readonly LedgerEventType[] = [
+  "planned",
+  "attempt_started",
+  "attempt_completed",
+  "attempt_failed",
+  "attempt_unknown",
+  "cancelled",
+  "superseded",
+  "criteria_removed",
+];
+
+const VALID_EXECUTION_STATES: readonly LedgerExecutionState[] = [
+  "planned",
+  "started",
+  "completed",
+  "failed",
+  "unknown",
+  "cancelled",
+];
+
+const VALID_CLEANUP_STATES = ["clean", "pending", "failed", "unknown"] as const;
+
 const ANONYMOUS_WRITER = "__ledger_anonymous_append__";
 
 // --- Single-writer contract (in-process only) ---
@@ -156,49 +191,119 @@ function ensureWriter(writerId: string | undefined): { id: string; acquired: boo
   return { id, acquired: true };
 }
 
+// --- Validation helpers ---
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isNonEmptyString(value: unknown): value is string {
+  return typeof value === "string" && value.trim().length > 0;
+}
+
+function isNullableString(value: unknown): boolean {
+  return value === null || typeof value === "string";
+}
+
+function isStringArray(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every((v) => typeof v === "string");
+}
+
+/** Git tree/commit ids are 40 hex chars; sha256 digests are 64. Accept either. */
+function isDigestLike(value: unknown): boolean {
+  return typeof value === "string" && /^[0-9a-f]{7,64}$/i.test(value);
+}
+
+function isIsoTimestamp(value: unknown): boolean {
+  return typeof value === "string" && value.trim().length > 0 && !Number.isNaN(Date.parse(value));
+}
+
+function isIntegerAtLeastZero(value: unknown): value is number {
+  return typeof value === "number" && Number.isInteger(value) && value >= 0;
+}
+
 /**
  * Validate a ledger record's required fields. Returns list of errors.
+ * Accepts unknown input and never throws on malformed values.
  */
-export function validateLedgerRecord(record: LedgerRecord): string[] {
+export function validateLedgerRecord(input: unknown): string[] {
   const errors: string[] = [];
-  if (!record.schemaVersion) errors.push("missing schemaVersion");
-  if (typeof record.sequence !== "number") errors.push("missing sequence");
-  if (!record.slotId) errors.push("missing slotId");
-  if (!record.runId) errors.push("missing runId");
-  if (!record.attemptId) errors.push("missing attemptId");
-  if (!record.eventId) errors.push("missing eventId");
-  if (!record.eventType) errors.push("missing eventType");
-  if (!record.opaqueCandidateId) errors.push("missing opaqueCandidateId");
-  if (!record.profile) errors.push("missing profile");
-  if (typeof record.repetition !== "number") errors.push("missing repetition");
-  if (!Array.isArray(record.subjectInventory)) errors.push("subjectInventory must be array");
-  if (!Array.isArray(record.criterionInventory)) errors.push("criterionInventory must be array");
-  if (!record.criteriaRevision) errors.push("missing criteriaRevision");
-  if (!record.policyDigest) errors.push("missing policyDigest");
-  if (!record.startTimestamp) errors.push("missing startTimestamp");
-  if (!record.executionState) errors.push("missing executionState");
-  const validStates: LedgerExecutionState[] = ["planned", "started", "completed", "failed", "unknown", "cancelled"];
-  if (!validStates.includes(record.executionState)) errors.push(`invalid executionState: ${record.executionState}`);
+  if (!isRecord(input)) return ["ledger record must be an object"];
+  const record = input;
+
+  if (record.schemaVersion !== LEDGER_SCHEMA_VERSION) {
+    errors.push(`schemaVersion must be ${LEDGER_SCHEMA_VERSION}`);
+  }
+  if (!isIntegerAtLeastZero(record.sequence) || record.sequence < 1) errors.push("sequence must be a positive integer");
+  if (!isNonEmptyString(record.slotId)) errors.push("missing or invalid slotId");
+  if (!isNonEmptyString(record.runId)) errors.push("missing or invalid runId");
+  if (!isNonEmptyString(record.attemptId)) errors.push("missing or invalid attemptId");
+  if (!isNonEmptyString(record.eventId)) errors.push("missing or invalid eventId");
+  if (!VALID_EVENT_TYPES.includes(record.eventType as LedgerEventType)) {
+    errors.push(`invalid eventType: ${String(record.eventType)}`);
+  }
+  if (!isNonEmptyString(record.opaqueCandidateId)) errors.push("missing or invalid opaqueCandidateId");
+  if (!isNonEmptyString(record.profile)) errors.push("missing or invalid profile");
+  if (!isIntegerAtLeastZero(record.repetition)) errors.push("repetition must be a non-negative integer");
+  if (!isStringArray(record.subjectInventory)) errors.push("subjectInventory must be an array of strings");
+  if (!isStringArray(record.criterionInventory)) errors.push("criterionInventory must be an array of strings");
+  if (!isDigestLike(record.baseTreeIdentity)) errors.push("baseTreeIdentity must be a hex digest");
+  if (!isDigestLike(record.headTreeIdentity)) errors.push("headTreeIdentity must be a hex digest");
+  if (!isDigestLike(record.runtimeSnapshotDigest)) errors.push("runtimeSnapshotDigest must be a hex digest");
+  if (!isNonEmptyString(record.criteriaRevision)) errors.push("missing or invalid criteriaRevision");
+  if (!isDigestLike(record.policyDigest)) errors.push("policyDigest must be a hex digest");
+  if (!isDigestLike(record.promptDigest)) errors.push("promptDigest must be a hex digest");
+  if (!isDigestLike(record.inputDigest)) errors.push("inputDigest must be a hex digest");
+  if (!isNullableString(record.requestedModel)) errors.push("requestedModel must be string or null");
+  if (!isNullableString(record.observedModel)) errors.push("observedModel must be string or null");
+  if (!isRecord(record.reasoningConfiguration)) errors.push("reasoningConfiguration must be an object");
+  if (!isNonEmptyString(record.adapterEntryIdentity)) errors.push("missing or invalid adapterEntryIdentity");
+  if (!isIsoTimestamp(record.startTimestamp)) errors.push("startTimestamp must be an ISO timestamp");
+  if (!isNullableString(record.endTimestamp)) errors.push("endTimestamp must be string or null");
+  if (record.endTimestamp !== null && record.endTimestamp !== undefined && !isIsoTimestamp(record.endTimestamp)) {
+    errors.push("endTimestamp must be an ISO timestamp");
+  }
+  if (!VALID_EXECUTION_STATES.includes(record.executionState as LedgerExecutionState)) {
+    errors.push(`invalid executionState: ${String(record.executionState)}`);
+  }
+  if (!VALID_CLEANUP_STATES.includes(record.cleanupStatus as (typeof VALID_CLEANUP_STATES)[number])) {
+    errors.push(`invalid cleanupStatus: ${String(record.cleanupStatus)}`);
+  }
+  if (!isStringArray(record.requestIds)) errors.push("requestIds must be an array of strings");
+  if (!isStringArray(record.rawArtifactRefs)) errors.push("rawArtifactRefs must be an array of strings");
+  if (!isNullableString(record.rawUnavailableCause)) errors.push("rawUnavailableCause must be string or null");
+  if (!isRecord(record.usage)) errors.push("usage must be an object");
+  if (!isStringArray(record.diagnostics)) errors.push("diagnostics must be an array of strings");
+  if (!isNonEmptyString(record.admissionState)) errors.push("missing or invalid admissionState");
   if (typeof record.isStub !== "boolean") errors.push("isStub must be boolean");
-  if (!record.eventId.match(/^evt-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/)) {
+  if (!isNullableString(record.supersededBy)) errors.push("supersededBy must be string or null");
+  if (!isNullableString(record.supersedes)) errors.push("supersedes must be string or null");
+
+  if (!isNonEmptyString(record.eventId) || !/^evt-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(record.eventId)) {
     errors.push("eventId must be a UUID v4 format string");
   }
-  const validEventTypes: LedgerEventType[] = [
-    "planned",
-    "attempt_started",
-    "attempt_completed",
-    "attempt_failed",
-    "attempt_unknown",
-    "cancelled",
-    "superseded",
-    "criteria_removed",
-  ];
-  if (!validEventTypes.includes(record.eventType)) errors.push(`invalid eventType: ${record.eventType}`);
+
+  // Event type must be consistent with the recorded execution state.
+  if (VALID_EVENT_TYPES.includes(record.eventType as LedgerEventType)) {
+    const allowed = EVENT_EXECUTION[record.eventType as LedgerEventType];
+    if (VALID_EXECUTION_STATES.includes(record.executionState as LedgerExecutionState) && !allowed.includes(record.executionState as LedgerExecutionState)) {
+      errors.push(`eventType ${record.eventType} requires executionState in {${allowed.join(",")}}`);
+    }
+  }
+
+  // Stub/live distinction: a stub must not claim a live model.
+  if (record.isStub === true && (record.requestedModel !== null || record.observedModel !== null)) {
+    errors.push("stub record must not claim a requested/observed model");
+  }
 
   if (record.eventType === "criteria_removed") {
-    if (!record.criterionId) errors.push("criteria_removed requires criterionId");
-    if (!record.tombstoneOf) errors.push("criteria_removed requires tombstoneOf (the removed revision identity)");
+    if (!isNonEmptyString(record.criterionId)) errors.push("criteria_removed requires criterionId");
+    if (!isNonEmptyString(record.tombstoneOf)) {
+      errors.push("criteria_removed requires tombstoneOf (the removed revision identity)");
+    }
+    if (!isNonEmptyString(record.lineage)) errors.push("criteria_removed requires lineage");
   }
+
   return errors;
 }
 
@@ -334,9 +439,17 @@ export function appendLedgerRecord(record: LedgerRecord, options?: LedgerAppendO
       throw new Error(`failed to read ledger: ${err instanceof Error ? err.message : String(err)}`);
     }
 
-    // Check for duplicate event IDs.
+    // Reject duplicate event IDs before appending.
     if (existingRecords.some((r) => r.eventId === record.eventId)) {
       throw new Error(`duplicate eventId: ${record.eventId}`);
+    }
+
+    // Reject a duplicate run/attempt start before appending.
+    if (record.eventType === "planned" || record.eventType === "attempt_started") {
+      const key = attemptKey(record);
+      if (existingRecords.some((r) => attemptKey(r) === key && r.eventType === record.eventType)) {
+        throw new Error(`duplicate ${record.eventType} for ${key}`);
+      }
     }
 
     // Validate lifecycle transition against prior records of this attempt.
@@ -380,32 +493,105 @@ export function readLedger(ledgerPath?: string): LedgerRecord[] {
 }
 
 /**
- * Replay ledger integrity: verify monotonic criteria revisions, no duplicate
- * identities, valid event lifecycle transitions, schema validity, and no
- * resurrection of cancelled/superseded attempts.
+ * Replay ledger integrity: verify unique event IDs, attempt identity uniqueness,
+ * valid lifecycle transitions, criteria revision lineage, supersedes/supersededBy
+ * referential integrity, no cycles, no resurrection of cancelled/superseded
+ * attempts, stub/live distinction, record schema validity and monotonic event
+ * ordering.
  */
 export function verifyLedgerIntegrity(records: LedgerRecord[]): string[] {
   const errors: string[] = [];
 
-  for (const d of findDuplicateEventIds(records)) errors.push(`duplicate eventId: ${d}`);
-  for (const d of findDuplicateAttemptStarts(records)) errors.push(`duplicate identity: ${d}`);
-
+  // 1. Record schema validity.
   for (const r of records) {
     for (const e of validateLedgerRecord(r)) errors.push(`${attemptKey(r)}: ${e}`);
   }
 
-  // Replay transitions in sequence order, enforcing per-attempt monotonicity.
+  // 2. Unique event IDs.
+  for (const d of findDuplicateEventIds(records)) errors.push(`duplicate eventId: ${d}`);
+
+  // 3. Attempt identity uniqueness rules.
+  for (const d of findDuplicateAttemptStarts(records)) errors.push(`duplicate identity: ${d}`);
+
+  // 4. Monotonic event ordering: sequence must be unique and strictly
+  // increasing in file order.
+  for (let i = 1; i < records.length; i++) {
+    if (records[i].sequence <= records[i - 1].sequence) {
+      errors.push(
+        `sequence not monotonic at index ${i}: ${records[i - 1].sequence} -> ${records[i].sequence}`,
+      );
+    }
+  }
+
+  // 5. Per-attempt lifecycle transitions in sequence order.
   const sorted = [...records].sort((a, b) => a.sequence - b.sequence);
   const seenPerAttempt = new Map<string, LedgerRecord[]>();
   for (const r of sorted) {
     const key = attemptKey(r);
     const prior = seenPerAttempt.get(key) ?? [];
-    if (prior.length > 0 && r.sequence <= prior[prior.length - 1].sequence) {
-      errors.push(`${key}: sequence not monotonic`);
-    }
     for (const e of checkLifecycleTransition(prior, r)) errors.push(e);
     prior.push(r);
     seenPerAttempt.set(key, prior);
+  }
+
+  // 6. Supersedes/supersededBy referential integrity and cycle detection.
+  const byEventId = new Map<string, LedgerRecord>();
+  for (const r of records) byEventId.set(r.eventId, r);
+
+  const supersedeEdges = new Map<string, string[]>();
+  for (const r of records) {
+    const targets: string[] = [];
+    if (r.supersedes) targets.push(r.supersedes);
+    if (r.supersededBy) targets.push(r.supersededBy);
+    if (targets.length > 0) supersedeEdges.set(r.eventId, targets);
+    for (const target of targets) {
+      if (target === r.eventId) {
+        errors.push(`${attemptKey(r)}: supersedes/supersededBy self-reference`);
+      } else if (!byEventId.has(target)) {
+        errors.push(`${attemptKey(r)}: supersedes/supersededBy target not found: ${target}`);
+      }
+    }
+    if (r.supersedes && r.supersededBy) {
+      errors.push(`${attemptKey(r)}: record cannot both supersede and be superseded`);
+    }
+  }
+
+  const visiting = new Set<string>();
+  const visited = new Set<string>();
+  const visit = (id: string, stack: string[]): void => {
+    if (visiting.has(id)) {
+      errors.push(`supersede cycle: ${[...stack, id].join(" -> ")}`);
+      return;
+    }
+    if (visited.has(id)) return;
+    visiting.add(id);
+    for (const next of supersedeEdges.get(id) ?? []) visit(next, [...stack, id]);
+    visiting.delete(id);
+    visited.add(id);
+  };
+  for (const id of supersedeEdges.keys()) visit(id, []);
+
+  // 7. Criteria revision lineage: tombstones are unique, are not repeated, and
+  // a removed revision may not reappear in a later record.
+  const tombstoned = new Set<string>();
+  const lineages = new Set<string>();
+  for (const r of sorted) {
+    if (r.eventType === "criteria_removed") {
+      const removed = r.tombstoneOf;
+      if (removed) {
+        if (tombstoned.has(removed)) {
+          errors.push(`criteria revision tombstoned twice: ${removed}`);
+        }
+        tombstoned.add(removed);
+      }
+      const lineage = r.lineage;
+      if (lineage) {
+        if (lineages.has(lineage)) errors.push(`duplicate criteria lineage: ${lineage}`);
+        lineages.add(lineage);
+      }
+    } else if (r.criteriaRevision && tombstoned.has(r.criteriaRevision)) {
+      errors.push(`${attemptKey(r)}: resurrects removed criteria revision ${r.criteriaRevision}`);
+    }
   }
 
   return errors;
