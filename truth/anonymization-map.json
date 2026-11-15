@@ -1,0 +1,12 @@
+{
+  "anonymizationId": "anon-v1",
+  "version": "v1",
+  "saltRef": "truth/salt.txt",
+  "mapping": {
+    "S1-C1": "S1-FIX-5ba5153fec57",
+    "S1-C2": "S1-FIX-9f1b492fe31a",
+    "S1-C3": "S1-FIX-c719e43e54e4",
+    "S1-C4": "S1-FIX-f91b12c2cee5"
+  },
+  "notes": "The salt is public reproducibility data, not a credential. The mapping is publicly reconstructable. Anonymization is reviewer-facing input exclusion, not confidentiality."
+}

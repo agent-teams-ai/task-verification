@@ -1,0 +1,177 @@
+{
+  "packetId": "packet-S1-FIX-9f1b492fe31a",
+  "schemaVersion": "evidence-v1",
+  "version": "v1",
+  "producer": "oracle-O-1",
+  "candidateAnonId": "S1-FIX-9f1b492fe31a",
+  "candidateSnapshotDigest": "cd83f7c60958f28c7e84ec16811307bad17ac3b20d272a60ee5eb7f429fa2cef",
+  "runtime": "node-24.13.1",
+  "checkDefinitionDigest": "ef5ca877ec5fbbfe4aabe935a1a366a3c1cacd68e922eb3f7cb1419d01056b1b",
+  "inputsScope": "candidate application snapshot + oracle observations",
+  "environment": "local",
+  "observationTime": "2026-11-15T09:00:22.060Z",
+  "completeness": "complete",
+  "artifactRefs": [
+    "candidates/S1-C2/MANIFEST.json",
+    ".oracle-receipts/S1-C2-pass1.json"
+  ],
+  "criterionChecks": {
+    "AC-1": [
+      "EV-S1-C2-AC-1-P-active-a-0",
+      "EV-S1-C2-AC-1-P-active-b-1"
+    ],
+    "AC-2": [
+      "EV-S1-C2-AC-2-P-missing-2"
+    ],
+    "AC-3": [
+      "EV-S1-C2-AC-3-P-revoked-3"
+    ],
+    "AC-4": [
+      "EV-S1-C2-AC-4-P-active-a-4",
+      "EV-S1-C2-AC-4-P-active-b-5",
+      "EV-S1-C2-AC-4-P-missing-6",
+      "EV-S1-C2-AC-4-P-revoked-7"
+    ],
+    "AC-5": [
+      "EV-S1-C2-AC-5-P-missing-8"
+    ]
+  },
+  "evidence": [
+    {
+      "evidenceId": "EV-S1-C2-AC-1-P-active-a-0",
+      "candidateAnonId": "S1-FIX-9f1b492fe31a",
+      "criterionId": "AC-1",
+      "evidenceType": "http-body",
+      "sourceRef": "candidates/S1-C2/src/app.ts",
+      "sourceDigest": "cd83f7c60958f28c7e84ec16811307bad17ac3b20d272a60ee5eb7f429fa2cef",
+      "sourceLocation": "P-active-a response",
+      "observation": "pass",
+      "provenance": "oracle O-1 pass 1, request P-active-a",
+      "applicability": "applicable",
+      "freshness": "fresh",
+      "schemaVersion": "evidence-v1",
+      "version": "v1"
+    },
+    {
+      "evidenceId": "EV-S1-C2-AC-1-P-active-b-1",
+      "candidateAnonId": "S1-FIX-9f1b492fe31a",
+      "criterionId": "AC-1",
+      "evidenceType": "http-body",
+      "sourceRef": "candidates/S1-C2/src/app.ts",
+      "sourceDigest": "cd83f7c60958f28c7e84ec16811307bad17ac3b20d272a60ee5eb7f429fa2cef",
+      "sourceLocation": "P-active-b response",
+      "observation": "pass",
+      "provenance": "oracle O-1 pass 1, request P-active-b",
+      "applicability": "applicable",
+      "freshness": "fresh",
+      "schemaVersion": "evidence-v1",
+      "version": "v1"
+    },
+    {
+      "evidenceId": "EV-S1-C2-AC-2-P-missing-2",
+      "candidateAnonId": "S1-FIX-9f1b492fe31a",
+      "criterionId": "AC-2",
+      "evidenceType": "http-status",
+      "sourceRef": "candidates/S1-C2/src/app.ts",
+      "sourceDigest": "cd83f7c60958f28c7e84ec16811307bad17ac3b20d272a60ee5eb7f429fa2cef",
+      "sourceLocation": "P-missing response",
+      "observation": "pass",
+      "provenance": "oracle O-1 pass 1, request P-missing",
+      "applicability": "applicable",
+      "freshness": "fresh",
+      "schemaVersion": "evidence-v1",
+      "version": "v1"
+    },
+    {
+      "evidenceId": "EV-S1-C2-AC-3-P-revoked-3",
+      "candidateAnonId": "S1-FIX-9f1b492fe31a",
+      "criterionId": "AC-3",
+      "evidenceType": "http-status",
+      "sourceRef": "candidates/S1-C2/src/app.ts",
+      "sourceDigest": "cd83f7c60958f28c7e84ec16811307bad17ac3b20d272a60ee5eb7f429fa2cef",
+      "sourceLocation": "P-revoked response",
+      "observation": "pass",
+      "provenance": "oracle O-1 pass 1, request P-revoked",
+      "applicability": "applicable",
+      "freshness": "fresh",
+      "schemaVersion": "evidence-v1",
+      "version": "v1"
+    },
+    {
+      "evidenceId": "EV-S1-C2-AC-4-P-active-a-4",
+      "candidateAnonId": "S1-FIX-9f1b492fe31a",
+      "criterionId": "AC-4",
+      "evidenceType": "field-scan",
+      "sourceRef": "candidates/S1-C2/src/app.ts",
+      "sourceDigest": "cd83f7c60958f28c7e84ec16811307bad17ac3b20d272a60ee5eb7f429fa2cef",
+      "sourceLocation": "all four responses",
+      "observation": "pass",
+      "provenance": "oracle O-1 pass 1, request P-active-a",
+      "applicability": "applicable",
+      "freshness": "fresh",
+      "schemaVersion": "evidence-v1",
+      "version": "v1"
+    },
+    {
+      "evidenceId": "EV-S1-C2-AC-4-P-active-b-5",
+      "candidateAnonId": "S1-FIX-9f1b492fe31a",
+      "criterionId": "AC-4",
+      "evidenceType": "field-scan",
+      "sourceRef": "candidates/S1-C2/src/app.ts",
+      "sourceDigest": "cd83f7c60958f28c7e84ec16811307bad17ac3b20d272a60ee5eb7f429fa2cef",
+      "sourceLocation": "all four responses",
+      "observation": "pass",
+      "provenance": "oracle O-1 pass 1, request P-active-b",
+      "applicability": "applicable",
+      "freshness": "fresh",
+      "schemaVersion": "evidence-v1",
+      "version": "v1"
+    },
+    {
+      "evidenceId": "EV-S1-C2-AC-4-P-missing-6",
+      "candidateAnonId": "S1-FIX-9f1b492fe31a",
+      "criterionId": "AC-4",
+      "evidenceType": "field-scan",
+      "sourceRef": "candidates/S1-C2/src/app.ts",
+      "sourceDigest": "cd83f7c60958f28c7e84ec16811307bad17ac3b20d272a60ee5eb7f429fa2cef",
+      "sourceLocation": "all four responses",
+      "observation": "pass",
+      "provenance": "oracle O-1 pass 1, request P-missing",
+      "applicability": "applicable",
+      "freshness": "fresh",
+      "schemaVersion": "evidence-v1",
+      "version": "v1"
+    },
+    {
+      "evidenceId": "EV-S1-C2-AC-4-P-revoked-7",
+      "candidateAnonId": "S1-FIX-9f1b492fe31a",
+      "criterionId": "AC-4",
+      "evidenceType": "field-scan",
+      "sourceRef": "candidates/S1-C2/src/app.ts",
+      "sourceDigest": "cd83f7c60958f28c7e84ec16811307bad17ac3b20d272a60ee5eb7f429fa2cef",
+      "sourceLocation": "all four responses",
+      "observation": "pass",
+      "provenance": "oracle O-1 pass 1, request P-revoked",
+      "applicability": "applicable",
+      "freshness": "fresh",
+      "schemaVersion": "evidence-v1",
+      "version": "v1"
+    },
+    {
+      "evidenceId": "EV-S1-C2-AC-5-P-missing-8",
+      "candidateAnonId": "S1-FIX-9f1b492fe31a",
+      "criterionId": "AC-5",
+      "evidenceType": "audit-observation",
+      "sourceRef": "candidates/S1-C2/src/app.ts",
+      "sourceDigest": "cd83f7c60958f28c7e84ec16811307bad17ac3b20d272a60ee5eb7f429fa2cef",
+      "sourceLocation": "P-missing audit delta",
+      "observation": "pass",
+      "provenance": "oracle O-1 pass 1, request P-missing",
+      "applicability": "applicable",
+      "freshness": "fresh",
+      "schemaVersion": "evidence-v1",
+      "version": "v1"
+    }
+  ],
+  "generatedAt": "2026-11-15T09:00:22.060Z"
+}
