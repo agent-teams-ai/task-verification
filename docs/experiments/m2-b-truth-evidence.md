@@ -122,7 +122,13 @@ without reading truth.
 
 Full suite: all tests pass, 0 fail, 0 skipped (includes 83 M2-A regression
 tests plus WP3/WP4 tests). Strict typecheck and declaration build pass.
-Fresh CI runs on Ubuntu 24.04 and Windows 2022 for the stacked PR #3.
+Fresh CI runs on Ubuntu 24.04 and Windows 2022 for the stacked PR #3:
+
+- Commit SHA: `278128e8b33e806fe7042500389c200894a83858`
+- Push CI run `43702048245`: success — `verify (ubuntu-24.04)`,
+  `verify (windows-2022)`
+- PR CI run `43702053758`: success — `verify (ubuntu-24.04)`,
+  `verify (windows-2022)`
 
 ## Deferred work
 
