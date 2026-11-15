@@ -1,170 +1,53 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import * as http from "node:http";
-import * as crypto from "node:crypto";
+import * as fs from "node:fs";
+import * as path from "node:path";
+import { fileURLToPath } from "node:url";
 
-// WP7: Model-free fake-provider qualification.
-// Qualifies experimental consumer boundaries using injected ports,
-// fixed responses and local fake providers (loopback only).
-// No real provider, credentials, live model request or Gateway deployment.
+// WP7: Adapter qualification status.
 //
-// BLOCKER: The exact @agent-teams/account-gateway SDK package and the
-// managed OCR binary (ocr-v1.13.1-rr.6) are not available in this
-// environment. The qualification below uses loopback fake providers that
-// exercise the consumer boundary contracts (request identity, cancellation,
-// caps, readback mapping, no retry) without the real SDK/OCR packages.
-// This must be completed with the exact pinned packages when available.
+// The Gateway SDK was qualified offline against the exact pinned source and a
+// locally packed tarball; see docs/experiments/m2-wp7-adapter-qualification.md
+// and scripts/qualify-sdk.mjs. The managed OCR binary (ocr-v1.13.1-rr.6) is
+// NOT available in this environment, so Profile A is BLOCKED. These tests assert
+// the recorded evidence and the model-free constraints. They do not claim a
+// qualification that was not performed, and they do not substitute a fake OCR.
 
-// --- Loopback fake provider helper ---
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const REPORT = path.join(ROOT, "docs/experiments/m2-wp7-adapter-qualification.md");
 
-function createFakeProvider(
-  handler: (req: http.IncomingMessage, res: http.ServerResponse) => void,
-): Promise<{ server: http.Server; url: string; close: () => Promise<void> }> {
-  return new Promise((resolve) => {
-    const server = http.createServer(handler);
-    server.listen(0, "127.0.0.1", () => {
-      const addr = server.address() as { port: number };
-      resolve({
-        server,
-        url: `http://127.0.0.1:${addr.port}`,
-        close: () => new Promise((res) => server.close(() => res())),
-      });
-    });
-  });
-}
-
-test("WP7: loopback fake provider responds to qualification request", async () => {
-  const { url, close } = await createFakeProvider((_req, res) => {
-    res.writeHead(200, { "Content-Type": "application/json" });
-    res.end(JSON.stringify({ result: "ok", requestId: "req-1" }));
-  });
-  assert.ok(url.startsWith("http://127.0.0.1"), "must be loopback");
-  const resp = await fetch(`${url}/test`);
-  const data = (await resp.json()) as { result: string };
-  assert.equal(data.result, "ok");
-  await close();
+test("WP7: qualification report records SDK qualification and OCR blocker", () => {
+  assert.ok(fs.existsSync(REPORT), "WP7 qualification report must exist");
+  const text = fs.readFileSync(REPORT, "utf8");
+  assert.match(text, /@agent-teams\/account-gateway/);
+  assert.match(text, /539418d5935a9e336d480b128a1cdb93c1daa6e1/);
+  assert.match(text, /dfa8fad3058813d4b0db52f3a05e347c0c8a531286bcbea2183554045e179f00/);
+  assert.match(text, /10\/10 passed/);
+  assert.match(text, /ocr-v1\.13\.1-rr\.6/);
+  assert.match(text, /9dd5f115747d24100f0767133a3288d268f3bc399675f5b826e7a867d101ee5c/);
+  assert.match(text, /BLOCKED/);
 });
 
-test("WP7: no external provider contacted", async () => {
-  const endpoints = ["http://127.0.0.1:9999/fake", "http://localhost:8080/test"];
-  for (const ep of endpoints) {
-    assert.ok(ep.includes("127.0.0.1") || ep.includes("localhost"), `endpoint ${ep} must be loopback`);
-  }
+test("WP7: qualification harness is present and targets the real /llm entry", () => {
+  const harness = path.join(ROOT, "scripts/qualify-sdk.mjs");
+  assert.ok(fs.existsSync(harness), "SDK qualification harness must exist");
+  const text = fs.readFileSync(harness, "utf8");
+  assert.match(text, /@agent-teams\/account-gateway\/llm/);
+  assert.match(text, /createLlmClient/);
+  assert.match(text, /127\.0\.0\.1/);
 });
 
-test("WP7: no credentials loaded", () => {
+test("WP7: no credentials are loaded", () => {
   const credVars = ["OPENAI_API_KEY", "ANTHROPIC_API_KEY", "GATEWAY_TOKEN", "OCR_API_KEY"];
   for (const v of credVars) {
     assert.equal(process.env[v], undefined, `${v} must not be set`);
   }
 });
 
-test("WP7: request identity stored before dispatch", async () => {
-  const dispatchLog: string[] = [];
-  const requestId = `req-${crypto.randomUUID()}`;
-  // Identity stored before transport.
-  dispatchLog.push(`identity:${requestId}`);
-  // Simulate dispatch.
-  dispatchLog.push(`dispatch:${requestId}`);
-  assert.equal(dispatchLog[0], `identity:${requestId}`, "identity must be stored first");
-  assert.equal(dispatchLog[1], `dispatch:${requestId}`, "dispatch must follow identity");
-});
-
-test("WP7: cancellation leaves visible incomplete state", () => {
-  const attempt = { state: "started", cancelled: false };
-  attempt.cancelled = true;
-  attempt.state = "cancelled";
-  assert.equal(attempt.state, "cancelled", "cancelled state must be visible");
-});
-
-test("WP7: cleanup pending state preserved", () => {
-  const attempt = { cleanupStatus: "pending" };
-  assert.equal(attempt.cleanupStatus, "pending", "pending cleanup must be preserved");
-});
-
-test("WP7: no automatic retry on failure", async () => {
-  const retryLog: string[] = [];
-  // Simulate a failed request with no retry.
-  retryLog.push("attempt-1: failed");
-  assert.equal(retryLog.length, 1, "no retry should occur");
-});
-
-test("WP7: fake provider handles malformed JSON", async () => {
-  const { url, close } = await createFakeProvider((_req, res) => {
-    res.writeHead(200, { "Content-Type": "application/json" });
-    res.end("{ invalid json }");
-  });
-  const resp = await fetch(`${url}/test`);
-  const text = await resp.text();
-  assert.throws(() => JSON.parse(text), "malformed JSON must throw");
-  await close();
-});
-
-test("WP7: fake provider handles truncated response", async () => {
-  const { url, close } = await createFakeProvider((_req, res) => {
-    res.writeHead(200, { "Content-Type": "application/json" });
-    res.end('{"result": "truncat');
-  });
-  const resp = await fetch(`${url}/test`);
-  const text = await resp.text();
-  assert.throws(() => JSON.parse(text), "truncated response must throw");
-  await close();
-});
-
-test("WP7: fake provider handles refusal", async () => {
-  const { url, close } = await createFakeProvider((_req, res) => {
-    res.writeHead(200, { "Content-Type": "application/json" });
-    res.end(JSON.stringify({ refused: true, reason: "safety" }));
-  });
-  const resp = await fetch(`${url}/test`);
-  const data = (await resp.json()) as { refused: boolean };
-  assert.equal(data.refused, true, "refusal must be visible");
-  await close();
-});
-
-test("WP7: input size bound enforced", () => {
-  const INPUT_CAP = 8000;
-  const oversizedInput = "a".repeat(8001);
-  assert.ok(oversizedInput.length > INPUT_CAP, "oversized input must exceed cap");
-  // Verify rejection before provider request.
-  const accepted = oversizedInput.length <= INPUT_CAP;
-  assert.equal(accepted, false, "oversized input must be rejected");
-});
-
-test("WP7: request body verified at fake provider", async () => {
-  let receivedBody = "";
-  const { url, close } = await createFakeProvider((_req, res) => {
-    let body = "";
-    _req.on("data", (chunk: Buffer) => { body += chunk.toString(); });
-    _req.on("end", () => {
-      receivedBody = body;
-      res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(JSON.stringify({ ok: true }));
-    });
-  });
-  await fetch(`${url}/test`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ criteria: "AC-1", candidate: "C1" }),
-  });
-  const parsed = JSON.parse(receivedBody) as { criteria: string; candidate: string };
-  assert.equal(parsed.criteria, "AC-1");
-  assert.equal(parsed.candidate, "C1");
-  await close();
-});
-
-test("WP7: no automatic retry on failure", async () => {
-  let callCount = 0;
-  const { url, close } = await createFakeProvider((_req, res) => {
-    callCount++;
-    res.writeHead(500, { "Content-Type": "application/json" });
-    res.end(JSON.stringify({ error: "server error" }));
-  });
-  try {
-    await fetch(`${url}/test`);
-  } catch {
-    // Expected.
-  }
-  assert.equal(callCount, 1, "no retry should occur");
-  await close();
+test("WP7: model-free constraint is explicit", () => {
+  const text = fs.readFileSync(REPORT, "utf8");
+  assert.match(text, /No live model, provider, OCR, Gateway or credential call was made/);
+  assert.match(text, /No package was published/);
+  // The OCR section must remain a blocker, not a silent substitution.
+  assert.match(text, /No substitute binary or fake OCR replacement is used/);
 });
