@@ -1,0 +1,55 @@
+{
+  "schema": "m2.rr7-artifact-manifest/v1",
+  "activePin": "ocr-v1.13.1-rr.7",
+  "releaseVersion": "1.13.1-rr.7",
+  "source": {
+    "repository": "agent-teams-ai/open-code-review",
+    "commit": "997293d17d2d4db08c942ecdd4d6fe0af91811a9",
+    "tree": "8e19c7b5ecd86c7bd696aa088455bdbe6e563bf8",
+    "upstreamRepository": "alibaba/open-code-review",
+    "upstreamCommit": "8eb83340a487b1150af00701b94f01af97e4b4d6"
+  },
+  "toolchain": {
+    "go": "go1.26.11",
+    "goos": "linux",
+    "goarch": "amd64",
+    "goamd64": "v1",
+    "gofips140": "off",
+    "cgoEnabled": "0",
+    "buildFlags": "-trimpath -buildvcs=false -ldflags=-s -w"
+  },
+  "asset": {
+    "name": "opencodereview-linux-amd64",
+    "sizeBytes": 80513021,
+    "sha256": "2f290fb407a5cb6fbe854cb6702b8c713325fce603a71c1be83f5284034aaa29",
+    "verifiedInCi": true,
+    "executionPlatform": "Ubuntu 24.04 (Linux/amd64) only"
+  },
+  "companions": {
+    "MANIFEST": "open-code-review.build/v1",
+    "qualification": "opencodereview.managed-qualification/v1",
+    "outcomeSchema": "reviewrouter.ocr-outcome/v1"
+  },
+  "parserNormalizer": {
+    "repository": "777genius/review-router",
+    "commit": "7a079c382d8e98b426ee90a6b3764be2a21b4c49",
+    "outcomeContractBlobSha1": "5ba2ba5ddfe52c93b0dc7d7514b1e0a3d7047698",
+    "normalizationBlobSha1": "43bcfa54ee3dedd50a18e2d8e8f9aaf5cd5a0a42",
+    "unchanged": true
+  },
+  "historical": {
+    "release": "ocr-v1.13.1-rr.6",
+    "sizeBytes": 80513363,
+    "sha256": "9dd5f115747d24100f0767133a3288d268f3bc399675f5b826e7a867d101ee5c",
+    "go": "go1.26.10",
+    "status": "superseded by rr.7; provenance preserved unchanged"
+  },
+  "qualification": {
+    "releaseLevel": "upstream four model-free cases (qualification.json), asserted by tests/rr7/wp7-rr7.test.ts",
+    "m2Specific": "tests/rr7/wp7-rr7.test.ts + tests/rr7/wp8-profile-a.test.ts",
+    "provider": "loopback fake Responses provider only",
+    "networkBoundary": "loopback only; no live provider, no OS network-isolation claim beyond the CI container",
+    "liveProviderCalls": 0
+  },
+  "status": "QUALIFIED (model-free)."
+}
