@@ -91,7 +91,16 @@ export interface NativeComment {
 
 /** Injected Profile A OCR port. Called at most once per invocation. */
 export interface ProfileAProviderPort {
-  review(input: { requestId: string; body: string }): Promise<{ comments: NativeComment[] }>;
+  review(input: { requestId: string; body: string }): Promise<{
+    comments: NativeComment[];
+    /**
+     * Optional fully-normalized findings produced by the real OCR consumer
+     * adapter (pinned parser + normalizer). When present they are used
+     * verbatim; the adapter does not re-normalize or invent verdicts.
+     */
+    findings?: FindingRecord[];
+    diagnostics?: string[];
+  }>;
 }
 
 export interface ProfileAAdapterResult {
@@ -119,8 +128,17 @@ export async function runProfileA(params: {
   params.dispatchLog.push(dispatch);
 
   const out = await params.provider.review({ requestId: params.requestId, body: params.body });
+  if (out.findings !== undefined) {
+    return {
+      requestId: params.requestId,
+      findings: out.findings,
+      dispatches: [dispatch],
+      diagnostics: [...(out.diagnostics ?? [])],
+    };
+  }
+
   const findings: FindingRecord[] = [];
-  const diagnostics: string[] = [];
+  const diagnostics: string[] = [...(out.diagnostics ?? [])];
 
   for (const c of out.comments) {
     const skipped = c.skipped === true;

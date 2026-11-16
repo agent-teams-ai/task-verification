@@ -86,56 +86,36 @@ provider recorded **exactly one** dispatch; the SDK exposes no raw failure text.
 This qualifies the SDK consumer boundary offline. It does **not** qualify a live model, live
 Gateway recovery, provider rate limits or model quality. Those remain D1/D2.
 
-## 3. Managed OCR blocker
+## 3. Managed OCR — rr.7 (owner-approved active pin)
+
+Historical rr.6 provenance is preserved unchanged (release `ocr-v1.13.1-rr.6`,
+size `80,513,363`, SHA-256 `9dd5f115747d24100f0767133a3288d268f3bc399675f5b826e7a867d101ee5c`,
+Go 1.26.10). The active M2 pin is now `ocr-v1.13.1-rr.7`.
 
 | Fact | Value |
 | --- | --- |
-| Approved release | `ocr-v1.13.1-rr.6` (binary reports `1.13.1-rr.6`) |
-| Upstream build input | `alibaba/open-code-review@8eb83340a487b1150af00701b94f01af97e4b4d6` (v1.13.1) |
-| Patch/build source | ReviewRouter Action `7a079c382d8e98b426ee90a6b3764be2a21b4c49`; recipe `go1.26.10` |
-| Approved Linux/amd64 asset | `80,513,363` bytes; SHA-256 `9dd5f115747d24100f0767133a3288d268f3bc399675f5b826e7a867d101ee5c` |
+| Approved release | `ocr-v1.13.1-rr.7` (binary reports `1.13.1-rr.7`) |
+| Source repository | `agent-teams-ai/open-code-review` |
+| Full source commit | `997293d17d2d4db08c942ecdd4d6fe0af91811a9` |
+| Source tree | `8e19c7b5ecd86c7bd696aa088455bdbe6e563bf8` |
+| Upstream base | `alibaba/open-code-review@8eb83340a487b1150af00701b94f01af97e4b4d6` (v1.13.1) |
+| Toolchain | Go 1.26.11 (`go1.26.11`, CGO_ENABLED=0, goamd64=v1) |
+| Build flags | `-trimpath -buildvcs=false -ldflags=-s -w` |
+| Approved Linux/amd64 asset | `80,513,021` bytes; SHA-256 `2f290fb407a5cb6fbe854cb6702b8c713325fce603a71c1be83f5284034aaa29` |
+| Parser/normalizer pin (unchanged) | `777genius/review-router@7a079c382d8e98b426ee90a6b3764be2a21b4c49` |
 
-The exact release asset and its source repository are **not accessible** from this environment.
-
-Commands and observed results:
-
-```
-gh release view ocr-v1.13.1-rr.6 --repo agent-teams-ai/engineering-research
-  -> release not found
-
-gh repo view agent-teams-ai/ReviewRouter --json name,visibility
-  -> GraphQL: Could not resolve to a Repository with the name 'agent-teams-ai/ReviewRouter'
-
-gh repo view agent-teams-ai/open-code-review --json name,visibility
-  -> GraphQL: Could not resolve to a Repository with the name 'agent-teams-ai/open-code-review'
-
-Get-Command open-code-review / ocr
-  -> (not found on PATH)
-
-npm view @agent-teams/account-gateway version
-  -> E404 (private package; expected)
-
-# Scoped filesystem search in Downloads, TEMP and the project tree for
-# *ocr-v1.13.1* / open-code-review returned no matching asset.
-```
-
-### What is needed from the maintainer (Iliya)
-
-To finish WP7 Profile A qualification, provide one of:
-
-1. The exact `ocr-v1.13.1-rr.6` Linux/amd64 release asset (or a private release URL/token), so the
-   expected size `80,513,363` bytes and SHA-256
-   `9dd5f115747d24100f0767133a3288d268f3bc399675f5b826e7a867d101ee5c` can be verified; or
-2. Access to the `ReviewRouter` repository/release that publishes it; or
-3. The managed binary plus its Action parser modules at the pinned commit.
-
-Until then the managed OCR consumer adapter cannot be exercised against the real binary, and WP7
-Profile A remains **BLOCKED**. No substitute binary or fake OCR replacement is used.
+The asset, MANIFEST and `qualification.json` were independently retrieved and verified; the binary
+was executed on Ubuntu 24.04 (Linux/amd64) inside a `--network none` container. 16 WP7 rr.7 tests
+pass (`tests/rr7/wp7-rr7.test.ts`) and the Profile A integrated suite passes
+(`tests/rr7/wp8-profile-a.test.ts`).
 
 ## 4. Status
 
 | Work package | Status |
 | --- | --- |
 | WP7 Gateway SDK (model-free) | QUALIFIED |
-| WP7 Managed OCR | BLOCKED (exact artifact inaccessible) |
-| **WP7 overall** | **PARTIAL** |
+| WP7 Managed OCR (rr.7) | QUALIFIED (model-free, loopback fake provider) |
+
+No substitute binary or fake OCR replacement is used.
+| WP8 Profile A (rr.7) | QUALIFIED |
+| **WP7/WP8 overall** | **COMPLETE (model-free scope)** |

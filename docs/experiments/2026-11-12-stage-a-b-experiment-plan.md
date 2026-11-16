@@ -671,3 +671,10 @@ Code and research evidence links use the pinned revisions in §3. The organizati
 - [Organization engineering quality standard](https://github.com/agent-teams-ai/.github/blob/main/docs/engineering-quality-standard.md) — inspected blob `9d4fc54d99249077bf6887be35a59ace1d5547bd`; maintained runtime tooling follows its strict TypeScript and architecture requirements
 
 [Documentation map](../README.md)
+
+
+## Amendment - Active managed OCR pin (owner-approved)
+
+Historical pin preserved: ocr-v1.13.1-rr.6, size 80513363, SHA-256 9dd5f115747d24100f0767133a3288d268f3bc399675f5b826e7a867d101ee5c, Go 1.26.10.
+
+Active pin: ocr-v1.13.1-rr.7, source commit 997293d17d2d4db08c942ecdd4d6fe0af91811a9, size 80513021, SHA-256 2f290fb407a5cb6fbe854cb6702b8c713325fce603a71c1be83f5284034aaa29, Go 1.26.11. Parser/normalizer pin unchanged: 777genius/review-router@7a079c382d8e98b426ee90a6b3764be2a21b4c49.

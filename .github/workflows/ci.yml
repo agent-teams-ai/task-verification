@@ -27,3 +27,25 @@ jobs:
       - run: pnpm run typecheck
       - run: pnpm run build:types
       - run: pnpm run test
+
+  rr7-ocr:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 24.13.1
+      - name: Download rr.7 asset
+        run: |
+          mkdir -p /tmp/rr7
+          curl -fsSL -o /tmp/rr7/opencodereview-linux-amd64 https://github.com/agent-teams-ai/open-code-review/releases/download/ocr-v1.13.1-rr.7/opencodereview-linux-amd64
+          curl -fsSL -o /tmp/rr7/MANIFEST https://github.com/agent-teams-ai/open-code-review/releases/download/ocr-v1.13.1-rr.7/MANIFEST
+          curl -fsSL -o /tmp/rr7/qualification.json https://github.com/agent-teams-ai/open-code-review/releases/download/ocr-v1.13.1-rr.7/qualification.json
+      - name: Verify rr.7
+        run: |
+          echo "2f290fb407a5cb6fbe854cb6702b8c713325fce603a71c1be83f5284034aaa29  /tmp/rr7/opencodereview-linux-amd64" | sha256sum -c -
+          test "$(stat -c%s /tmp/rr7/opencodereview-linux-amd64)" = "80513021"
+          chmod +x /tmp/rr7/opencodereview-linux-amd64
+          /tmp/rr7/opencodereview-linux-amd64 --version
+      - run: pnpm install --frozen-lockfile
+      - run: OCR_RR7_DIR=/tmp/rr7 node --experimental-transform-types --test --test-concurrency=1 tests/rr7/*.test.ts

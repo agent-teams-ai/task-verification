@@ -1,0 +1,16 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "noEmit": true,
+    "emitDeclarationOnly": false
+  },
+  "include": [
+    "src/**/*.ts",
+    "scripts/ocr-rr7/**/*.ts",
+    "tests/rr7/**/*.ts",
+    "vendor/review-router/**/*.ts"
+  ],
+  "exclude": ["node_modules", "dist"]
+}
