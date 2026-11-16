@@ -27,6 +27,16 @@ import { runProfileA, type DispatchRecord, type ProfileAAdapterResult } from "./
  */
 export const MAX_OCR_INPUT_CHARS = 8000;
 
+export class OcrIdentityMismatchError extends Error {
+  readonly code = "ocr_identity_mismatch";
+  readonly field: string;
+  constructor(field: string, actual: string, expected: string) {
+    super(`OCR reviewer input ${field} is not the authoritative identity (got ${actual}, expected ${expected})`);
+    this.name = "OcrIdentityMismatchError";
+    this.field = field;
+  }
+}
+
 export class OcrInputTooLargeError extends Error {
   readonly code = "ocr_input_too_large";
   readonly length: number;
@@ -140,6 +150,50 @@ export interface OcrExecutionPort {
   }>;
 }
 
+/**
+ * The authoritative base/head/diff identity a rendered reviewer input must
+ * carry. WP8 fails closed: a rendered input that does not carry the official
+ * base tree, head tree and base-to-head diff is never executed, so no result
+ * can be attributed to a snapshot that was not actually reviewed.
+ */
+export interface OcrIdentityBinding {
+  base: string;
+  head: string;
+  diff: string;
+  allowedPaths?: readonly string[];
+}
+
+/** Throw when the rendered fields do not carry the authoritative identity. */
+export function assertOcrIdentityBinding(
+  fields: OcrReviewerInputFields,
+  expected: OcrIdentityBinding,
+): void {
+  if (fields.base !== expected.base) {
+    throw new OcrIdentityMismatchError("base identity", fields.base, expected.base);
+  }
+  if (fields.head !== expected.head) {
+    throw new OcrIdentityMismatchError("head identity", fields.head, expected.head);
+  }
+  const canonical = (text: string): string => text.replace(/\r\n/g, "\n").replace(/\n+$/, "");
+  if (canonical(fields.diff) !== canonical(expected.diff)) {
+    throw new OcrIdentityMismatchError("base-to-head diff", "altered diff", "authoritative diff");
+  }
+  if (expected.allowedPaths) {
+    const header = /^diff --git a\/(\S+) b\/(\S+)$/gm;
+    for (let m = header.exec(fields.diff); m !== null; m = header.exec(fields.diff)) {
+      for (const candidatePath of [m[1], m[2]]) {
+        if (!expected.allowedPaths.includes(candidatePath)) {
+          throw new OcrIdentityMismatchError(
+            "diff path",
+            candidatePath,
+            `one of ${expected.allowedPaths.join(", ")}`,
+          );
+        }
+      }
+    }
+  }
+}
+
 export interface OcrProfileAResult {
   requestId: string;
   findings: FindingRecord[];
@@ -232,6 +286,10 @@ export function mapOcrOutputToFindings(params: {
 export async function runOcrProfileA(params: {
   requestId: string;
   reviewerInput: string;
+  /** Rendered fields, when the caller has them; required with `identity`. */
+  reviewerFields?: OcrReviewerInputFields;
+  /** Authoritative identity the rendered fields must carry. */
+  identity?: OcrIdentityBinding;
   execution: OcrExecutionPort;
   parser: OcrParserPort;
   expectedCriterionIds: readonly string[];
@@ -241,6 +299,16 @@ export async function runOcrProfileA(params: {
   dispatchLog: DispatchRecord[];
 }): Promise<{ adapter: ProfileAAdapterResult; details: OcrProfileAResult }> {
   assertOcrInputBound(params.reviewerInput);
+  if (params.identity) {
+    if (!params.reviewerFields) {
+      throw new OcrIdentityMismatchError("fields", "absent", "explicit reviewer fields");
+    }
+    assertOcrIdentityBinding(params.reviewerFields, params.identity);
+    const rerendered = renderOcrReviewerInput(params.reviewerFields);
+    if (rerendered !== params.reviewerInput) {
+      throw new OcrIdentityMismatchError("rendered input", "differs from its fields", rerendered.slice(0, 64));
+    }
+  }
   let details: OcrProfileAResult | null = null;
 
   const adapter = await runProfileA({
