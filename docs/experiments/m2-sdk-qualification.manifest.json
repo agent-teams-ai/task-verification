@@ -6,7 +6,8 @@
   "source": {
     "repository": "https://github.com/agent-teams-ai/account-gateway",
     "commit": "539418d5935a9e336d480b128a1cdb93c1daa6e1",
-    "tree": "608b577e2da608b09d77ca2cf19661a82543185c"
+    "tree": "608b577e2da608b09d77ca2cf19661a82543185c",
+    "checkout": "core.autocrlf=true (the approved tarball was packed from a CRLF working tree)"
   },
   "engine": ">=24.21.0 <25 || >=26.10.0 <27",
   "exports": [".", "./contracts", "./http", "./get-modular", "./llm"],
@@ -21,7 +22,23 @@
     "sha256": "dfa8fad3058813d4b0db52f3a05e347c0c8a531286bcbea2183554045e179f00",
     "npmIntegrity": "sha512-4KRoem4eP1pVDHHy/ElDwoJvzIUY9MtTbAaCarPSg2mT+4I/tq05HHfg3yd+F5tC6S8ECRjtDALRA3/iW2hEtA==",
     "reproducedExactly": true,
-    "published": false
+    "published": false,
+    "platformNote": {
+      "approvedArtifact": "packed on Windows (win32/x64), gzip OS byte 0x0a",
+      "linuxReproduction": {
+        "sizeBytes": 54221,
+        "sha256": "dd828049d12dac9bd37c492e639561733641047b90aca281a3c5b47f011e8c13",
+        "rawDiff": "exactly one byte at offset 9 (gzip OS field)",
+        "normalisedSha256": "dfa8fad3058813d4b0db52f3a05e347c0c8a531286bcbea2183554045e179f00",
+        "extractedContent": "byte-identical (diff -r empty; tar listings identical)"
+      },
+      "unNormalisedLinuxCheckout": {
+        "coreAutocrlf": false,
+        "sizeBytes": 54109,
+        "reason": "CRLF working-tree files differ from the approved CRLF checkout"
+      },
+      "verification": "scripts/verify-sdk-tarball.mjs (size + SHA-256 raw or gzip-OS-normalised)"
+    }
   },
   "runtimes": {
     "sdkQualification": { "node": "24.21.0", "pnpm": "11.28.2" },

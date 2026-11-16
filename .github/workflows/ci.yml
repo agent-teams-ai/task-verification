@@ -89,22 +89,26 @@ jobs:
         run: test "$(node --version)" = "v${SDK_NODE_VERSION}"
       - name: Clone the exact approved SDK source
         run: |
-          git clone --quiet https://github.com/agent-teams-ai/account-gateway.git /tmp/sdk
-          git -C /tmp/sdk checkout --quiet "${SDK_COMMIT}"
+          git clone --quiet --no-checkout https://github.com/agent-teams-ai/account-gateway.git /tmp/sdk
+          git -C /tmp/sdk config core.autocrlf true
+          git -C /tmp/sdk checkout -f --quiet "${SDK_COMMIT}"
           test "$(git -C /tmp/sdk rev-parse HEAD)" = "${SDK_COMMIT}"
           test "$(git -C /tmp/sdk rev-parse HEAD^{tree})" = "608b577e2da608b09d77ca2cf19661a82543185c"
       - name: Install, build and pack the SDK
         working-directory: /tmp/sdk
         run: |
+          # The approved tarball was produced from a checkout with CRLF working-tree
+          # files; reproduce that content so the artifact identity is meaningful.
+          git config core.autocrlf true
+          git checkout -f --quiet "${SDK_COMMIT}"
           npx --yes pnpm@${SDK_PNPM_VERSION} install --frozen-lockfile
           node scripts/build.mjs
           mkdir -p /tmp/sdk-out
           npx --yes pnpm@${SDK_PNPM_VERSION} --dir packages/account-gateway pack --pack-destination /tmp/sdk-out
       - name: Verify the packed tarball identity
-        run: |
-          tarball=/tmp/sdk-out/agent-teams-account-gateway-0.1.0.tgz
-          test "$(stat -c%s "$tarball")" = "${SDK_TARBALL_SIZE}"
-          echo "${SDK_TARBALL_SHA256}  ${tarball}" | sha256sum -c -
+        env:
+          SDK_TARBALL_EVIDENCE: /tmp/sdk-out/tarball-verification.json
+        run: node scripts/verify-sdk-tarball.mjs /tmp/sdk-out/agent-teams-account-gateway-0.1.0.tgz
       - name: Install the tarball in an isolated qualification project
         run: |
           mkdir -p /tmp/sdk-qual
@@ -128,4 +132,5 @@ jobs:
             /tmp/sdk-qual/sdk-qualification.json
             /tmp/sdk-qual/profile-b-evidence.json
             /tmp/sdk-qual/request-identity.jsonl
+            /tmp/sdk-out/tarball-verification.json
           if-no-files-found: error

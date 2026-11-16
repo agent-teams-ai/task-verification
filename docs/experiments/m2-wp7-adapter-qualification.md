@@ -49,17 +49,41 @@ pnpm@11.28.2 --dir packages/account-gateway pack --pack-destination <out>
 npm install <out>/agent-teams-account-gateway-0.1.0.tgz   # isolated qualification project
 ```
 
-### Packed artifact identity — reproduced byte for byte
+### Packed artifact identity — reproduced exactly
 
-| Property | Approved value | Fresh reproduction | Result |
+| Property | Approved value | Fresh reproduction (Windows) | Result |
 | --- | --- | --- | --- |
 | Tarball | `agent-teams-account-gateway-0.1.0.tgz` | same name | match |
 | Size | `54,221` bytes | `54,221` bytes | **match** |
 | SHA-256 | `dfa8fad3058813d4b0db52f3a05e347c0c8a531286bcbea2183554045e179f00` | identical | **match** |
 | npm integrity | `sha512-4KRoem4eP1pVDHHy/ElDwoJvzIUY9MtTbAaCarPSg2mT+4I/tq05HHfg3yd+F5tC6S8ECRjtDALRA3/iW2hEtA==` | identical | **match** |
 
-All three approved pins reproduce exactly, so no expected value is replaced and no investigation of
-a divergence is required.
+### One platform-byte investigation (documented, not silently replaced)
+
+Rebuilding the same source on Linux with the default `core.autocrlf=false` produced
+`54,109` bytes, and with `core.autocrlf=true` `54,221` bytes, but the SHA-256 did not match the
+approved pin. Cause, established byte by byte:
+
+- the approved tarball was packed from a checkout with **CRLF working-tree files**
+  (`core.autocrlf=true`), which is why the un-normalised Linux checkout is 112 bytes smaller;
+- at `core.autocrlf=true` the two tarballs have the **same size, an identical tar stream and
+  byte-identical extracted content** (`diff -r` is empty; `tar -tvzf` listings match on mode, owner,
+  size and normalised mtime);
+- exactly **one byte** differs, at offset 9 — the gzip `OS` field (`0x0a` NTFS on Windows,
+  `0x03` Unix on Linux).
+
+Normalising that single byte reproduces the approved pin exactly:
+
+```
+linux  sha256            dd828049d12dac9bd37c492e639561733641047b90aca281a3c5b47f011e8c13
+normalised (OS=0x0a)     dfa8fad3058813d4b0db52f3a05e347c0c8a531286bcbea2183554045e179f00
+approved pin             dfa8fad3058813d4b0db52f3a05e347c0c8a531286bcbea2183554045e179f00
+```
+
+No approved value is replaced. CI reproduces the approved content (`core.autocrlf=true`, pinned
+commit) and `scripts/verify-sdk-tarball.mjs` accepts the tarball only when the size matches and the
+SHA-256 matches either raw or after normalising the gzip `OS` byte; any content or structural change
+fails the check. The tarball is never published.
 
 ## 2. SDK qualification harness
 
