@@ -824,6 +824,28 @@ export function scoreResult(input: ScorerInput): ScorerResult {
   const evidenceApplicable = rc.evidence.applicability === "applicable";
   const lifecycleValid = execState !== "cancelled" && supersededBy === null;
   const cancelledOrSuperseded = !lifecycleValid;
+  // Explicitly resolve reference validity/sufficiency from the immutable
+  // artifact registry instead of relying on consumerAdmit() defaults.
+  const hasAssessmentReferences = rc.assessments.some((a) => a.references.length > 0);
+  const allRefsValid = hasAssessmentReferences
+    ? rc.assessments.every((a) =>
+        a.references.length === 0 ||
+        a.references.every((ref) => {
+          const rv = referenceValidity.find((x) => x.criterionId === a.expectedCriterionId && x.reference === ref);
+          return !!rv && rv.valid;
+        }),
+      )
+    : null;
+  const allRefsSufficient = hasAssessmentReferences
+    ? rc.assessments.every((a) =>
+        a.references.length === 0 ||
+        a.references.every((ref) => {
+          const ss = semanticSupport.find((x) => x.criterionId === a.expectedCriterionId && x.reference === ref);
+          return !!ss && ss.supporting;
+        }),
+      )
+    : null;
+
   const binding: AssessmentBinding = {
     assessmentId: rc.contractId,
     criteriaRevision: rc.criteria.authoredCriteriaRevision,
@@ -833,6 +855,8 @@ export function scoreResult(input: ScorerInput): ScorerResult {
     admittedCriterionIds: rc.assessments
       .filter((a) => a.admittedConclusion !== null)
       .map((a) => a.expectedCriterionId),
+    referenceValidity: allRefsValid,
+    referenceSufficiency: allRefsSufficient,
   };
   const admission = consumerAdmit(
     binding,

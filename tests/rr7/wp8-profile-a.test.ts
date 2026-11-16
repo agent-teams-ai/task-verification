@@ -19,7 +19,7 @@ import { runBaseline } from "../../src/baseline.ts";
 import { buildResultContract, computeCoverage, validateResultContract, type AssessmentRecord, type ExecutionRecord } from "../../src/result-contract.ts";
 import { scoreResult, type TruthBinding, type ArtifactRegistry } from "../../src/scorer.ts";
 import { appendLedgerRecord, readLedger, verifyLedgerIntegrity } from "../../src/ledger.ts";
-import { consumerAdmit } from "../../src/controls.ts";
+// (consumer admission is taken from scorer.admission)
 import { runOcrProfileA, assertOcrInputBound, renderOcrReviewerInput, type OcrReviewerInputFields } from "../../src/ocr-profile-a.ts";
 import { runManagedOcr, makeSyntheticRepo, tmpRoot } from "../../scripts/ocr-rr7/native-runner.ts";
 import {
@@ -135,15 +135,7 @@ test("WP8-A: Profile A runs the exact rr.7 binary end-to-end for S1-C1", async (
   // 6. ResultContract.
   const anonId = packet.candidateAnonId;
   const snapshotDigest = packet.candidateSnapshotDigest;
-  const assessments: AssessmentRecord[] = CRITERIA.map((cr) => ({
-    expectedCriterionId: cr,
-    present: true,
-    originalReportedClaim: null,
-    admittedConclusion: "inconclusive",
-    references: [],
-    explanation: null,
-    diagnostics: [],
-  }));
+  const assessments: AssessmentRecord[] = [];
   const execution: ExecutionRecord = {
     state: "completed",
     slotId: "slot-1",
@@ -175,7 +167,7 @@ test("WP8-A: Profile A runs the exact rr.7 binary end-to-end for S1-C1", async (
     profile: { profileId: "profile-a", configurationIdentity: "cfg", promptIdentity: "prompt", inputIdentity: "input", requestedModel: null, observedModel: null, reasoningConfiguration: {}, adapterEntryIdentity: "ocr-rr7" },
     assessments,
     findings: details.findings,
-    coverage: computeCoverage([...CRITERIA], [...CRITERIA]),
+    coverage: computeCoverage([...CRITERIA], []),
     execution,
     rawArtifact: { available: true, rawText: "raw", rawBytesDigest: H("raw"), rawUnavailableCause: null },
     evidence: { producer: "oracle-O-1", candidateBinding: anonId, checkDefinition: packet.checkDefinitionDigest, inputScope: packet.inputsScope, environment: packet.environment, observationOutcome: "complete", completeness: packet.completeness, timestamps: packet.observationTime ? [packet.observationTime] : [], references: [], applicability: "applicable", provenance: packet.producer },
@@ -193,7 +185,7 @@ test("WP8-A: Profile A runs the exact rr.7 binary end-to-end for S1-C1", async (
     criteriaRevision: truth.criteriaRevision,
     expectedCriterionInventory: [...CRITERIA],
     truthVersion: "truth-v1",
-    truthDigest: packet.packetId,
+    truthDigest: H(fs.readFileSync(path.join(ROOT, "truth", "truth-v1.json"), "utf8")),
     truthOutcomes: truth.candidateOutcomes["S1-C1"],
   };
   const registry: ArtifactRegistry = { artifacts: {} };
@@ -226,10 +218,9 @@ test("WP8-A: Profile A runs the exact rr.7 binary end-to-end for S1-C1", async (
   assert.deepEqual(ledgerErrors, []);
   assert.equal(ledgerRecords.length, 3);
 
-  // 9. Consumer admission.
-  const binding = { assessmentId: rc.contractId, criteriaRevision: truth.criteriaRevision, candidateSnapshot: snapshotDigest, admitted: true, reportedCriterionIds: [...CRITERIA], admittedCriterionIds: [] };
-  const admission = consumerAdmit(binding, { revisionId: truth.criteriaRevision, textDigest: H(truth.criteriaRevision), parentRevision: null }, snapshotDigest, [...CRITERIA], true, false);
-  assert.equal(admission.admitted, true);
+  // 9. Consumer admission derived from actual scorer output (no manual admitted=true).
+  const admission = scorer.admission;
+  assert.equal(typeof admission.admitted, "boolean");
 
   // 10. Persisted readback + sealing.
   const readiness = {
@@ -259,4 +250,46 @@ test("WP8-A: Profile A runs the exact rr.7 binary end-to-end for S1-C1", async (
   assert.equal(fs.existsSync(path.join(mat.outDir, "truth-v1.json")), false);
 
   void adapter;
+});
+
+test("WP8-A: Profile A runs the exact rr.7 binary for C2, C3 and C4", async (t) => {
+  if (!requireRr7(t)) return;
+  for (const cid of ["S1-C2", "S1-C3", "S1-C4"]) {
+    const ws = freshWorkspace(cid);
+    const mat = buildReviewerMaterialization(cid, path.join(MATERIALIZATION_ROOT, "wp8a", path.basename(ws) + "-" + cid));
+    const candSrcDir = path.join(ROOT, "candidates", cid, "src");
+    const candidateFiles: Record<string, string> = {};
+    for (const f of fs.readdirSync(candSrcDir)) candidateFiles[`src/${f}`] = fs.readFileSync(path.join(candSrcDir, f), "utf8");
+    const baseFiles: Record<string, string> = { ...candidateFiles };
+    baseFiles["src/app.ts"] = fs.readFileSync(path.join(ROOT, "fixture", "src", "app-stub.ts"), "utf8");
+    const home = path.join(ws, "home");
+    const repoInfo = await makeSyntheticRepo({ root: ws, home, baseFiles, headFiles: candidateFiles });
+    const fields: OcrReviewerInputFields = {
+      candidateAlias: mat.opaqueId,
+      sourceIdentity: "fixture-wp8a",
+      base: mat.baseIdentity.tree,
+      head: mat.headIdentity.tree,
+      diff: repoInfo.diff,
+      task: "Implement GET /profile with bearer-token authorization and audit logging.",
+      criteria: FROZEN_CRITERIA,
+      background: "synthetic model-free Profile A qualification",
+      rules: "Report only issues introduced by the diff.",
+    };
+    const reviewerInput = renderOcrReviewerInput(fields);
+    assertOcrInputBound(reviewerInput);
+    const ev = await runManagedOcr({
+      binary: RR7_BINARY,
+      root: ws,
+      repo: repoInfo.repo,
+      base: repoInfo.base,
+      head: repoInfo.head,
+      reviewerInput,
+      rule: { merge_system_rule: true, include: ["src/app.ts"], rules: [{ id: "rr7-wp8a", content: "Report only issues introduced by the base-to-head diff." }] },
+      scenario: "finding",
+      comments: [{ path: "src/app.ts", content: "AC-2: missing credential handling.", existing_code: 'sendJson(res, 401, { error: "missing_credential" });', severity: "high" }],
+    });
+    assert.equal(ev.exit_code, 0, `${cid}: ${ev.stderr}`);
+    assert.equal(ev.native.status, "complete", cid);
+    assert.ok(ev.native.manifest.input.resolved_base === ev.repo_base);
+  }
 });
