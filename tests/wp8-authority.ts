@@ -31,10 +31,17 @@ import {
   verifyArtifactRegistry,
 } from "../src/artifact-registry.ts";
 import { admitProfileAFindings } from "../src/profile-a-admission.ts";
-import { scoreResult, type ArtifactRegistry, type RubricDecision, type TruthBinding } from "../src/scorer.ts";
+import {
+  claimSupportKey,
+  scoreResult,
+  type ArtifactRegistry,
+  type RubricDecision,
+  type TruthBinding,
+} from "../src/scorer.ts";
+import { captureCriteriaSnapshot } from "../src/criteria.ts";
 import { buildResultContract, computeCoverage, validateResultContract, type FindingRecord } from "../src/result-contract.ts";
 import { loadTruth, CRITERIA } from "../src/truth.ts";
-import { opaqueId } from "../src/materialization.ts";
+import { FROZEN_CRITERIA, opaqueId } from "../src/materialization.ts";
 import { headFilesFor } from "../scripts/snapshot-defs.ts";
 import { assertOcrIdentityBinding, OcrIdentityMismatchError } from "../src/ocr-profile-a.ts";
 
@@ -64,6 +71,32 @@ const SUPPORTING: RubricDecision = {
   relevantCurrentApplicable: true,
   contradictsClaim: false,
 };
+
+/** Independently captured expected criteria content (not taken from any result). */
+const CAPTURED_CRITERIA = captureCriteriaSnapshot({
+  authoredRevision: loadTruth().criteriaRevision,
+  criteria: FROZEN_CRITERIA,
+  source: "tests/wp8-authority.ts",
+});
+
+/**
+ * Declare claim-scoped support for each (criterion, reference) pair a finding
+ * actually asserts. A single reference-level judgment is deliberately NOT
+ * spread across findings that cite the same file.
+ */
+function claimRubricsFor(
+  findings: readonly FindingRecord[],
+  decision: RubricDecision = SUPPORTING,
+): Record<string, RubricDecision> {
+  const out: Record<string, RubricDecision> = {};
+  for (const f of findings) {
+    if (f.criterionMapping === null) continue;
+    for (const ref of f.references ?? []) {
+      out[claimSupportKey(f.criterionMapping, ref)] = { ...decision, criterionId: f.criterionMapping };
+    }
+  }
+  return out;
+}
 
 // --- Snapshot identity ------------------------------------------------------
 
@@ -321,7 +354,7 @@ function profileAContract(params: {
     },
     criteria: {
       authoredCriteriaRevision: truth.criteriaRevision,
-      criteriaTextDigest: H(truth.criteriaRevision),
+      criteriaTextDigest: CAPTURED_CRITERIA.contentDigest,
       expectedCriterionIds: [...CRITERIA],
       criterionToCheckMapping: {},
       policyVersion: "baseline-policy-v1",
@@ -412,6 +445,7 @@ function admit(params: {
   candidateId: string;
   findings: FindingRecord[];
   registry?: ArtifactRegistry;
+  /** Claim-scoped support decisions, keyed by `criterionId::reference`. */
   rubrics?: Record<string, RubricDecision>;
   allowedPaths?: string[];
 }) {
@@ -423,7 +457,7 @@ function admit(params: {
   const scorer = scoreResult({
     resultContract: rc,
     truthBinding: truthBinding(candidateId),
-    referenceRubrics: params.rubrics ?? { [artifactReference("app.ts")]: SUPPORTING },
+    claimRubrics: params.rubrics ?? claimRubricsFor(params.findings),
     artifactRegistry: usedRegistry,
   });
   const decision = admitProfileAFindings({
@@ -434,6 +468,7 @@ function admit(params: {
     expectedCandidateBinding: opaqueId(candidateId),
     expectedSnapshotDigest: snapshot.head.applicationDigest,
     expectedCriteriaRevision: loadTruth().criteriaRevision,
+    expectedCriteriaContentDigest: CAPTURED_CRITERIA.contentDigest,
     expectedCriterionIds: [...CRITERIA],
   });
   return { rc, scorer, decision };
@@ -463,11 +498,7 @@ test("WP8-A admission: a valid current C4 finding is admitted and is a supported
     criterionMapping: "AC-4",
     references: [artifactReference("serializer.ts")],
   });
-  const { decision } = admit({
-    candidateId: "S1-C4",
-    findings: [ac4],
-    rubrics: { [artifactReference("serializer.ts")]: SUPPORTING },
-  });
+  const { decision } = admit({ candidateId: "S1-C4", findings: [ac4] });
   assert.equal(decision.admitted, true, decision.reason);
   assert.equal(decision.findings[0].supportedDetection, true);
 });
@@ -529,6 +560,7 @@ test("WP8-A admission: stale or inapplicable evidence cannot be admitted", () =>
     expectedCandidateBinding: opaqueId("S1-C3"),
     expectedSnapshotDigest: snapshotFor("S1-C3").head.applicationDigest,
     expectedCriteriaRevision: loadTruth().criteriaRevision,
+    expectedCriteriaContentDigest: CAPTURED_CRITERIA.contentDigest,
     expectedCriterionIds: [...CRITERIA],
   });
   assert.equal(decisionInapplicable.admitted, false);
@@ -562,7 +594,7 @@ test("WP8-A admission: unsupported semantic evidence is not a supported detectio
   const { decision, scorer } = admit({
     candidateId: "S1-C3",
     findings: [finding()],
-    rubrics: { [artifactReference("app.ts")]: contradicting },
+    rubrics: claimRubricsFor([finding()], contradicting),
   });
   assert.equal(decision.findings[0].referenceValid, true, "mechanical resolution still succeeds");
   assert.equal(decision.findings[0].semanticSupported, false);

@@ -45,6 +45,8 @@ export interface ProfileAFindingAdmission {
   snapshotBound: boolean;
   /** Scorer semantic-support dimension for this finding. */
   semanticSupported: boolean;
+  /** The assessment was produced against the current criteria CONTENT. */
+  criteriaContentBound: boolean;
   executionComplete: boolean;
   /** Finding-level admission. */
   admitted: boolean;
@@ -62,6 +64,13 @@ export interface ProfileAAdmissionDecision {
   executionValid: boolean;
   criteriaApplicable: boolean;
   criteriaRevisionBound: boolean;
+  /**
+   * The submitted `criteriaTextDigest` equals the independently captured
+   * content digest of the current criteria. False means the criteria content
+   * has changed since this assessment was produced (stale), even if the
+   * authored revision label is unchanged.
+   */
+  criteriaContentBound: boolean;
   candidateSnapshotBound: boolean;
   evidenceApplicable: boolean;
   deliveredFindings: number;
@@ -82,6 +91,8 @@ export interface ProfileAAdmissionInput {
   expectedCandidateBinding: string;
   expectedSnapshotDigest: string;
   expectedCriteriaRevision: string;
+  /** Digest over the independently captured expected criterion content. */
+  expectedCriteriaContentDigest: string;
   expectedCriterionIds: readonly string[];
 }
 
@@ -101,6 +112,7 @@ export function admitProfileAFindings(input: ProfileAAdmissionInput): ProfileAAd
   const executionComplete = scorer.executionValid;
   const evidenceApplicable = rc.evidence.applicability === "applicable";
   const criteriaRevisionBound = rc.criteria.authoredCriteriaRevision === input.expectedCriteriaRevision;
+  const criteriaContentBound = rc.criteria.criteriaTextDigest === input.expectedCriteriaContentDigest;
   const candidateSnapshotBound =
     rc.candidate.repositoryMaterializationId === input.expectedCandidateBinding &&
     rc.candidate.runtimeSnapshotDigest === input.expectedSnapshotDigest;
@@ -177,6 +189,7 @@ export function admitProfileAFindings(input: ProfileAAdmissionInput): ProfileAAd
       executionComplete &&
       evidenceApplicable &&
       criteriaApplicable &&
+      criteriaContentBound &&
       referenceValid &&
       candidateBound &&
       snapshotBound &&
@@ -187,6 +200,7 @@ export function admitProfileAFindings(input: ProfileAAdmissionInput): ProfileAAd
     // in fact violated). Mechanisms must still all pass first.
     const supportedDetection =
       admitted &&
+      criteriaContentBound &&
       semanticSupported &&
       criterionId !== null &&
       scorer.truthBindingValid &&
@@ -196,6 +210,7 @@ export function admitProfileAFindings(input: ProfileAAdmissionInput): ProfileAAd
     if (!delivered) reason = raw.skipped ? "skipped" : "not delivered";
     else if (!executionComplete) reason = "execution not admissible";
     else if (!evidenceApplicable) reason = "evidence not applicable";
+    else if (!criteriaContentBound) reason = "criteria content is stale for this assessment";
     else if (!criteriaApplicable) reason = reasons[reasons.length - 1] ?? "criterion not applicable";
     else if (!candidateBound) reason = "candidate binding mismatch";
     else if (!snapshotBound) reason = "snapshot binding mismatch";
@@ -216,6 +231,7 @@ export function admitProfileAFindings(input: ProfileAAdmissionInput): ProfileAAd
       candidateBound: candidateBound && references.length > 0,
       snapshotBound: snapshotBound && references.length > 0,
       semanticSupported,
+      criteriaContentBound,
       executionComplete,
       admitted,
       supportedDetection,
@@ -234,6 +250,7 @@ export function admitProfileAFindings(input: ProfileAAdmissionInput): ProfileAAd
     executionComplete &&
     evidenceApplicable &&
     criteriaRevisionBound &&
+    criteriaContentBound &&
     candidateSnapshotBound &&
     inventoryMatches &&
     decisions.length === rc.findings.length;
@@ -242,6 +259,7 @@ export function admitProfileAFindings(input: ProfileAAdmissionInput): ProfileAAd
   if (!executionComplete) reason = "execution not admissible";
   else if (!evidenceApplicable) reason = "evidence not applicable";
   else if (!criteriaRevisionBound) reason = "criteria revision mismatch";
+  else if (!criteriaContentBound) reason = "criteria content mismatch (stale assessment)";
   else if (!candidateSnapshotBound) reason = "candidate/snapshot binding mismatch";
   else if (!inventoryMatches) reason = "expected criterion inventory mismatch";
   else reason = "review execution admitted";
@@ -254,6 +272,7 @@ export function admitProfileAFindings(input: ProfileAAdmissionInput): ProfileAAd
     executionValid: executionComplete,
     criteriaApplicable: criteriaApplicableAll(decisions),
     criteriaRevisionBound,
+    criteriaContentBound,
     candidateSnapshotBound,
     evidenceApplicable,
     deliveredFindings: deliveredCount,

@@ -9,6 +9,7 @@ import {
 } from "../src/result-contract.ts";
 import {
   scoreResult,
+  claimSupportKey,
   evaluateRubric,
   isReferenceSupporting,
   isAdmissibleExecution,
@@ -508,11 +509,14 @@ test("WP5 execution: partial execution stays admissible but cannot imply whole-i
 });
 
 test("WP5 execution: completed full-coverage result is admitted", () => {
-  const rc = baseRc();
+  // A conclusion that asserts a polarity must cite a reference and carry support
+  // for that specific claim; a bare verdict is never sufficient evidence.
+  const rc = baseRc({ references: ["ref-1"] });
   const result = scoreResult({
     resultContract: rc,
     truthBinding: makeTruthBinding(rc, { "AC-1": true }),
-    referenceRubrics: {},
+    claimRubrics: { [claimSupportKey("AC-1", "ref-1")]: { ...SUPPORTING, criterionId: "AC-1" } },
+    artifactRegistry: makeRegistry(rc, { "ref-1": {} }),
   });
   assert.equal(result.executionValid, true);
   assert.equal(result.admission.admitted, true);
@@ -601,7 +605,9 @@ test("WP5 Profile A: supported finding on a known violation is a supported detec
   const result = scoreResult({
     resultContract: rc,
     truthBinding: makeTruthBinding(rc, { "AC-1": false }),
-    referenceRubrics: { "ref-valid": SUPPORTING },
+    // Support is declared for this exact claim (AC-1 citing ref-valid), not
+    // for the reference in general.
+    claimRubrics: { [claimSupportKey("AC-1", "ref-valid")]: { ...SUPPORTING, criterionId: "AC-1" } },
     artifactRegistry: makeRegistry(rc, { "ref-valid": {} }),
   });
   const f = result.profileA.findings[0];

@@ -77,6 +77,15 @@ jobs:
         run: OCR_RR7_DIR=/tmp/rr7 node --experimental-transform-types --test --test-concurrency=1 tests/rr7/wp7-rr7.test.ts
       - name: WP8-A integrated Profile A suite (Linux only)
         run: OCR_RR7_DIR=/tmp/rr7 node --experimental-transform-types --test --test-concurrency=1 tests/rr7/wp8-profile-a.test.ts
+      - name: Upload retained Profile A evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: wp8a-evidence
+          path: |
+            .isolation-tmp/wp8a-evidence/**
+          if-no-files-found: error
+          include-hidden-files: true
 
   sdk-qualification:
     runs-on: ubuntu-24.04
@@ -124,6 +133,7 @@ jobs:
         env:
           SDK_PROJECT_DIR: /tmp/sdk-qual
           PROFILE_B_OUT: /tmp/sdk-qual/profile-b-evidence.json
+          PROFILE_B_EVIDENCE_DIR: /tmp/sdk-qual/wp8b-evidence
         run: node --experimental-strip-types scripts/qualify-profile-b.mjs
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
@@ -131,6 +141,7 @@ jobs:
           path: |
             /tmp/sdk-qual/sdk-qualification.json
             /tmp/sdk-qual/profile-b-evidence.json
+            /tmp/sdk-qual/wp8b-evidence/**
             /tmp/sdk-qual/request-identity.jsonl
             /tmp/sdk-out/tarball-verification.json
           if-no-files-found: error

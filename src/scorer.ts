@@ -32,10 +32,73 @@ export interface RubricDecision {
   referenceExists?: boolean;
   /** @deprecated Mechanical binding is resolved from the artifact registry. */
   tiedToCandidate?: boolean;
+  /**
+   * Criterion this support judgment is about. A support decision is a judgment
+   * about a specific claim, not about a file: the same artifact may support one
+   * criterion and fail to support another that cites it.
+   */
+  criterionId?: string;
   supportsBehavior: boolean;
   coversSubclauses: boolean;
   relevantCurrentApplicable: boolean;
   contradictsClaim: boolean;
+}
+
+/**
+ * Support decisions are looked up per (criterion, reference) claim. A shared
+ * evidence reference never transfers a positive judgment to every assertion
+ * citing that file.
+ */
+export function claimSupportKey(criterionId: string, reference: string): string {
+  return `${criterionId}::${reference}`;
+}
+
+interface SupportSource {
+  /** Claim-scoped rubric decisions, keyed by `criterionId::reference`. */
+  claimRubrics?: Record<string, RubricDecision>;
+  /** @deprecated Reference-level decisions only apply when bound to the claim. */
+  referenceRubrics?: Record<string, RubricDecision>;
+}
+
+interface ClaimSupportLookup {
+  decision: RubricDecision | null;
+  reason: string;
+}
+
+/**
+ * Resolve the semantic-support decision for ONE claim. A reference-level entry
+ * is only usable when it explicitly names the criterion; otherwise the claim is
+ * unsupported with an explanatory reason rather than inheriting another claim's
+ * judgment.
+ */
+function lookupClaimSupport(
+  support: SupportSource,
+  criterionId: string | null,
+  reference: string,
+): ClaimSupportLookup {
+  if (criterionId === null) {
+    return { decision: null, reason: "no criterion mapping, so no claim-specific support decision applies" };
+  }
+  const claimed = support.claimRubrics?.[claimSupportKey(criterionId, reference)];
+  if (claimed) return { decision: claimed, reason: "claim-scoped support decision" };
+
+  const referenceLevel = support.referenceRubrics?.[reference];
+  if (referenceLevel) {
+    if (referenceLevel.criterionId === criterionId) {
+      return { decision: referenceLevel, reason: "reference rubric explicitly bound to this criterion" };
+    }
+    if (referenceLevel.criterionId === undefined) {
+      return {
+        decision: null,
+        reason: "reference-level rubric is not bound to a claim; a shared reference does not support every claim citing it",
+      };
+    }
+    return {
+      decision: null,
+      reason: `reference rubric is bound to criterion ${referenceLevel.criterionId}, not ${criterionId}`,
+    };
+  }
+  return { decision: null, reason: "no semantic support decision for this claim" };
 }
 
 /** Human-review provenance for a semantic-support decision. */
@@ -104,14 +167,27 @@ export interface ArtifactEntry {
 export interface ScorerInput {
   resultContract: ResultContract;
   truthBinding: TruthBinding;
-  /** Frozen semantic-support rubric, per reference id. */
-  referenceRubrics: Record<string, RubricDecision>;
+  /** Claim-scoped support decisions, keyed by `criterionId::reference`. */
+  claimRubrics?: Record<string, RubricDecision>;
+  /**
+   * @deprecated Reference-level rubric decisions. Used only when the decision
+   * explicitly names the criterion (`criterionId`); a file-level judgment is
+   * never transferred across claims.
+   */
+  referenceRubrics?: Record<string, RubricDecision>;
   /** Human-review provenance for rubric decisions. */
   rubricReviews?: Record<string, RubricReview>;
   /** Immutable artifact registry used for mechanical reference resolution. */
   artifactRegistry?: ArtifactRegistry;
   /** @deprecated Retained for call compatibility; execution state governs admission. */
   executionBinding?: "preserve-claim" | "no-verdict";
+  /**
+   * Independently captured criteria CONTENT digest of the current criteria.
+   * When supplied, shared consumer admission compares the assessment against
+   * this digest instead of against the contract's own bound digest (which by
+   * definition always matches itself).
+   */
+  expectedCriteriaContentDigest?: string;
   /** When true, an invalid Truth binding throws instead of returning errors. */
   strictTruthBinding?: boolean;
 }
@@ -196,16 +272,76 @@ export interface ReportedClaimAccounting {
  */
 export function parseReportedClaim(claim: string | null | undefined): ParsedReportedClaim {
   if (claim === null || claim === undefined) return "unknown";
-  const normalized = claim.trim().toLowerCase();
+  const normalized = claim
+    .trim()
+    .toLowerCase()
+    .replace(/[\u2018\u2019]/g, "'")
+    .replace(/\s+/g, " ")
+    .replace(/[.;:,!]+$/, "");
   if (normalized === "") return "unknown";
-  if (normalized === "satisfied") return "satisfied";
-  if (normalized === "violated") return "violated";
+
+  // Explicit schema states first: an exact token is unambiguous.
+  if (SATISFIED_STATES.has(normalized)) return "satisfied";
+  if (VIOLATED_STATES.has(normalized)) return "violated";
+  if (UNKNOWN_STATES.has(normalized)) return "unknown";
+
+  // Negation takes precedence over any positive substring. `not satisfied`
+  // asserts a violation; it must never be read as `satisfied`.
+  const partiallySatisfied =
+    /\b(partially|partly|half|mostly)\b[^.\n]{0,20}\bsatisf/.test(normalized) ||
+    /\bnot\s+fully\s+satisf/.test(normalized);
+  if (partiallySatisfied) return "unknown";
+
+  const negatedSatisfied = /\b(not|never|no|isn'?t|aren'?t|wasn'?t|weren'?t|doesn'?t|didn'?t)\b[^.\n]{0,12}\bsatisf/.test(
+    normalized,
+  );
+  const negatedViolated = /\b(not|never|no|isn'?t|aren'?t|wasn'?t|weren'?t|doesn'?t|didn'?t)\b[^.\n]{0,12}\bviolat/.test(
+    normalized,
+  );
+  const hasUnsatisfied = /\bunsatisfied\b/.test(normalized);
   const hasViolated = /\bviolated\b/.test(normalized);
   const hasSatisfied = /\bsatisfied\b/.test(normalized);
+
+  if (negatedSatisfied) return "violated";
+  if (negatedViolated) return "satisfied";
+  if (hasUnsatisfied) return "violated";
   if (hasViolated && !hasSatisfied) return "violated";
   if (hasSatisfied && !hasViolated) return "satisfied";
+  // Conflicting or unrecognised wording stays unknown: it is never silently
+  // converted into positive satisfaction.
   return "unknown";
 }
+
+const SATISFIED_STATES: ReadonlySet<string> = new Set([
+  "satisfied",
+  "pass",
+  "passed",
+  "met",
+  "ok",
+  "complete",
+  "completed",
+]);
+const VIOLATED_STATES: ReadonlySet<string> = new Set([
+  "violated",
+  "unsatisfied",
+  "not satisfied",
+  "fail",
+  "failed",
+  "unmet",
+  "not met",
+  "missing",
+]);
+const UNKNOWN_STATES: ReadonlySet<string> = new Set([
+  "partial",
+  "partially satisfied",
+  "partly satisfied",
+  "inconclusive",
+  "unknown",
+  "unclear",
+  "n/a",
+  "na",
+  "none",
+]);
 
 export interface ScorerResult {
   scorerVersion: string;
@@ -410,20 +546,24 @@ function resolveReference(
 
 interface ResolvedFindingReference extends ResolvedReference {
   supportsBehavior: boolean;
+  /** Why this claim is or is not supported by this reference. */
+  supportReason: string;
 }
 
 function resolveFindingReferences(
   refs: string[] | undefined,
   rc: ResultContract,
   registry: ArtifactRegistry | undefined,
-  rubrics: Record<string, RubricDecision>,
+  support: SupportSource,
+  criterionId: string | null,
 ): ResolvedFindingReference[] {
   const out: ResolvedFindingReference[] = [];
   for (const ref of refs ?? []) {
     const resolved = resolveReference(ref, rc, registry);
-    const rubric = rubrics[ref];
-    const supportsBehavior = resolved.mechanicallyValid && rubric ? isReferenceSupporting(rubric) : false;
-    out.push({ ...resolved, supportsBehavior });
+    const lookup = lookupClaimSupport(support, criterionId, ref);
+    const supportsBehavior =
+      resolved.mechanicallyValid && lookup.decision !== null && isReferenceSupporting(lookup.decision);
+    out.push({ ...resolved, supportsBehavior, supportReason: lookup.reason });
   }
   return out;
 }
@@ -476,7 +616,7 @@ function computeReportedClaimAccounting(
     // the original claim accounting.
     let referenceValid: boolean | null = null;
     if (a.references.length > 0) {
-      const resolved = resolveFindingReferences(a.references, rc, registry, {});
+      const resolved = resolveFindingReferences(a.references, rc, registry, {}, a.expectedCriterionId);
       referenceValid = resolved.some((r) => r.mechanicallyValid);
     }
 
@@ -518,7 +658,7 @@ function computeProfileAOutput(
   rc: ResultContract,
   truthOutcomes: Record<string, boolean>,
   registry: ArtifactRegistry | undefined,
-  rubrics: Record<string, RubricDecision>,
+  support: SupportSource,
   truthBindingValid: boolean,
 ): ProfileAOutput {
   const findings: ProfileAFindingOutput[] = [];
@@ -584,10 +724,6 @@ function computeProfileAOutput(
 
     deliveredCount++;
     const findingDiagnostics: string[] = [];
-    const resolvedRefs = resolveFindingReferences(f.references, rc, registry, rubrics);
-    for (const r of resolvedRefs) {
-      findingDiagnostics.push(`reference ${r.reference}: ${r.reason}`);
-    }
 
     let mappingStatus: "mapped" | "unmapped" | "out-of-scope" = "unmapped";
     let criterionMapping: string | null = null;
@@ -607,6 +743,16 @@ function computeProfileAOutput(
     } else {
       unmappedCount++;
       findingDiagnostics.push("no criterion mapping");
+    }
+
+    // Support is resolved for THIS finding's mapped criterion only. A positive
+    // judgment about the file never spreads to another finding/criterion.
+    const resolvedRefs = resolveFindingReferences(f.references, rc, registry, support, criterionMapping);
+    for (const r of resolvedRefs) {
+      findingDiagnostics.push(`reference ${r.reference}: ${r.reason}`);
+      if (r.mechanicallyValid && !r.supportsBehavior) {
+        findingDiagnostics.push(`criterion ${criterionMapping}: ${r.supportReason}`);
+      }
     }
 
     let referenceValidity: "valid" | "invalid" | "unknown";
@@ -782,16 +928,17 @@ export function scoreResult(input: ScorerInput): ScorerResult {
         valid: resolved.mechanicallyValid,
         reason: resolved.reason,
       });
-      const rubric = input.referenceRubrics[ref];
-      const supporting = resolved.mechanicallyValid && rubric ? isReferenceSupporting(rubric) : false;
+      const lookup = lookupClaimSupport(input, a.expectedCriterionId, ref);
+      const supporting =
+        resolved.mechanicallyValid && lookup.decision !== null && isReferenceSupporting(lookup.decision);
       semanticSupport.push({
         criterionId: a.expectedCriterionId,
         reference: ref,
         supporting,
         reason: !resolved.mechanicallyValid
           ? resolved.reason
-          : !rubric
-            ? "no semantic rubric decision"
+          : lookup.decision === null
+            ? lookup.reason
             : supporting
               ? "supports behavior and covers subclauses"
               : "does not fully support the claimed behavior",
@@ -807,7 +954,7 @@ export function scoreResult(input: ScorerInput): ScorerResult {
     rc,
     tb.truthOutcomes,
     input.artifactRegistry,
-    input.referenceRubrics,
+    input,
     truthBindingValid,
   );
 
@@ -836,7 +983,12 @@ export function scoreResult(input: ScorerInput): ScorerResult {
         }),
       )
     : null;
-  const allRefsSufficient = hasAssessmentReferences
+  // A conclusion that asserts a polarity must cite at least one reference: a
+  // bare verdict is never sufficient evidence.
+  const conclusionsWithoutReferences = rc.assessments.filter(
+    (a) => a.admittedConclusion !== null && a.references.length === 0,
+  ).length;
+  let allRefsSufficient: boolean | null = hasAssessmentReferences
     ? rc.assessments.every((a) =>
         a.references.length === 0 ||
         a.references.every((ref) => {
@@ -845,10 +997,12 @@ export function scoreResult(input: ScorerInput): ScorerResult {
         }),
       )
     : null;
+  if (conclusionsWithoutReferences > 0) allRefsSufficient = false;
 
   const binding: AssessmentBinding = {
     assessmentId: rc.contractId,
     criteriaRevision: rc.criteria.authoredCriteriaRevision,
+    criteriaTextDigest: rc.criteria.criteriaTextDigest,
     candidateSnapshot: rc.candidate.runtimeSnapshotDigest,
     admitted: admissible && rc.assessments.every((a) => a.admittedConclusion !== null),
     reportedCriterionIds: rc.coverage.presentIds,
@@ -862,7 +1016,10 @@ export function scoreResult(input: ScorerInput): ScorerResult {
     binding,
     {
       revisionId: rc.criteria.authoredCriteriaRevision,
-      textDigest: rc.criteria.criteriaTextDigest,
+      // The current content digest is the independently captured one when the
+      // caller supplies it; comparing the contract's digest to itself would
+      // never detect edited criteria under an unchanged revision label.
+      textDigest: input.expectedCriteriaContentDigest ?? rc.criteria.criteriaTextDigest,
       parentRevision: null,
     },
     rc.candidate.runtimeSnapshotDigest,

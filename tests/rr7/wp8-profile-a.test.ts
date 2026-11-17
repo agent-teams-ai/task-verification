@@ -42,8 +42,17 @@ import {
   type ExecutionRecord,
   type FindingRecord,
 } from "../../src/result-contract.ts";
-import { scoreResult, type RubricDecision, type TruthBinding } from "../../src/scorer.ts";
-import { appendLedgerRecord, readLedger, verifyLedgerIntegrity } from "../../src/ledger.ts";
+import { claimSupportKey, scoreResult, type RubricDecision, type TruthBinding } from "../../src/scorer.ts";
+import { captureCriteriaSnapshot } from "../../src/criteria.ts";
+import {
+  persistPlanned,
+  persistStarted,
+  persistTerminal,
+  verifyAttemptAtDispatch,
+  type DispatchIdentityEvidence,
+} from "../../src/attempt-persistence.ts";
+import { changedPathsFromDiff } from "../../src/materialization.ts";
+import { readLedger, verifyLedgerIntegrity } from "../../src/ledger.ts";
 import { admitProfileAFindings, type ProfileAAdmissionDecision } from "../../src/profile-a-admission.ts";
 import { artifactReference, buildArtifactRegistry, verifyArtifactRegistry } from "../../src/artifact-registry.ts";
 import {
@@ -56,6 +65,64 @@ import { runManagedOcr, tmpRoot } from "../../scripts/ocr-rr7/native-runner.ts";
 import { pinnedParser, requireRr7, RR7_BINARY, ROOT } from "./harness.ts";
 
 const H = (s: string): string => crypto.createHash("sha256").update(s).digest("hex");
+
+/**
+ * Independently captured expected criteria content. Derived from the frozen
+ * review-time criteria source, never from the assessment under evaluation.
+ */
+const CAPTURED_CRITERIA = captureCriteriaSnapshot({
+  authoredRevision: loadTruth().criteriaRevision,
+  criteria: FROZEN_CRITERIA,
+  source: "tests/rr7/wp8-profile-a.test.ts (frozen crit-v1 source)",
+});
+
+/** Retained per-candidate evidence (actual files, not just hashes). */
+const EVIDENCE_DIR = path.join(ROOT, ".isolation-tmp", "wp8a-evidence");
+const EVIDENCE_MANIFEST: Record<string, unknown>[] = [];
+
+function retainEvidence(
+  candidateId: string,
+  runId: string,
+  snapshot: AuthoritativeSnapshot,
+  name: string,
+  value: unknown,
+): { path: string; bytes: number; sha256: string } {
+  const dir = path.join(EVIDENCE_DIR, candidateId);
+  fs.mkdirSync(dir, { recursive: true });
+  const file = path.join(dir, name);
+  const body = typeof value === "string" ? value : JSON.stringify(value, null, 2) + "\n";
+  fs.writeFileSync(file, body, "utf8");
+  const bytes = fs.readFileSync(file);
+  const entry = {
+    path: path.relative(ROOT, file).split(path.sep).join("/"),
+    bytes: bytes.length,
+    sha256: crypto.createHash("sha256").update(bytes).digest("hex"),
+  };
+  EVIDENCE_MANIFEST.push({
+    profile: "profile-a",
+    candidate: candidateId,
+    producer: "tests/rr7/wp8-profile-a.test.ts",
+    runIdentity: runId,
+    snapshotDigest: snapshot.head.applicationDigest,
+    baseTree: snapshot.base.tree,
+    headTree: snapshot.head.tree,
+    criteriaRevision: CAPTURED_CRITERIA.authoredRevision,
+    criteriaContentDigest: CAPTURED_CRITERIA.contentDigest,
+    scope: name,
+    completeness: "complete",
+    ...entry,
+  });
+  return entry;
+}
+
+function writeEvidenceManifest(): void {
+  fs.mkdirSync(EVIDENCE_DIR, { recursive: true });
+  fs.writeFileSync(
+    path.join(EVIDENCE_DIR, "manifest.json"),
+    JSON.stringify({ schema: "m2.evidence-manifest/v1", profile: "profile-a", files: EVIDENCE_MANIFEST }, null, 2) + "\n",
+    "utf8",
+  );
+}
 
 const SUPPORTING: RubricDecision = {
   referenceExists: true,
@@ -192,6 +259,41 @@ async function runCandidate(candidateId: string): Promise<CandidateRun> {
     severity: "high",
   }));
 
+  // Durable attempt lifecycle: planned and started BEFORE the binary starts.
+  const ledgerPath = path.join(ws, "runs.jsonl");
+  const attempt = {
+    identity: {
+      runId: `run-${candidateId}`,
+      attemptId: "attempt-1",
+      profile: "profile-a",
+      candidateId: anonId,
+      baseTreeIdentity: snapshot.base.tree,
+      headTreeIdentity: snapshot.head.tree,
+      runtimeSnapshotDigest: snapshotDigest,
+      criteriaAuthoredRevision: CAPTURED_CRITERIA.authoredRevision,
+      criteriaContentDigest: CAPTURED_CRITERIA.contentDigest,
+      requestIdentity: H(reviewerInput),
+    },
+    record: {
+      slotId: "slot-1",
+      repetition: 1,
+      seed: 42,
+      subjectInventory: [...CRITERIA],
+      criterionInventory: [...CRITERIA],
+      policyDigest: packet.checkDefinitionDigest,
+      promptDigest: H(fields.rules),
+      requestedModel: "rr7-fake-model",
+      adapterEntryIdentity: "ocr-v1.13.1-rr.7",
+      startTimestamp: "2026-01-01T00:00:00Z",
+      requestIds: [`wp8a-${candidateId}`],
+      diagnostics: [],
+    },
+    ledgerPath,
+  };
+  persistPlanned(attempt);
+  persistStarted(attempt);
+  let dispatchEvidence: DispatchIdentityEvidence | null = null;
+
   const dispatchLog: { requestId: string; profile: "A" | "B"; dispatchedAt: number }[] = [];
   const { details } = await runOcrProfileA({
     requestId: `wp8a-${candidateId}`,
@@ -235,7 +337,18 @@ async function runCandidate(candidateId: string): Promise<CandidateRun> {
     headFiles: new Map(Object.entries(snapshot.headFiles)),
     assignedPaths: [...snapshot.files],
     dispatchLog,
+    beforeDispatch: () => {
+      // The durable record must already exist and match this request.
+      dispatchEvidence = verifyAttemptAtDispatch(attempt);
+    },
   });
+  assert.ok(dispatchEvidence, `${candidateId}: dispatch boundary was not verified`);
+  assert.equal(
+    (dispatchEvidence as DispatchIdentityEvidence).plannedPersisted &&
+      (dispatchEvidence as DispatchIdentityEvidence).startedPersisted,
+    true,
+    `${candidateId}: attempt was not durable before dispatch`,
+  );
 
   assert.equal(dispatchLog.length, 1, `${candidateId}: exactly one dispatch`);
   assert.equal(details.terminalState, "complete");
@@ -276,7 +389,7 @@ async function runCandidate(candidateId: string): Promise<CandidateRun> {
     },
     criteria: {
       authoredCriteriaRevision: truth.criteriaRevision,
-      criteriaTextDigest: H(truth.criteriaRevision),
+      criteriaTextDigest: CAPTURED_CRITERIA.contentDigest,
       expectedCriterionIds: [...CRITERIA],
       criterionToCheckMapping: {},
       policyVersion: "baseline-policy-v1",
@@ -333,10 +446,19 @@ async function runCandidate(candidateId: string): Promise<CandidateRun> {
   // 10. Scoring with the real registry; Truth digest is the Truth file SHA-256.
   const truthDigest = H(fs.readFileSync(path.join(ROOT, "truth", "truth-v1.json"), "utf8"));
   assert.notEqual(truthDigest, packet.packetId, `${candidateId}: truth digest must not be a packet id`);
-  const referenceRubrics: Record<string, RubricDecision> = {
-    [artifactReference("app.ts")]: candidateId === "S1-C3" ? SUPPORTING : NON_SUPPORTING,
-    [artifactReference("serializer.ts")]: NON_SUPPORTING,
-  };
+  // Support is declared per (criterion, reference) claim. A single judgment
+  // about app.ts is never transferred to every finding that cites app.ts.
+  const claimDecision = candidateId === "S1-C3" ? SUPPORTING : NON_SUPPORTING;
+  const claimRubrics: Record<string, RubricDecision> = {};
+  for (const f of findings) {
+    if (f.criterionMapping === null) continue;
+    for (const ref of f.references ?? []) {
+      claimRubrics[claimSupportKey(f.criterionMapping, ref)] = {
+        ...claimDecision,
+        criterionId: f.criterionMapping,
+      };
+    }
+  }
   const truthBinding: TruthBinding = {
     canonicalCandidateId: anonId,
     anonymizedCandidateId: anonId,
@@ -350,7 +472,7 @@ async function runCandidate(candidateId: string): Promise<CandidateRun> {
   const scorer = scoreResult({
     resultContract: rc,
     truthBinding,
-    referenceRubrics,
+    claimRubrics,
     artifactRegistry: verified.accepted,
   });
   assert.deepEqual(scorer.truthBindingErrors, []);
@@ -365,6 +487,7 @@ async function runCandidate(candidateId: string): Promise<CandidateRun> {
     expectedCandidateBinding: anonId,
     expectedSnapshotDigest: snapshotDigest,
     expectedCriteriaRevision: truth.criteriaRevision,
+    expectedCriteriaContentDigest: CAPTURED_CRITERIA.contentDigest,
     expectedCriterionIds: [...CRITERIA],
   });
 
@@ -386,59 +509,27 @@ async function runCandidate(candidateId: string): Promise<CandidateRun> {
   }
   assert.deepEqual(decision.admittedCriterionIds, [], `${candidateId}: fabricated criterion verdicts`);
 
-  // 12. Ledger lifecycle, persisted and replayed.
-  const ledgerPath = path.join(ws, "runs.jsonl");
-  const ledgerBase = {
-    schemaVersion: "ledger-event-v1",
-    sequence: 1,
-    slotId: "slot-1",
-    runId: `run-${candidateId}`,
-    attemptId: "attempt-1",
-    opaqueCandidateId: anonId,
-    profile: "profile-a",
-    repetition: 1,
-    seed: 42,
-    subjectInventory: [...CRITERIA],
-    criterionInventory: [...CRITERIA],
-    baseTreeIdentity: snapshot.base.tree,
-    headTreeIdentity: snapshot.head.tree,
-    runtimeSnapshotDigest: snapshotDigest,
-    criteriaRevision: truth.criteriaRevision,
-    policyDigest: packet.checkDefinitionDigest,
-    promptDigest: H(fields.rules),
-    inputDigest: H(reviewerInput),
-    requestedModel: "rr7-fake-model",
+  // 12. Terminal ledger record AFTER execution, then replay from disk.
+  persistTerminal(attempt, "completed", {
     observedModel: "rr7-fake-model",
-    reasoningConfiguration: { effort: "medium" },
-    adapterEntryIdentity: "ocr-v1.13.1-rr.7",
-    startTimestamp: "2026-01-01T00:00:00Z",
-    endTimestamp: null,
-    requestIds: [`wp8a-${candidateId}`],
     rawArtifactRefs: [H(JSON.stringify(details.native))],
-    rawUnavailableCause: null,
-    usage: {},
-    diagnostics: [],
     admissionState: decision.admitted ? "admitted" : "rejected",
     cleanupStatus: "clean",
-    isStub: false,
-    supersededBy: null,
-    supersedes: null,
-  };
-  const events = [
-    { ...ledgerBase, eventId: `evt-${crypto.randomUUID()}`, eventType: "planned", executionState: "planned" },
-    { ...ledgerBase, eventId: `evt-${crypto.randomUUID()}`, eventType: "attempt_started", executionState: "started" },
-    {
-      ...ledgerBase,
-      eventId: `evt-${crypto.randomUUID()}`,
-      eventType: "attempt_completed",
-      executionState: "completed",
-      endTimestamp: "2026-01-01T00:00:01Z",
-    },
-  ];
-  for (const e of events) appendLedgerRecord(e as never, { ledgerPath });
+    endTimestamp: "2026-01-01T00:00:01Z",
+    diagnostics: [...details.diagnostics],
+  });
   const ledgerRecords = readLedger(ledgerPath);
   assert.deepEqual(verifyLedgerIntegrity(ledgerRecords), [], `${candidateId}: ledger invalid`);
   assert.equal(ledgerRecords.length, 3);
+  assert.deepEqual(
+    ledgerRecords.map((r) => r.eventType),
+    ["planned", "attempt_started", "attempt_completed"],
+  );
+  for (const rec of ledgerRecords) {
+    assert.equal(rec.criteriaContentDigest, CAPTURED_CRITERIA.contentDigest, `${candidateId}: criteria content digest`);
+    assert.equal(rec.criteriaRevision, CAPTURED_CRITERIA.authoredRevision);
+    assert.equal(rec.inputDigest, H(reviewerInput));
+  }
 
   // 13. Persist the readiness artifact (identities + decision) and read it back.
   const readiness = {
@@ -501,6 +592,33 @@ async function runCandidate(candidateId: string): Promise<CandidateRun> {
       assert.ok(!f.toLowerCase().includes(bad.toLowerCase()), `${candidateId}: sealed material ${f}`);
     }
   }
+
+  // Detailed retained evidence for this candidate and profile.
+  const runId = `run-${candidateId}`;
+  retainEvidence(candidateId, runId, snapshot, "readiness.json", readiness);
+  retainEvidence(
+    candidateId,
+    runId,
+    snapshot,
+    "runs.jsonl",
+    ledgerRecords.map((r) => JSON.stringify(r)).join("\n") + "\n",
+  );
+  retainEvidence(candidateId, runId, snapshot, "dispatch-identity.json", dispatchEvidence);
+  retainEvidence(candidateId, runId, snapshot, "native-output.json", details.native);
+  retainEvidence(candidateId, runId, snapshot, "normalized-output.json", details.normalized);
+  retainEvidence(candidateId, runId, snapshot, "skipped-findings.json", {
+    skipped: details.skipped,
+    dropped: details.findings.filter((f) => !f.skipped && f.normalizedFinding === null),
+  });
+  retainEvidence(candidateId, runId, snapshot, "admission.json", decision);
+  retainEvidence(candidateId, runId, snapshot, "criteria-binding.json", {
+    expected: CAPTURED_CRITERIA,
+    submitted: rc.criteria.criteriaTextDigest,
+    bound: rc.criteria.criteriaTextDigest === CAPTURED_CRITERIA.contentDigest,
+    providerInput: { reviewerInput, length: reviewerInput.length },
+  });
+  retainEvidence(candidateId, runId, snapshot, "reviewer-input.txt", reviewerInput);
+  writeEvidenceManifest();
 
   return {
     snapshot,
@@ -631,4 +749,143 @@ test("WP8-A: the pinned parser rejects a native manifest with a different head i
       headSha: "0".repeat(40),
     }),
   );
+});
+
+/**
+ * Native OCR scope: an unchanged dependency must be readable as context while
+ * remaining classified as unchanged, and findings must keep the candidate's
+ * actual changed-path assignment.
+ */
+test("WP8-A: an unchanged dependency is read natively but is not a candidate change", async (t) => {
+  if (!requireRr7(t)) return;
+  const ws = tmpRoot("wp8a-scope-");
+  const snapshot = buildAuthoritativeSnapshot("S1-C3", path.join(ws, "snapshot"));
+  const changed = changedPathsFromDiff(snapshot.diff);
+  assert.deepEqual(changed, ["app.ts"], "the candidate's changed-path assignment");
+  const unchanged = snapshot.files.filter((f) => !changed.includes(f));
+  assert.ok(unchanged.length >= 4, "expected unchanged dependencies");
+
+  const ev = await runManagedOcr({
+    binary: RR7_BINARY,
+    root: ws,
+    repo: snapshot.repo,
+    base: snapshot.base.commit,
+    head: snapshot.head.commit,
+    reviewerInput: renderOcrReviewerInput({
+      candidateAlias: opaqueId("S1-C3"),
+      sourceIdentity: "authoritative",
+      base: snapshot.base.tree,
+      head: snapshot.head.tree,
+      diff: snapshot.diff,
+      task: "Implement GET /profile.",
+      criteria: FROZEN_CRITERIA,
+      background: "scope qualification",
+      rules: "Report only issues introduced by the base-to-head diff.",
+    }),
+    // Unchanged files are permitted as supporting context.
+    rule: {
+      merge_system_rule: true,
+      include: [...snapshot.files],
+      rules: [{ id: "rr7-scope", content: "Report only issues introduced by the base-to-head diff." }],
+    },
+    scenario: "unchanged",
+    // The reviewer asks the binary to read an UNCHANGED dependency with its own
+    // native `file_read` tool.
+    readPaths: ["audit.ts"],
+  });
+  assert.equal(ev.exit_code, 0, ev.stderr);
+  assert.ok(ev.requests.length >= 3, `expected a native file_read round trip, got ${ev.requests.length} requests`);
+  // The read is executed by the binary after the tool call; its result is the
+  // real file content, delivered in a later request.
+  const afterRead = ev.requests.slice(2).map((r) => r.bodyText).join("\n");
+  assert.ok(
+    afterRead.includes("private readonly records: AuditRecord[] = [];"),
+    "the unchanged dependency's real content must be delivered after the native read",
+  );
+  // ...and it is still an unchanged dependency, not a candidate change.
+  assert.deepEqual(changed, ["app.ts"]);
+  assert.equal(unchanged.includes("audit.ts"), true);
+  // The candidate's diff scope still names only the changed file.
+  assert.ok(ev.native.manifest.input.resolved_base === snapshot.base.commit);
+  assert.ok(ev.native.manifest.input.resolved_head === snapshot.head.commit);
+
+  // Normalization keeps the changed-path assignment: nothing may be reported
+  // against an unchanged dependency.
+  const parsed = pinnedParser.parseOcrNativeReviewResult(ev.native, {
+    baseSha: ev.repo_base,
+    mergeBaseSha: ev.repo_base,
+    headSha: ev.repo_head,
+  });
+  const normalized = pinnedParser.normalizeOcrFindings({
+    comments: [
+      { path: "audit.ts", content: "AC-5: audit helper looks suspicious.", existingCode: null, startLine: 1, endLine: 1 },
+    ],
+    assignedPaths: changed,
+    headFiles: new Map(Object.entries(snapshot.headFiles)),
+  });
+  assert.deepEqual(normalized.findings, [], "a finding on an unchanged dependency must not survive scoped normalization");
+  assert.ok(normalized.diagnostics.skipped.length > 0 || normalized.diagnostics.reasons.length > 0);
+  void parsed;
+});
+
+/**
+ * Native OCR scope: an out-of-scope read attempt must not deliver content from
+ * outside the repository to the provider.
+ */
+test("WP8-A: out-of-scope reads through the native tools are refused", async (t) => {
+  if (!requireRr7(t)) return;
+  const ws = tmpRoot("wp8a-escape-");
+  const snapshot = buildAuthoritativeSnapshot("S1-C3", path.join(ws, "snapshot"));
+  const sentinel = "M2_OUT_OF_SCOPE_SENTINEL_9f13";
+  const outside = path.join(path.dirname(snapshot.repo), "outside-secret.ts");
+  fs.writeFileSync(outside, `export const LEAK = "${sentinel}";\n`, "utf8");
+  assert.equal(fs.existsSync(outside), true);
+
+  const ev = await runManagedOcr({
+    binary: RR7_BINARY,
+    root: ws,
+    repo: snapshot.repo,
+    base: snapshot.base.commit,
+    head: snapshot.head.commit,
+    reviewerInput: renderOcrReviewerInput({
+      candidateAlias: opaqueId("S1-C3"),
+      sourceIdentity: "authoritative",
+      base: snapshot.base.tree,
+      head: snapshot.head.tree,
+      diff: snapshot.diff,
+      task: "Implement GET /profile.",
+      criteria: FROZEN_CRITERIA,
+      background: "negative access qualification",
+      rules: "Report only issues introduced by the base-to-head diff.",
+    }),
+    rule: {
+      merge_system_rule: true,
+      include: ["app.ts", "../outside-secret.ts", "../../etc/passwd"],
+      rules: [{ id: "rr7-escape", content: "Report only issues introduced by the base-to-head diff." }],
+    },
+    scenario: "unchanged",
+    // Ask the native tool to read outside the repository.
+    readPaths: ["../outside-secret.ts", "/etc/passwd"],
+  });
+
+  // The review agent's REQUEST to read an out-of-scope path is part of the
+  // transcript (it is the attempt being recorded). What must never happen is
+  // that out-of-scope CONTENT comes back and reaches the provider.
+  const served = ev.requests.map((r) => r.bodyText).join("\n");
+  assert.equal(served.includes(sentinel), false, "out-of-scope file content reached the provider");
+  assert.equal(served.includes("root:x:0"), false, "content outside the repository reached the provider");
+  assert.equal(/<file path="[^"]*(outside-secret|\.\.\/)/.test(served), false, "an out-of-scope file block was delivered");
+  // The attempt is visible as a tool call, and the tool result carries no file
+  // content for it (it is an error/empty result, not a read).
+  assert.ok(served.includes("file_read"), "the native read attempt must be recorded");
+  // The native result may record that a path was requested, but it must never
+  // carry content from outside the repository.
+  const nativeText = JSON.stringify(ev.native ?? {});
+  assert.equal(nativeText.includes(sentinel), false);
+  assert.equal(nativeText.includes("root:x:0"), false);
+  // The run is recorded honestly: if it failed, the diagnostics are retained
+  // rather than reported as a successful out-of-scope review.
+  if (ev.exit_code !== 0) {
+    assert.ok(ev.stderr.length > 0 || ev.native_error !== null, "a failed run must retain diagnostics");
+  }
 });

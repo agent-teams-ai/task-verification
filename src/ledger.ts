@@ -58,6 +58,12 @@ export interface LedgerRecord {
   headTreeIdentity: string;
   runtimeSnapshotDigest: string;
   criteriaRevision: string;
+  /**
+   * SHA-256 over the canonical captured criterion content. Optional for older
+   * records; when present it binds the attempt to the criteria content rather
+   * than to the authored revision label alone.
+   */
+  criteriaContentDigest?: string;
   policyDigest: string;
   promptDigest: string;
   inputDigest: string;
@@ -251,6 +257,14 @@ export function validateLedgerRecord(input: unknown): string[] {
   if (!isDigestLike(record.headTreeIdentity)) errors.push("headTreeIdentity must be a hex digest");
   if (!isDigestLike(record.runtimeSnapshotDigest)) errors.push("runtimeSnapshotDigest must be a hex digest");
   if (!isNonEmptyString(record.criteriaRevision)) errors.push("missing or invalid criteriaRevision");
+  if (record.criteriaContentDigest !== undefined) {
+    if (
+      typeof record.criteriaContentDigest !== "string" ||
+      !/^[0-9a-f]{64}$/.test(record.criteriaContentDigest)
+    ) {
+      errors.push("criteriaContentDigest must be a lowercase SHA-256 hex digest when present");
+    }
+  }
   if (!isDigestLike(record.policyDigest)) errors.push("policyDigest must be a hex digest");
   if (!isDigestLike(record.promptDigest)) errors.push("promptDigest must be a hex digest");
   if (!isDigestLike(record.inputDigest)) errors.push("inputDigest must be a hex digest");

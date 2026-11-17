@@ -36,6 +36,12 @@ export interface FakeProviderOptions {
   comments?: unknown[];
   stallMs?: number;
   requestLimit?: number;
+  /**
+   * File paths the reviewer asks the binary to read with its own `file_read`
+   * tool, one per main turn, before finishing. This exercises the real native
+   * read path (including paths outside the repository).
+   */
+  readPaths?: string[];
 }
 
 export interface FakeProvider {
@@ -125,6 +131,7 @@ export async function startFakeProvider(options: FakeProviderOptions = {}): Prom
     comments = [],
     stallMs = 30000,
     requestLimit = 24,
+    readPaths = [],
   } = options;
   const requests: CapturedRequest[] = [];
   const state = {
@@ -229,10 +236,16 @@ export async function startFakeProvider(options: FakeProviderOptions = {}): Prom
           : key === "default"
             ? comments
             : comments.filter((c) => keyPaths.includes(String((c as { path?: unknown })?.path ?? "")));
-      output =
-        turn === 0 && groupComments.length > 0
-          ? [functionCall("code_comment", { comments: groupComments })]
-          : [functionCall("task_done", {})];
+      if (turn < readPaths.length && names.includes("file_read")) {
+        // Ask the binary to read this path with its own native tool. The read
+        // result arrives in the next request body.
+        output = [functionCall("file_read", { file_path: readPaths[turn] })];
+      } else {
+        output =
+          turn === 0 && groupComments.length > 0
+            ? [functionCall("code_comment", { comments: groupComments })]
+            : [functionCall("task_done", {})];
+      }
     } else {
       // Grouping call: no review tools are offered. Return a partition that
       // keeps a below-threshold change set in one group, or, for the partial

@@ -144,16 +144,46 @@ Go 1.26.10). The active M2 pin is now `ocr-v1.13.1-rr.7`.
 | Full source commit | `997293d17d2d4db08c942ecdd4d6fe0af91811a9` |
 | Source tree | `8e19c7b5ecd86c7bd696aa088455bdbe6e563bf8` |
 | Upstream base | `alibaba/open-code-review@8eb83340a487b1150af00701b94f01af97e4b4d6` (v1.13.1) |
-| Toolchain | Go 1.26.11 (`go1.26.11`, CGO_ENABLED=0, goamd64=v1) |
-| Build flags | `-trimpath -buildvcs=false -ldflags=-s -w` |
+| Toolchain | Go 1.26.11 (`go1.26.11`, `CGO_ENABLED=0`, `GOOS=linux`, `GOARCH=amd64`, `GOAMD64=v1`, `GOFIPS140=off`, `GOWORK=off`) |
+| Build flags (as recorded in the approved `MANIFEST`) | `-mod=readonly -trimpath -buildvcs=false -ldflags -X=main.Version=1.13.1-rr.7` |
 | Approved Linux/amd64 asset | `80,513,021` bytes; SHA-256 `2f290fb407a5cb6fbe854cb6702b8c713325fce603a71c1be83f5284034aaa29` |
 | Parser/normalizer pin (unchanged) | `777genius/review-router@7a079c382d8e98b426ee90a6b3764be2a21b4c49` |
 | Parser blob | `5ba2ba5ddfe52c93b0dc7d7514b1e0a3d7047698` |
 | Normalizer blob | `43bcfa54ee3dedd50a18e2d8e8f9aaf5cd5a0a42` |
 
-The asset, `MANIFEST` and `qualification.json` are retrieved and verified in CI (size, SHA-256 and
-`--version`), and the binary runs on Ubuntu 24.04 (Linux/amd64) only, against a loopback fake
-provider with an allowlisted child environment.
+**Build-flag reconciliation (M2 corrective pass).** An earlier revision of this table documented
+`-ldflags=-s -w`. That is **not** what the approved release records: the signed `MANIFEST` states
+`build_flags=-mod=readonly -trimpath -buildvcs=false -ldflags -X=main.Version=1.13.1-rr.7`, with no
+`-s`/`-w` stripping. The table above now matches the approved provenance exactly. No flag has been
+invented: the only recorded `ldflags` value is the version stamp, and the size difference against
+`-s -w` builds is consistent with symbols not being stripped.
+
+**Actual invocation arguments** used by the harness (`scripts/ocr-rr7/native-runner.ts`) — this is the
+command line, not the build line:
+
+```
+opencodereview-linux-amd64 review \
+  --reviewrouter-managed --repo <repo> --from <base> --to <head> \
+  --provider reviewrouter --model <model> --rule <rule.json> --effort medium \
+  --concurrency 1 --format json --audience agent --timeout 1 --max-tokens 32768 \
+  --output <result.json> --background <rendered reviewer input>
+```
+
+The child environment is an explicit allowlist (`PATH`, private `HOME`/XDG dirs, `LC_ALL=C`, Git
+config isolation, `OCR_ENABLE_TELEMETRY=0`, `OCR_CONTENT_LOGGING=0`, `OCR_RAW_LOGGING=0`).
+
+**Local container verification vs hosted CI — these are different executions.**
+
+| | Local verification | Hosted CI verification |
+| --- | --- | --- |
+| Where | Ubuntu 24.04 container (`m2-rr7`, Docker 29.8.0, `--network none`) on the maintainer workstation | GitHub Actions `rr7-ocr` job, `ubuntu-24.04` runner |
+| Asset | Same local file, SHA-256 `2f290fb4…4aaa29`, 80,513,021 bytes, verified before use | Downloaded from the release and verified (`sha256sum -c`, size, `--version`) |
+| Command | `docker run … node --experimental-transform-types --test --test-concurrency=1 tests/rr7/…` | `OCR_RR7_DIR=/tmp/rr7 node --experimental-transform-types --test …` |
+| Evidence | Local run output + `.isolation-tmp/wp8a-evidence/` | Job log + uploaded `wp8a-evidence` artifact |
+| Result | WP7 16/16, WP8-A 6/6 | Recorded per run id in the CI artifact |
+
+A local container run is **not** hosted CI execution, and a green CI job is **not** the local run.
+Both are reported separately.
 
 - **Release-level qualification** (the upstream four model-free cases) is recorded in
   `qualification.json` and asserted by `tests/rr7/wp7-rr7.test.ts`.
@@ -166,9 +196,9 @@ provider with an allowlisted child environment.
 | --- | --- |
 | WP7 Gateway SDK (model-free) | **QUALIFIED** — freshly reproduced and re-qualified |
 | WP7 Managed OCR (rr.7) | **QUALIFIED** (model-free, loopback fake provider) |
-| WP8 Profile A (rr.7) | **QUALIFIED** for all four candidates on authoritative snapshots |
-| WP8 Profile B (packed SDK) | **QUALIFIED** for all four candidates through the exact tarball |
-| WP7/WP8 overall | **COMPLETE (model-free scope)** |
+| WP8 Profile A (rr.7) | **QUALIFIED** for all four candidates; unchanged-dependency read and out-of-scope refusal exercised through the native tools |
+| WP8 Profile B (packed SDK) | **QUALIFIED** for all four candidates; complete provider-bound input verified at the fake-provider boundary |
+| WP7/WP8 overall | **COMPLETE (model-free scope)**, corrections included |
 
 No substitute binary or fake OCR replacement is used. Fixed injected provider responses qualify the
 protocol/adapter/accounting path; they do not measure reviewer reasoning or model quality.

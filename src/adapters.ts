@@ -49,11 +49,18 @@ export async function runProfileB(params: {
   dispatchLog: DispatchRecord[];
   now?: () => number;
   signal?: AbortSignal;
+  /**
+   * Dispatch-boundary hook. Invoked after the request identity is fixed and
+   * BEFORE the provider is called, so a caller can verify that this attempt is
+   * already durably persisted. If it throws, nothing is dispatched.
+   */
+  beforeDispatch?: (dispatch: DispatchRecord) => void | Promise<void>;
 }): Promise<ProfileBAdapterResult> {
   const now = params.now ?? Date.now;
   // Identity recorded before dispatch.
   const dispatch: DispatchRecord = { requestId: params.requestId, profile: "B", dispatchedAt: now() };
   params.dispatchLog.push(dispatch);
+  if (params.beforeDispatch) await params.beforeDispatch(dispatch);
 
   const out = await params.provider.generate({
     requestId: params.requestId,
@@ -122,10 +129,17 @@ export async function runProfileA(params: {
   normalize: (comment: NativeComment) => { normalizedFinding: string | null; criterionMapping: string | null; qualityFlags: string[] };
   dispatchLog: DispatchRecord[];
   now?: () => number;
+  /**
+   * Dispatch-boundary hook. Invoked after the request identity is fixed and
+   * BEFORE the OCR process is started, so a caller can verify that this attempt
+   * is already durably persisted. If it throws, nothing is dispatched.
+   */
+  beforeDispatch?: (dispatch: DispatchRecord) => void | Promise<void>;
 }): Promise<ProfileAAdapterResult> {
   const now = params.now ?? Date.now;
   const dispatch: DispatchRecord = { requestId: params.requestId, profile: "A", dispatchedAt: now() };
   params.dispatchLog.push(dispatch);
+  if (params.beforeDispatch) await params.beforeDispatch(dispatch);
 
   const out = await params.provider.review({ requestId: params.requestId, body: params.body });
   if (out.findings !== undefined) {

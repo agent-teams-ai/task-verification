@@ -66,6 +66,12 @@ export function createRevisionAfterTombstone(text: string, tombstone: CriteriaTo
 export interface AssessmentBinding {
   assessmentId: string;
   criteriaRevision: string;
+  /**
+   * Digest over the canonical captured criterion content this assessment was
+   * produced against. Optional for compatibility; when present it must match
+   * the current criteria content, independently of the revision label.
+   */
+  criteriaTextDigest?: string;
   candidateSnapshot: string;
   /** Whether this assessment was admitted by its producer. False can never be overridden. */
   admitted: boolean;
@@ -140,6 +146,7 @@ export interface AdmissionDecision {
   admitted: boolean;
   reason: string;
   criteriaMatch: boolean;
+  criteriaContentMatch: boolean;
   snapshotMatch: boolean;
   lifecycleValid: boolean;
   coverageComplete: boolean;
@@ -161,6 +168,11 @@ export function consumerAdmit(
   lifecycleValid: boolean = !cancelledOrSuperseded,
 ): AdmissionDecision {
   const criteriaMatch = assessment.criteriaRevision === currentCriteriaRevision.revisionId;
+  // Content binding is independent of the authored revision label: identical
+  // labels with edited criterion text must not keep an assessment current.
+  const criteriaContentMatch =
+    assessment.criteriaTextDigest === undefined ||
+    assessment.criteriaTextDigest === currentCriteriaRevision.textDigest;
   const snapshotMatch = assessment.candidateSnapshot === currentSnapshot;
   const lcValid = lifecycleValid && !cancelledOrSuperseded;
 
@@ -194,6 +206,7 @@ export function consumerAdmit(
 
   const admitted =
     criteriaMatch &&
+    criteriaContentMatch &&
     snapshotMatch &&
     lcValid &&
     assessmentAdmitted &&
@@ -205,6 +218,7 @@ export function consumerAdmit(
 
   let reason = "admitted";
   if (!criteriaMatch) reason = "criteria revision mismatch";
+  else if (!criteriaContentMatch) reason = "criteria content mismatch (stale criteria)";
   else if (!snapshotMatch) reason = "snapshot mismatch";
   else if (!lcValid) reason = "cancelled or superseded";
   else if (!assessmentAdmitted) reason = "assessment not admitted";
@@ -218,6 +232,7 @@ export function consumerAdmit(
     admitted,
     reason,
     criteriaMatch,
+    criteriaContentMatch,
     snapshotMatch,
     lifecycleValid: lcValid,
     coverageComplete,

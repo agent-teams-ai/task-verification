@@ -22,6 +22,7 @@ import * as crypto from "node:crypto";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
+import { canonicalJson } from "./canonical.ts";
 import { applicationDigest } from "./digest.ts";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -313,6 +314,89 @@ export interface ProfileBInput {
   prTitle: string;
   prDescription: string;
   instruction: string;
+  /** Task/PR background delivered to the provider. */
+  background: string;
+  /** Review rules delivered to the provider. */
+  rules: string;
+  /** Paths actually changed by the candidate (base-to-head), never widened. */
+  changedFiles: string[];
+  /** Unchanged files that remain available as supporting context. */
+  unchangedDependencies: string[];
+}
+
+export const PROFILE_B_REQUEST_SCHEMA = "profile-b-request-v1";
+
+/**
+ * The assessment shape the provider must return. This is the existing decoder
+ * contract made explicit: criterion id, polarity and the provider's OWN
+ * references and explanation. The integration never fills these in.
+ */
+export const PROFILE_B_OUTPUT_SCHEMA = {
+  type: "object",
+  required: ["assessments"],
+  properties: {
+    assessments: {
+      type: "array",
+      items: {
+        type: "object",
+        required: ["criterionId", "outcome", "references", "explanation"],
+        properties: {
+          criterionId: { type: "string" },
+          outcome: { enum: ["satisfied", "violated", "inconclusive"] },
+          references: { type: "array", items: { type: "string" } },
+          explanation: { type: ["string", "null"] },
+        },
+      },
+    },
+  },
+} as const;
+
+/** Changed paths from a unified diff's `diff --git a/x b/x` headers. */
+export function changedPathsFromDiff(diff: string): string[] {
+  const paths = new Set<string>();
+  const header = /^diff --git a\/(\S+) b\/(\S+)$/gm;
+  for (let m = header.exec(diff); m !== null; m = header.exec(diff)) {
+    paths.add(m[1]);
+    paths.add(m[2]);
+  }
+  return [...paths].sort();
+}
+
+/**
+ * Serialize the complete provider-bound Profile B request payload.
+ *
+ * Every file selected for review is delivered with its complete content, every
+ * criterion with its complete text, plus the task/PR background, the review
+ * instructions and the rules. Changed files are distinguished from unchanged
+ * dependencies explicitly so the provider cannot mistake readable context for
+ * a candidate-introduced change.
+ */
+export function renderProfileBRequestInput(input: ProfileBInput): string {
+  const changed = new Set(input.changedFiles);
+  const payload = {
+    schema: PROFILE_B_REQUEST_SCHEMA,
+    candidate: input.opaqueCandidateId,
+    subject: { base: input.baseIdentity, head: input.headIdentity },
+    task: {
+      title: input.prTitle,
+      description: input.prDescription,
+      background: input.background,
+    },
+    criteria: input.criteria.map((c) => ({ id: c.id, text: c.text })),
+    instructions: input.instruction,
+    rules: input.rules,
+    changedFiles: [...input.changedFiles],
+    unchangedDependencies: [...input.unchangedDependencies],
+    files: input.headFiles.map((f) => ({
+      path: f.path,
+      content: f.content,
+      changed: changed.has(f.path),
+      role: changed.has(f.path) ? "changed" : "unchanged-dependency",
+    })),
+    diff: input.baseToHeadDiff,
+    outputSchema: PROFILE_B_OUTPUT_SCHEMA,
+  };
+  return canonicalJson(payload);
 }
 
 export function buildProfileBInput(candidateId: string): ProfileBInput {
@@ -328,6 +412,12 @@ export function buildProfileBInput(candidateId: string): ProfileBInput {
     headFiles.push({ path: f, content: fs.readFileSync(path.join(srcDir, f), "utf8") });
   }
 
+  const changedFiles = changedPathsFromDiff(cand.diffFull);
+  const unchangedDependencies = headFiles
+    .map((f) => f.path)
+    .filter((p) => !changedFiles.includes(p))
+    .sort();
+
   return {
     opaqueCandidateId: opaqueId(candidateId),
     criteria: FROZEN_CRITERIA,
@@ -337,6 +427,17 @@ export function buildProfileBInput(candidateId: string): ProfileBInput {
     baseToHeadDiff: cand.diffFull,
     prTitle: "Add profile endpoint",
     prDescription: "Implements GET /profile with bearer-token authorization and audit logging.",
-    instruction: "Assess every expected criterion ID (AC-1..AC-5) against the supplied application context.",
+    instruction:
+      "Assess every expected criterion ID (AC-1..AC-5) against the supplied application context. " +
+      "Return one assessment per criterion with its own references and explanation.",
+    background:
+      "The candidate adds GET /profile behind bearer-token authorization. Every application file is " +
+      "supplied in full; only the files listed in changedFiles were changed by this candidate.",
+    rules:
+      "Assess each criterion only from the supplied application content. Cite artifact:// references " +
+      "for the files your conclusion relies on. Do not report a criterion as satisfied without a " +
+      "reference that supports it.",
+    changedFiles,
+    unchangedDependencies,
   };
 }

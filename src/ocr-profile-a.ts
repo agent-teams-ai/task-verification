@@ -297,6 +297,12 @@ export async function runOcrProfileA(params: {
   assignedPaths?: readonly string[];
   diffPositions?: ReadonlyMap<string, ReadonlyMap<number, number>>;
   dispatchLog: DispatchRecord[];
+  /**
+   * Verified at the dispatch boundary, immediately before the OCR process is
+   * started. A caller uses this to assert that the durable attempt record
+   * already exists and matches this request; if it throws, nothing runs.
+   */
+  beforeDispatch?: (dispatch: DispatchRecord) => void | Promise<void>;
 }): Promise<{ adapter: ProfileAAdapterResult; details: OcrProfileAResult }> {
   assertOcrInputBound(params.reviewerInput);
   if (params.identity) {
@@ -315,6 +321,7 @@ export async function runOcrProfileA(params: {
     requestId: params.requestId,
     body: params.reviewerInput,
     dispatchLog: params.dispatchLog,
+    ...(params.beforeDispatch ? { beforeDispatch: params.beforeDispatch } : {}),
     provider: {
       async review({ requestId, body }) {
         assertOcrInputBound(body);

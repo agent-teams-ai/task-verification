@@ -11,7 +11,14 @@ import { loadTruth, validateTruth, CRITERIA } from "../src/truth.ts";
 import { writeEvidencePacket } from "../src/evidence.ts";
 import { runBaseline } from "../src/baseline.ts";
 import { buildResultContract, computeCoverage, validateResultContract, type AssessmentRecord, type FindingRecord, type ExecutionRecord } from "../src/result-contract.ts";
-import { scoreResult, type TruthBinding, type ArtifactRegistry, type RubricDecision } from "../src/scorer.ts";
+import {
+  claimSupportKey,
+  scoreResult,
+  type TruthBinding,
+  type ArtifactRegistry,
+  type RubricDecision,
+} from "../src/scorer.ts";
+import { captureCriteriaSnapshot } from "../src/criteria.ts";
 import { appendLedgerRecord, readLedger, verifyLedgerIntegrity } from "../src/ledger.ts";
 import { createCriteriaRevision, createCriteriaTombstone, createRevisionAfterTombstone, consumerAdmit } from "../src/controls.ts";
 import { runProfileB, runProfileA, type DispatchRecord, type NativeComment } from "../src/adapters.ts";
@@ -148,7 +155,11 @@ function runScenario(opts: ScenarioOptions): ScenarioResult {
     },
     criteria: {
       authoredCriteriaRevision: truth.criteriaRevision,
-      criteriaTextDigest: H(truth.criteriaRevision),
+      criteriaTextDigest: captureCriteriaSnapshot({
+        authoredRevision: truth.criteriaRevision,
+        criteria: FROZEN_CRITERIA,
+        source: "tests/wp8.ts",
+      }).contentDigest,
       expectedCriterionIds: [...CRITERIA],
       criterionToCheckMapping: {},
       policyVersion: "baseline-policy-v1",
@@ -194,7 +205,12 @@ function runScenario(opts: ScenarioOptions): ScenarioResult {
     truthDigest: packet.packetId,
     truthOutcomes: outcomes,
   };
-  const scorer = scoreResult({ resultContract: rc, truthBinding, referenceRubrics: opts.rubrics ?? {}, artifactRegistry: registry });
+  const scorer = scoreResult({
+    resultContract: rc,
+    truthBinding,
+    claimRubrics: opts.rubrics ?? {},
+    artifactRegistry: registry,
+  });
 
   // 8. Persist a real ledger lifecycle and replay it.
   const ledgerPath = path.join(ws, "runs.jsonl");
@@ -327,7 +343,7 @@ test("WP8: Profile A supported detection with a real valid reference", () => {
     candidateId: "S1-C3",
     claims: { "AC-3": "violated" },
     admitted: { "AC-3": "violated" },
-    rubrics: { [realRef]: SUPPORTING },
+    rubrics: { [claimSupportKey("AC-3", realRef)]: SUPPORTING },
     findings: [{ nativeComment: "AC-3 revocation not checked", normalizedFinding: "AC-3 revocation not checked", skipped: false, skipReason: null, qualityFlags: [], criterionMapping: "AC-3", references: [realRef] }],
   });
   const f = r.scorer.profileA.findings[0];

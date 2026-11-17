@@ -99,15 +99,24 @@ real scorer output and the verified registry. The persisted `AdmissionDecision` 
 
 | # | Suite | Command | Platform | Result |
 | --- | --- | --- | --- | --- |
-| 1 | Main regression suite | `node --experimental-strip-types --test --test-concurrency=1 tests/*.ts` | win32/x64, Node 24.13.1 | **259 / 259 pass**, 0 fail, 0 skip |
+| 1 | Main regression suite | `node --experimental-strip-types --test --test-concurrency=1 tests/*.ts` | win32/x64, Node 24.13.1 | **284 / 284 pass**, 0 fail, 0 skip |
 | 2 | rr.7 WP7 suite | `OCR_RR7_DIR=/rr7 node --experimental-transform-types --test tests/rr7/wp7-rr7.test.ts` | Ubuntu 24.04 container, Node 24.13.1 | **16 / 16 pass** |
-| 3 | WP8-A integrated Profile A | `OCR_RR7_DIR=/rr7 … tests/rr7/wp8-profile-a.test.ts` | Ubuntu 24.04 container, Node 24.13.1 | **4 / 4 pass** (C1–C4 + 2 identity negatives) |
+| 3 | WP8-A integrated Profile A | `OCR_RR7_DIR=/rr7 … tests/rr7/wp8-profile-a.test.ts` | Ubuntu 24.04 container, Node 24.13.1 | **6 / 6 pass** (C1–C4, 2 identity negatives, native unchanged-dependency read, out-of-scope refusal) |
 | 4 | SDK qualification | `SDK_PROJECT_DIR=<isolated> node scripts/qualify-sdk.mjs` | win32/x64, Node 24.21.0 | **20 / 20 pass** |
 | 5 | WP8-B integrated Profile B | `SDK_PROJECT_DIR=<isolated> node --experimental-strip-types scripts/qualify-profile-b.mjs` | win32/x64, Node 24.21.0 | **4 / 4 candidates admitted** |
 
-Historical records preserved: main suite was 242/242; rr.7 suites were 18/18 (16 WP7 + 2 WP8-A). The
-main suite gained 17 tests (authoritative snapshot, registry and admission controls), and the WP8-A
-suite grew from 2 to 4 tests. The suites above are counted independently.
+Historical records preserved: main suite was 242/242, then 259/259; rr.7 suites were 18/18 (16 WP7 +
+2 WP8-A), then 20/20 (16 + 4). The main suite is now 284/284: +17 for the authoritative snapshot,
+registry and admission controls, and +25 from `tests/wp8-corrective.ts` (the M2 corrective pass), and
+the WP8-A suite is 6/6 after two native-scope tests were added. The suites above are counted
+independently and are never summed.
+
+### Corrective pass (2026-11-17)
+
+The six maintainer-reproduced defects and two clarifications are fixed with regression coverage; see
+`docs/experiments/m2-corrective-pass-report.md` for the root-cause-to-test mapping. Nothing in this
+section changes the frozen Truth semantics: `truth/truth-v1.json` outcomes are untouched, and the C4
+binding digest was updated only because the candidate's source comment changed during sanitation.
 
 ### Runtimes
 
@@ -138,8 +147,9 @@ Manifests: `docs/experiments/m2-sdk-qualification.manifest.json`,
 | --- | --- |
 | WP7 SDK qualification (fresh reproduction, supported runtime) | **COMPLETE** |
 | WP7 rr.7 release + M2 qualification | **COMPLETE** for the defined over-claim-safe case set |
-| WP8-A Profile A (C1–C4, authoritative snapshots, real references, real admission) | **COMPLETE** |
-| WP8-B Profile B (C1–C4, exact packed SDK) | **COMPLETE** |
+| WP8-A Profile A (C1–C4, authoritative snapshots, real references, real admission) | **COMPLETE** (corrected) |
+| WP8-B Profile B (C1–C4, exact packed SDK, complete provider-bound input) | **COMPLETE** (corrected) |
+| M2 corrective pass (6 defects + 2 clarifications) | **COMPLETE** — see `m2-corrective-pass-report.md` |
 | Live model evaluation | **NOT STARTED** (unauthorized) |
 | D1 live inference authorization | **PENDING** |
 | D2 live evaluation budget | **PENDING** |

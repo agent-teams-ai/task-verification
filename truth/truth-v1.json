@@ -59,7 +59,7 @@
     "S1-C1": "327d0a9690ff70ed5ff8b19e03cd4f9eb822fa4f6a87203b37f4b91499f4030a",
     "S1-C2": "229cd951be058c0d099a50298713c81d666cf79bb653f921939303caa97d793c",
     "S1-C3": "4fb700863d2a942aa6f5a43747b3c0da252a6911b454e87d1c6c7efb37bddbda",
-    "S1-C4": "e3700e622872ba32465e28ef014978236de90fec2bc21c5865a6a42aab253b92"
+    "S1-C4": "97969adc524893e4ce087796a8e04ef33bd501f18c79e8dbcf727eac444a75fc"
   },
   "scope": "Approved pilot labels under the declared fixture/input policy (crit-v1). Finite examples; not a claim of universal coverage.",
   "publicArtifactPolicy": "Public reproducibility artifact. Frozen and excluded from reviewer inputs and tool reach. Not a secret."

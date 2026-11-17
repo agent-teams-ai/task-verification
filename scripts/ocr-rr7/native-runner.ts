@@ -153,6 +153,8 @@ export interface ManagedOcrOptions {
   stracePath?: string;
   /** Provider delay for the `stall` scenario; defaults to 30000 ms. */
   stallMs?: number;
+  /** Paths the fake provider asks the binary to read with its native tool. */
+  readPaths?: string[];
 }
 
 export interface ManagedOcrEvidence {
@@ -199,6 +201,7 @@ export async function runManagedOcr(options: ManagedOcrOptions): Promise<Managed
     model = "rr7-fake-model",
     stracePath,
     stallMs = 30000,
+    readPaths = [],
   } = options;
 
   if (reviewerInput.length > MAX_OCR_INPUT_CHARS) {
@@ -211,7 +214,7 @@ export async function runManagedOcr(options: ManagedOcrOptions): Promise<Managed
   fs.chmodSync(home, 0o700);
   fs.chmodSync(cfgDir, 0o700);
 
-  const fake = await startFakeProvider({ scenario, model, comments, stallMs });
+  const fake = await startFakeProvider({ scenario, model, comments, stallMs, readPaths });
   const config = {
     provider: "reviewrouter",
     language: "en",
