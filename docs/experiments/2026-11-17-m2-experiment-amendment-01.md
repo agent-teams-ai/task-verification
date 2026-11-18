@@ -5,7 +5,7 @@
 | Amendment id | `exp-amendment-2026-11-17-01` |
 | Schema | `m2.experiment-amendment/v1` |
 | Amends | `2026-11-12-stage-a-b-experiment-plan.md` (Stage A/B plan) |
-| Status | **PROPOSED** — planning deliverable |
+| Status | **SUPERSEDED for next-phase feasibility work by `exp-amendment-2026-11-17-02`.** Preserved unchanged; not deleted or reinterpreted. |
 | Authority | Not an M2 acceptance item; requires separate maintainer authorization before execution |
 
 Versioning is independent of the M2 milestone documents. This amendment does not modify

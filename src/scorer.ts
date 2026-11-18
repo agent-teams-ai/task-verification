@@ -16,6 +16,7 @@
  */
 
 import { consumerAdmit, type AdmissionDecision, type AssessmentBinding } from "./controls.ts";
+import { validateResultContract } from "./result-contract.ts";
 import type {
   AdmittedConclusion,
   ExecutionState,
@@ -38,6 +39,12 @@ export interface RubricDecision {
    * criterion and fail to support another that cites it.
    */
   criterionId?: string;
+  /**
+   * Finding/claim identity this judgment is about. Two Profile A findings can
+   * share a criterion and an evidence reference while asserting different
+   * things; a decision bound to one of them never supports the other.
+   */
+  findingId?: string;
   supportsBehavior: boolean;
   coversSubclauses: boolean;
   relevantCurrentApplicable: boolean;
@@ -45,12 +52,15 @@ export interface RubricDecision {
 }
 
 /**
- * Support decisions are looked up per (criterion, reference) claim. A shared
- * evidence reference never transfers a positive judgment to every assertion
- * citing that file.
+ * Support decisions are looked up per (criterion, reference) claim, optionally
+ * narrowed to one finding identity. A shared evidence reference never transfers
+ * a positive judgment to every assertion citing that file, and a judgment bound
+ * to one finding never supports a different finding that happens to cite the
+ * same criterion and reference.
  */
-export function claimSupportKey(criterionId: string, reference: string): string {
-  return `${criterionId}::${reference}`;
+export function claimSupportKey(criterionId: string, reference: string, findingId?: string): string {
+  const base = `${criterionId}::${reference}`;
+  return findingId === undefined ? base : `${base}::${findingId}`;
 }
 
 interface SupportSource {
@@ -63,6 +73,12 @@ interface SupportSource {
 interface ClaimSupportLookup {
   decision: RubricDecision | null;
   reason: string;
+  /**
+   * True when the pair (criterion, reference) is claimed by more than one
+   * finding and no finding-scoped decision exists, so no individual support
+   * judgment can be made without inventing one.
+   */
+  ambiguous?: boolean;
 }
 
 /**
@@ -75,16 +91,62 @@ function lookupClaimSupport(
   support: SupportSource,
   criterionId: string | null,
   reference: string,
+  findingId?: string,
+  sharedAcrossFindings?: readonly string[],
 ): ClaimSupportLookup {
   if (criterionId === null) {
     return { decision: null, reason: "no criterion mapping, so no claim-specific support decision applies" };
   }
+
+  const shared = sharedAcrossFindings !== undefined && sharedAcrossFindings.length > 1;
+  const sharedReason = `criterion ${criterionId} and reference ${reference} are claimed by findings ${(sharedAcrossFindings ?? []).join(", ")}; a shared judgment cannot support each of them individually`;
+
+  // A finding-scoped decision is the only one that can bind support to one
+  // finding when the (criterion, reference) pair is shared.
+  if (findingId !== undefined) {
+    const scoped = support.claimRubrics?.[claimSupportKey(criterionId, reference, findingId)];
+    if (scoped) {
+      if (scoped.findingId !== undefined && scoped.findingId !== findingId) {
+        return {
+          decision: null,
+          reason: `finding-scoped support decision is bound to finding ${scoped.findingId}, not ${findingId}`,
+        };
+      }
+      return { decision: scoped, reason: "finding-scoped support decision" };
+    }
+  }
+
+  // When several findings claim this pair and none of them has its own
+  // decision, no individual support judgment exists: refuse rather than let one
+  // finding's judgment (or the absence of one) stand in for another's.
+  if (shared) {
+    const claimLevel = support.claimRubrics?.[claimSupportKey(criterionId, reference)];
+    if (claimLevel && claimLevel.findingId !== undefined && claimLevel.findingId !== findingId) {
+      return {
+        decision: null,
+        reason: `support decision is bound to finding ${claimLevel.findingId}, not ${findingId ?? "the unnamed finding"}`,
+        ambiguous: true,
+      };
+    }
+    return { decision: null, reason: sharedReason, ambiguous: true };
+  }
+
   const claimed = support.claimRubrics?.[claimSupportKey(criterionId, reference)];
-  if (claimed) return { decision: claimed, reason: "claim-scoped support decision" };
+  if (claimed) {
+    if (claimed.findingId !== undefined && claimed.findingId !== findingId) {
+      return {
+        decision: null,
+        reason: `support decision is bound to finding ${claimed.findingId}, not ${findingId ?? "the unnamed finding"}`,
+      };
+    }
+    if (shared) return { decision: null, reason: sharedReason, ambiguous: true };
+    return { decision: claimed, reason: "claim-scoped support decision" };
+  }
 
   const referenceLevel = support.referenceRubrics?.[reference];
   if (referenceLevel) {
     if (referenceLevel.criterionId === criterionId) {
+      if (shared) return { decision: null, reason: sharedReason, ambiguous: true };
       return { decision: referenceLevel, reason: "reference rubric explicitly bound to this criterion" };
     }
     if (referenceLevel.criterionId === undefined) {
@@ -188,6 +250,12 @@ export interface ScorerInput {
    * definition always matches itself).
    */
   expectedCriteriaContentDigest?: string;
+  /**
+   * Criteria revision label the consumer currently holds. When supplied,
+   * per-claim admission compares against it instead of the contract's own
+   * (self-matching) label.
+   */
+  expectedCriteriaRevision?: string;
   /** When true, an invalid Truth binding throws instead of returning errors. */
   strictTruthBinding?: boolean;
 }
@@ -201,8 +269,16 @@ export interface LabelAgreement {
   truthOutcome: boolean | null;
   /** Null when no admitted comparison is possible. */
   agrees: boolean | null;
-  /** True when an admissible semantic conclusion exists. */
-  admitted: boolean;
+  /**
+   * True when an admissible semantic conclusion exists for this claim. This is
+   * NOT consumer admission: it says nothing about reference validity, criteria
+   * content, candidate/snapshot binding or claim association. Use
+   * `consumerAdmitted` for the all-gates decision.
+   */
+  semanticConclusionAdmitted: boolean;
+  /** Final per-claim consumer admission (every mandatory gate). */
+  consumerAdmitted: boolean;
+  consumerAdmissionReason: string;
 }
 
 export interface ReferenceValidity {
@@ -219,6 +295,49 @@ export interface SemanticSupport {
   reference: string;
   supporting: boolean;
   reason: string;
+}
+
+/**
+ * Per-claim admission for one Profile B assessment.
+ *
+ * The dimensions are kept separate on purpose: the original reported claim is
+ * always retained, schema validity is not evidence validity, and no single
+ * dimension implies consumer admission. Only `consumerAdmitted` means "this
+ * claim may reach a consumer", and it is true only when every mandatory gate
+ * passes.
+ */
+export interface ClaimAdmission {
+  criterionId: string;
+  /** The provider's original wording, retained even when the claim is rejected. */
+  originalReportedClaim: string | null;
+  parsedClaim: ParsedReportedClaim;
+  /** The result contract satisfies its schema. */
+  contractValid: boolean;
+  /** Execution state permits a semantic conclusion. */
+  executionAdmissible: boolean;
+  /** Producer evidence is applicable to this review. */
+  evidenceApplicable: boolean;
+  /** Criteria revision label matches the consumer's current one. */
+  criteriaRevisionBound: boolean;
+  /** Criteria CONTENT matches, independently of the revision label. */
+  criteriaContentBound: boolean;
+  /** Every cited artifact names this candidate. */
+  candidateBound: boolean;
+  /** Every cited artifact names this runtime snapshot. */
+  snapshotBound: boolean;
+  /** Every cited artifact exists, is allowed, current, applicable and bound. */
+  referenceValid: boolean;
+  /** At least one cited artifact semantically supports the claim. */
+  referenceSufficient: boolean;
+  /** The criterion is in the expected inventory and claimed exactly once. */
+  claimAssociationValid: boolean;
+  /** An admissible semantic conclusion exists (execution + admitted conclusion). */
+  semanticConclusionAdmitted: boolean;
+  /** Final per-claim consumer admission. */
+  consumerAdmitted: boolean;
+  reason: string;
+  /** Claim-level diagnostics retained for a rejected claim. */
+  diagnostics: string[];
 }
 
 // --- Reported-claim accounting (WP5) ---
@@ -247,8 +366,14 @@ export interface ReportedClaimAccountingEntry {
   executionState: ExecutionState;
   /** True when the original claim is retained as a reported-claim observation. */
   accounted: boolean;
-  /** True when an admissible semantic conclusion exists (execution valid + admitted). */
-  admitted: boolean;
+  /**
+   * True when an admissible semantic conclusion exists for this claim. Not
+   * consumer admission; see `consumerAdmitted`.
+   */
+  semanticConclusionAdmitted: boolean;
+  /** Final per-claim consumer admission (every mandatory gate). */
+  consumerAdmitted: boolean;
+  consumerAdmissionReason: string;
 }
 
 export interface ReportedClaimAccounting {
@@ -359,6 +484,14 @@ export interface ScorerResult {
   executionState: ExecutionState;
   /** Shared deterministic consumer-admission decision for this result. */
   admission: AdmissionDecision;
+  /**
+   * Per-claim admission (Profile B). Each dimension is separate; only
+   * `consumerAdmitted` means a claim may reach a consumer.
+   */
+  claimAdmissions: ClaimAdmission[];
+  /** The result contract satisfied its schema. */
+  contractValid: boolean;
+  contractErrors: string[];
   diagnostics: string[];
   // Profile A finding scoring — structured output, no invented B-style verdicts.
   profileA: ProfileAOutput;
@@ -382,6 +515,12 @@ export interface ProfileAFindingOutput {
   duplicateMapping: boolean;
   referenceValidity: "valid" | "invalid" | "unknown";
   semanticSupport: "supported" | "unsupported" | "neutral";
+  /**
+   * True when this finding's (criterion, reference) pair is also claimed by
+   * another finding and no finding-scoped support decision exists, so semantic
+   * support cannot be attributed to this finding individually.
+   */
+  supportAmbiguous: boolean;
   truthComparison: "matches" | "contradicts" | "neutral" | "n/a";
   qualityFlags: string[];
   diagnostics: string[];
@@ -404,6 +543,8 @@ export interface ProfileAOutput {
     falseAllegations: number;
     supportedDetections: number;
     duplicateMappings: number;
+    /** Findings whose shared (criterion, reference) pair has no finding-scoped support decision. */
+    ambiguousSupport: number;
     overallStatus: "complete" | "partial" | "inconclusive";
   };
 }
@@ -492,6 +633,10 @@ interface ResolvedReference {
   reference: string;
   exists: boolean;
   tiedToCandidate: boolean;
+  /** The artifact names this result contract's candidate materialization. */
+  candidateBound: boolean;
+  /** The artifact names this result contract's runtime snapshot. */
+  snapshotBound: boolean;
   mechanicallyValid: boolean;
   reason: string;
 }
@@ -510,6 +655,8 @@ function resolveReference(
       reference: ref,
       exists: false,
       tiedToCandidate: false,
+      candidateBound: false,
+      snapshotBound: false,
       mechanicallyValid: false,
       reason: "no artifact registry",
     };
@@ -520,13 +667,15 @@ function resolveReference(
       reference: ref,
       exists: false,
       tiedToCandidate: false,
+      candidateBound: false,
+      snapshotBound: false,
       mechanicallyValid: false,
       reason: "reference not in artifact registry",
     };
   }
-  const tied =
-    artifact.candidateBinding === rc.candidate.repositoryMaterializationId &&
-    artifact.snapshotDigest === rc.candidate.runtimeSnapshotDigest;
+  const candidateBound = artifact.candidateBinding === rc.candidate.repositoryMaterializationId;
+  const snapshotBound = artifact.snapshotDigest === rc.candidate.runtimeSnapshotDigest;
+  const tied = candidateBound && snapshotBound;
   const mechanicallyValid = tied && artifact.allowedSource && artifact.current && artifact.applicable;
 
   let reason = "resolved and mechanically valid";
@@ -539,6 +688,8 @@ function resolveReference(
     reference: ref,
     exists: true,
     tiedToCandidate: tied,
+    candidateBound,
+    snapshotBound,
     mechanicallyValid,
     reason,
   };
@@ -548,6 +699,8 @@ interface ResolvedFindingReference extends ResolvedReference {
   supportsBehavior: boolean;
   /** Why this claim is or is not supported by this reference. */
   supportReason: string;
+  /** The support judgment is ambiguous because the pair is shared by findings. */
+  supportAmbiguous: boolean;
 }
 
 function resolveFindingReferences(
@@ -556,16 +709,144 @@ function resolveFindingReferences(
   registry: ArtifactRegistry | undefined,
   support: SupportSource,
   criterionId: string | null,
+  findingId?: string,
+  sharedPairs?: Map<string, string[]>,
 ): ResolvedFindingReference[] {
   const out: ResolvedFindingReference[] = [];
   for (const ref of refs ?? []) {
     const resolved = resolveReference(ref, rc, registry);
-    const lookup = lookupClaimSupport(support, criterionId, ref);
+    const shared = criterionId === null ? undefined : sharedPairs?.get(claimSupportKey(criterionId, ref));
+    const lookup = lookupClaimSupport(support, criterionId, ref, findingId, shared);
     const supportsBehavior =
       resolved.mechanicallyValid && lookup.decision !== null && isReferenceSupporting(lookup.decision);
-    out.push({ ...resolved, supportsBehavior, supportReason: lookup.reason });
+    out.push({
+      ...resolved,
+      supportsBehavior,
+      supportReason: lookup.reason,
+      supportAmbiguous: lookup.ambiguous === true,
+    });
   }
   return out;
+}
+
+/**
+ * Per-claim admission. Every dimension is computed independently and reported
+ * separately; `consumerAdmitted` is the only field that means "may reach a
+ * consumer", and the original claim survives every rejection.
+ */
+function computeClaimAdmissions(ctx: {
+  rc: ResultContract;
+  contractValid: boolean;
+  executionAdmissible: boolean;
+  evidenceApplicable: boolean;
+  expectedCriteriaRevision: string;
+  expectedCriteriaContentDigest: string;
+  registry: ArtifactRegistry | undefined;
+  support: SupportSource;
+}): ClaimAdmission[] {
+  const { rc } = ctx;
+  const duplicateIds = new Set(rc.coverage.duplicateIds);
+  const unknownIds = new Set(rc.coverage.unknownIds);
+  const claimsPerCriterion = new Map<string, number>();
+  for (const a of rc.assessments) {
+    claimsPerCriterion.set(a.expectedCriterionId, (claimsPerCriterion.get(a.expectedCriterionId) ?? 0) + 1);
+  }
+
+  return rc.assessments.map((a) => {
+    const criterionId = a.expectedCriterionId;
+    const diagnostics: string[] = [...(a.diagnostics ?? [])];
+    const refs = a.references ?? [];
+    const supporting: boolean[] = [];
+    let candidateBound = refs.length > 0;
+    let snapshotBound = refs.length > 0;
+    let referenceValid = refs.length > 0;
+
+    for (const ref of refs) {
+      const resolved = resolveReference(ref, rc, ctx.registry);
+      const lookup = lookupClaimSupport(ctx.support, criterionId, ref);
+      supporting.push(resolved.mechanicallyValid && lookup.decision !== null && isReferenceSupporting(lookup.decision));
+      if (!resolved.candidateBound) {
+        candidateBound = false;
+        diagnostics.push(`${criterionId}: reference ${ref} is bound to a different candidate`);
+      }
+      if (!resolved.snapshotBound) {
+        snapshotBound = false;
+        diagnostics.push(`${criterionId}: reference ${ref} is bound to a different snapshot`);
+      }
+      if (!resolved.mechanicallyValid) {
+        referenceValid = false;
+        diagnostics.push(`${criterionId}: reference ${ref} — ${resolved.reason}`);
+      }
+      if (resolved.mechanicallyValid && lookup.decision === null) {
+        diagnostics.push(`${criterionId}: reference ${ref} — ${lookup.reason}`);
+      }
+    }
+
+    const referenceSufficient = a.admittedConclusion !== null && supporting.some(Boolean);
+    const semanticConclusionAdmitted = ctx.executionAdmissible && a.admittedConclusion !== null;
+    const claimAssociationValid =
+      rc.criteria.expectedCriterionIds.includes(criterionId) &&
+      !duplicateIds.has(criterionId) &&
+      !unknownIds.has(criterionId) &&
+      (claimsPerCriterion.get(criterionId) ?? 0) === 1;
+    const criteriaRevisionBound = rc.criteria.authoredCriteriaRevision === ctx.expectedCriteriaRevision;
+    const criteriaContentBound = rc.criteria.criteriaTextDigest === ctx.expectedCriteriaContentDigest;
+
+    if (!claimAssociationValid) {
+      diagnostics.push(`${criterionId}: claim association is not valid (duplicate, unknown or outside the inventory)`);
+    }
+    if (a.admittedConclusion !== null && refs.length === 0) {
+      diagnostics.push(`${criterionId}: conclusion cites no reference`);
+    }
+
+    const consumerAdmitted =
+      ctx.contractValid &&
+      ctx.executionAdmissible &&
+      ctx.evidenceApplicable &&
+      criteriaRevisionBound &&
+      criteriaContentBound &&
+      claimAssociationValid &&
+      candidateBound &&
+      snapshotBound &&
+      referenceValid &&
+      referenceSufficient &&
+      semanticConclusionAdmitted;
+
+    let reason: string;
+    if (!ctx.contractValid) reason = "result contract is not schema-valid";
+    else if (!ctx.executionAdmissible) reason = "execution not admissible";
+    else if (!ctx.evidenceApplicable) reason = "evidence not applicable";
+    else if (!criteriaRevisionBound) reason = "criteria revision mismatch";
+    else if (!criteriaContentBound) reason = "criteria content mismatch (stale criteria)";
+    else if (!claimAssociationValid) reason = "invalid claim association";
+    else if (refs.length === 0) reason = "conclusion cites no reference";
+    else if (!candidateBound) reason = "candidate binding mismatch";
+    else if (!snapshotBound) reason = "snapshot binding mismatch";
+    else if (!referenceValid) reason = refs.length === 0 ? "conclusion cites no reference" : "invalid reference";
+    else if (!referenceSufficient) reason = "insufficient reference support";
+    else if (!semanticConclusionAdmitted) reason = "no admitted semantic conclusion";
+    else reason = "admitted";
+
+    return {
+      criterionId,
+      originalReportedClaim: a.originalReportedClaim,
+      parsedClaim: parseReportedClaim(a.originalReportedClaim),
+      contractValid: ctx.contractValid,
+      executionAdmissible: ctx.executionAdmissible,
+      evidenceApplicable: ctx.evidenceApplicable,
+      criteriaRevisionBound,
+      criteriaContentBound,
+      candidateBound,
+      snapshotBound,
+      referenceValid,
+      referenceSufficient,
+      claimAssociationValid,
+      semanticConclusionAdmitted,
+      consumerAdmitted,
+      reason,
+      diagnostics,
+    };
+  });
 }
 
 function computeReportedClaimAccounting(
@@ -574,6 +855,7 @@ function computeReportedClaimAccounting(
   truthBindingValid: boolean,
   registry: ArtifactRegistry | undefined,
   admissible: boolean,
+  claimAdmissions: readonly ClaimAdmission[],
 ): ReportedClaimAccounting {
   const entries: ReportedClaimAccountingEntry[] = [];
   let reportedSatisfied = 0;
@@ -586,7 +868,9 @@ function computeReportedClaimAccounting(
   let rejectedUnadmittedConclusions = 0;
   let truthComparisonSuspended = 0;
 
-  for (const a of rc.assessments) {
+  for (let index = 0; index < rc.assessments.length; index++) {
+    const a = rc.assessments[index];
+    const claimAdmission = claimAdmissions[index];
     const parsedClaim = parseReportedClaim(a.originalReportedClaim);
     if (parsedClaim === "satisfied") reportedSatisfied++;
     else if (parsedClaim === "violated") reportedViolated++;
@@ -620,8 +904,8 @@ function computeReportedClaimAccounting(
       referenceValid = resolved.some((r) => r.mechanicallyValid);
     }
 
-    const admitted = admissible && a.admittedConclusion !== null;
-    if (admitted) admittedSemanticConclusions++;
+    const semanticConclusionAdmitted = admissible && a.admittedConclusion !== null;
+    if (semanticConclusionAdmitted) admittedSemanticConclusions++;
     else rejectedUnadmittedConclusions++;
 
     entries.push({
@@ -634,7 +918,9 @@ function computeReportedClaimAccounting(
       referenceValid,
       executionState: rc.execution.state,
       accounted: a.originalReportedClaim !== null && a.originalReportedClaim !== undefined,
-      admitted,
+      semanticConclusionAdmitted,
+      consumerAdmitted: claimAdmission?.consumerAdmitted === true,
+      consumerAdmissionReason: claimAdmission?.reason ?? "no claim admission computed",
     });
   }
 
@@ -663,6 +949,24 @@ function computeProfileAOutput(
 ): ProfileAOutput {
   const findings: ProfileAFindingOutput[] = [];
   const mappedFindings: { findingId: string; criterionId: string }[] = [];
+
+  // Which delivered findings claim each (criterion, reference) pair. A pair
+  // claimed by more than one finding cannot inherit a single support judgment.
+  const sharedPairs = new Map<string, string[]>();
+  rc.findings.forEach((f, i) => {
+    if (f.skipped) return;
+    if (f.normalizedFinding === null && (f.nativeComment ?? "").trim().length > 0) return;
+    const mapped = f.criterionMapping;
+    if (mapped === null || mapped === undefined || !rc.criteria.expectedCriterionIds.includes(mapped)) return;
+    const fid = f.findingId ?? `finding-${i}`;
+    for (const ref of f.references ?? []) {
+      const key = claimSupportKey(mapped, ref);
+      const list = sharedPairs.get(key) ?? [];
+      if (!list.includes(fid)) list.push(fid);
+      sharedPairs.set(key, list);
+    }
+  });
+
   let deliveredCount = 0;
   let mappedCount = 0;
   let unmappedCount = 0;
@@ -692,6 +996,7 @@ function computeProfileAOutput(
         duplicateMapping: false,
         referenceValidity: "unknown",
         semanticSupport: "neutral",
+        supportAmbiguous: false,
         truthComparison: "n/a",
         qualityFlags: f.qualityFlags,
         diagnostics: [f.skipReason ? `skipped: ${f.skipReason}` : "skipped"],
@@ -715,6 +1020,7 @@ function computeProfileAOutput(
         duplicateMapping: false,
         referenceValidity: "unknown",
         semanticSupport: "neutral",
+        supportAmbiguous: false,
         truthComparison: "n/a",
         qualityFlags: f.qualityFlags,
         diagnostics: ["normalization dropped the raw native finding"],
@@ -747,7 +1053,21 @@ function computeProfileAOutput(
 
     // Support is resolved for THIS finding's mapped criterion only. A positive
     // judgment about the file never spreads to another finding/criterion.
-    const resolvedRefs = resolveFindingReferences(f.references, rc, registry, support, criterionMapping);
+    const resolvedRefs = resolveFindingReferences(
+      f.references,
+      rc,
+      registry,
+      support,
+      criterionMapping,
+      findingId,
+      sharedPairs,
+    );
+    const supportAmbiguous = resolvedRefs.some((r) => r.supportAmbiguous);
+    if (supportAmbiguous) {
+      findingDiagnostics.push(
+        "semantic support is ambiguous: the criterion and reference are shared with another finding and no finding-scoped decision exists",
+      );
+    }
     for (const r of resolvedRefs) {
       findingDiagnostics.push(`reference ${r.reference}: ${r.reason}`);
       if (r.mechanicallyValid && !r.supportsBehavior) {
@@ -802,6 +1122,7 @@ function computeProfileAOutput(
       duplicateMapping: false,
       referenceValidity,
       semanticSupport,
+      supportAmbiguous,
       truthComparison,
       qualityFlags: f.qualityFlags,
       diagnostics: findingDiagnostics,
@@ -853,6 +1174,7 @@ function computeProfileAOutput(
       falseAllegations,
       supportedDetections,
       duplicateMappings,
+      ambiguousSupport: findings.filter((f) => f.supportAmbiguous).length,
       overallStatus,
     },
   };
@@ -883,10 +1205,32 @@ export function scoreResult(input: ScorerInput): ScorerResult {
     );
   }
 
+  // --- Schema validity and per-claim admission ---
+  // Contract validity is its own dimension: a schema-valid contract can still
+  // carry claims that must not reach a consumer, and vice versa.
+  const contractErrors = validateResultContract(rc);
+  const contractValid = contractErrors.length === 0;
+  if (!contractValid) diagnostics.push(`result contract invalid: ${contractErrors.join("; ")}`);
+
+  const expectedCriteriaRevision = input.expectedCriteriaRevision ?? rc.criteria.authoredCriteriaRevision;
+  const expectedCriteriaContentDigest =
+    input.expectedCriteriaContentDigest ?? rc.criteria.criteriaTextDigest;
+  const claimAdmissions = computeClaimAdmissions({
+    rc,
+    contractValid,
+    executionAdmissible: admissible,
+    evidenceApplicable: rc.evidence.applicability === "applicable",
+    expectedCriteriaRevision,
+    expectedCriteriaContentDigest,
+    registry: input.artifactRegistry,
+    support: input,
+  });
+
   // --- Label agreement (only for admissible execution) ---
-  const labelAgreement: LabelAgreement[] = rc.assessments.map((a) => {
+  const labelAgreement: LabelAgreement[] = rc.assessments.map((a, index) => {
     const truth = truthBindingValid ? tb.truthOutcomes[a.expectedCriterionId] ?? null : null;
     const parsed = parseReportedClaim(a.originalReportedClaim);
+    const claim = claimAdmissions[index];
 
     if (!admissible) {
       return {
@@ -895,7 +1239,9 @@ export function scoreResult(input: ScorerInput): ScorerResult {
         reportedClaim: parsed,
         truthOutcome: truth,
         agrees: null,
-        admitted: false,
+        semanticConclusionAdmitted: false,
+        consumerAdmitted: claim?.consumerAdmitted === true,
+        consumerAdmissionReason: claim?.reason ?? "execution not admissible",
       };
     }
 
@@ -912,7 +1258,9 @@ export function scoreResult(input: ScorerInput): ScorerResult {
       reportedClaim: parsed,
       truthOutcome: truth,
       agrees,
-      admitted: admittedConclusion !== null,
+      semanticConclusionAdmitted: admittedConclusion !== null,
+      consumerAdmitted: claim?.consumerAdmitted === true,
+      consumerAdmissionReason: claim?.reason ?? "no claim admission computed",
     };
   });
 
@@ -965,6 +1313,7 @@ export function scoreResult(input: ScorerInput): ScorerResult {
     truthBindingValid,
     input.artifactRegistry,
     admissible,
+    claimAdmissions,
   );
 
   // --- Shared consumer admission ---
@@ -1086,6 +1435,9 @@ export function scoreResult(input: ScorerInput): ScorerResult {
     executionValid: admissible,
     executionState: execState,
     admission,
+    claimAdmissions,
+    contractValid,
+    contractErrors,
     diagnostics,
     profileA: profileAOutput,
     reportedClaims,

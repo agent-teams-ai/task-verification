@@ -305,7 +305,8 @@ test("WP8: failed execution preserves a captured original claim", () => {
   const r = runScenario({ candidateId: "S1-C1", claims: { "AC-1": "satisfied" }, execution: { state: "failed", sdkEffectCode: "SDK_FAIL", diagnostics: ["timeout"] } });
   const ac1 = r.scorer.reportedClaims.entries.find((e) => e.criterionId === "AC-1")!;
   assert.equal(ac1.accounted, true);
-  assert.equal(ac1.admitted, false);
+  assert.equal(ac1.semanticConclusionAdmitted, false);
+  assert.equal(ac1.consumerAdmitted, false);
   assert.equal(r.scorer.reportedClaims.admittedSemanticConclusions, 0);
   assert.equal(r.scorer.labelAgreement[0].agrees, null);
 });

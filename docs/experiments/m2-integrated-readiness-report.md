@@ -99,7 +99,7 @@ real scorer output and the verified registry. The persisted `AdmissionDecision` 
 
 | # | Suite | Command | Platform | Result |
 | --- | --- | --- | --- | --- |
-| 1 | Main regression suite | `node --experimental-strip-types --test --test-concurrency=1 tests/*.ts` | win32/x64, Node 24.13.1 | **284 / 284 pass**, 0 fail, 0 skip |
+| 1 | Main regression suite | `node --experimental-strip-types --test --test-concurrency=1 tests/*.ts` | win32/x64, Node 24.13.1 | **299 / 299 pass**, 0 fail, 0 skip |
 | 2 | rr.7 WP7 suite | `OCR_RR7_DIR=/rr7 node --experimental-transform-types --test tests/rr7/wp7-rr7.test.ts` | Ubuntu 24.04 container, Node 24.13.1 | **16 / 16 pass** |
 | 3 | WP8-A integrated Profile A | `OCR_RR7_DIR=/rr7 … tests/rr7/wp8-profile-a.test.ts` | Ubuntu 24.04 container, Node 24.13.1 | **6 / 6 pass** (C1–C4, 2 identity negatives, native unchanged-dependency read, out-of-scope refusal) |
 | 4 | SDK qualification | `SDK_PROJECT_DIR=<isolated> node scripts/qualify-sdk.mjs` | win32/x64, Node 24.21.0 | **20 / 20 pass** |
@@ -150,11 +150,74 @@ Manifests: `docs/experiments/m2-sdk-qualification.manifest.json`,
 | WP8-A Profile A (C1–C4, authoritative snapshots, real references, real admission) | **COMPLETE** (corrected) |
 | WP8-B Profile B (C1–C4, exact packed SDK, complete provider-bound input) | **COMPLETE** (corrected) |
 | M2 corrective pass (6 defects + 2 clarifications) | **COMPLETE** — see `m2-corrective-pass-report.md` |
+| M2 final audit (per-claim admission, Profile A finding isolation) | **COMPLETE** — see §9 |
+| Experiment amendment v02 (model-free feasibility card) | **PROPOSED** — planning only, supersedes v01 for next-phase feasibility; D1/D2 remain pending |
 | Live model evaluation | **NOT STARTED** (unauthorized) |
 | D1 live inference authorization | **PENDING** |
 | D2 live evaluation budget | **PENDING** |
 
-## 9. Known limitations
+## 9. Claim-level admission and finding isolation (final audit)
+
+### 9.1 Profile B: `admitted` is not consumer admission
+
+The per-claim fields in `src/scorer.ts` are deliberately separate dimensions. The original reported
+claim and its diagnostics survive every rejection; no dimension implies another.
+
+| Dimension | Field | Meaning |
+| --- | --- | --- |
+| Original claim | `originalReportedClaim`, `parsedClaim` | Provider wording and its parsed polarity, retained even when rejected |
+| Contract/schema validity | `contractValid` (`ScorerResult.contractValid`) | The result contract satisfies its schema |
+| Execution admissibility | `executionAdmissible` | Execution state permits a semantic conclusion |
+| Evidence applicability | `evidenceApplicable` | Producer evidence is applicable |
+| Criteria revision | `criteriaRevisionBound` | The authored label matches the consumer's |
+| Criteria content | `criteriaContentBound` | Content digest matches, independently of the label |
+| Candidate / snapshot | `candidateBound`, `snapshotBound` | Every cited artifact names this candidate and snapshot |
+| Evidence resolution | `referenceValid`, `referenceSufficient` | Artifacts resolve, and at least one semantically supports the claim |
+| Claim association | `claimAssociationValid` | Criterion is in the inventory and claimed exactly once |
+| Semantic conclusion | `semanticConclusionAdmitted` | An admissible conclusion exists (execution + conclusion) |
+| **Consumer admission** | `consumerAdmitted` | **Every** mandatory gate above |
+
+`LabelAgreement` and `ReportedClaimAccountingEntry` previously exposed a field named `admitted` that
+meant only "an admissible semantic conclusion exists". That field is renamed
+`semanticConclusionAdmitted`, and each carries `consumerAdmitted` plus
+`consumerAdmissionReason`. A claim can therefore no longer be read as admitted while failing an
+evidence, criteria-content or candidate-binding gate. `ScorerResult.claimAdmissions` is the
+per-claim table; `ScorerResult.admission` remains the result-level decision and is unchanged in
+meaning.
+
+Profile B qualification records these per claim in `claims.json` per candidate and in `readiness.json`
+(`claims.total`, `claims.consumerAdmitted`, `claims.rejected`, `claims.entries`), with the independent
+consumer-side criteria revision and content digest supplied to the scorer rather than the contract's
+own self-matching copies.
+
+### 9.2 Profile A: same-criterion, same-reference isolation
+
+Support is keyed `criterionId::reference`, optionally narrowed to a finding identity
+(`claimSupportKey(criterionId, reference, findingId)`). Two findings with different IDs that share a
+mapped criterion **and** an evidence reference are now handled explicitly:
+
+- A finding-scoped decision (`RubricDecision.findingId`) supports only its own finding.
+- When a pair is claimed by more than one finding and no finding-scoped decision exists, support is
+  **refused** with an `ambiguous` reason; the finding records `supportAmbiguous` and is diagnosed.
+- A criterion claimed by more than one delivered finding is `duplicateMapping`; admission refuses it
+  for **every** such finding rather than attributing one finding's judgment to another.
+- Both findings, their native comments, their diagnostics and the scorer's `delivered`/`skipped`
+  counts are preserved; `supportedDetections` stays empty for an ambiguous pair.
+
+The real rr.7 runs are unaffected: no candidate produces duplicate criterion mappings, so WP8-A
+remains 6/6 and WP7 16/16 with the new gates active.
+
+### 9.3 Audit regressions
+
+`tests/m2-final-audit.ts` (15 tests) covers the nine Profile B negative scenarios (no reference,
+missing artifact, invalid digest, wrong candidate, wrong snapshot, stale criteria content,
+inapplicable evidence, unsupported/contradictory support, duplicate criterion association) and five
+Profile A cases (cross-finding non-transfer, explicit duplicate accounting, stale criteria, wrong
+candidate/snapshot, preservation of rejected findings). Each asserts the original claim is retained,
+diagnostics are retained, accounting is accurate, evidence/support state is accurate and consumer
+admission is false. Truth outcomes were not changed.
+
+## 10. Known limitations
 
 - Fake providers and fixed injected replies only; no model-quality claim is made.
 - Production Gateway recovery, provider rate limits, billing behaviour and capacity are not tested.
@@ -163,7 +226,7 @@ Manifests: `docs/experiments/m2-sdk-qualification.manifest.json`,
 - The `--network none` container plus an allowlisted child environment is the recorded network
   boundary; the binary's own egress is traced, but this is not an OS-level sandbox claim.
 
-## 10. Zero live calls
+## 11. Zero live calls
 
 - No live model/API/OCR/Gateway call.
 - No credential loaded; the qualification refuses to run if a provider credential is present.

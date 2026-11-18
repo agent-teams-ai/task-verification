@@ -35,6 +35,17 @@ export interface ProfileAFindingAdmission {
   normalizationDropped: boolean;
   mappingStatus: "mapped" | "unmapped" | "out-of-scope" | "invalid";
   criterionId: string | null;
+  /**
+   * Another delivered finding maps to the same criterion. An ambiguous
+   * duplicate mapping is never individually admitted; both findings are kept.
+   */
+  duplicateMapping: boolean;
+  /**
+   * The (criterion, reference) pair is shared with another finding and no
+   * finding-scoped support decision exists, so support cannot be attributed to
+   * this finding individually.
+   */
+  supportAmbiguous: boolean;
   /** Mapped to a criterion in the frozen expected inventory. */
   criteriaApplicable: boolean;
   references: string[];
@@ -174,6 +185,14 @@ export function admitProfileAFindings(input: ProfileAAdmissionInput): ProfileAAd
     const criteriaApplicable =
       mappingStatus === "mapped" && criterionId !== null && input.expectedCriterionIds.includes(criterionId);
     const semanticSupported = output?.semanticSupport === "supported";
+    const supportAmbiguous = output?.supportAmbiguous === true;
+    // The scorer flags duplicate/conflicting criterion mappings on the finding
+    // record; admission is refused rather than silently picking one.
+    const duplicateMapping =
+      output?.duplicateMapping === true ||
+      scorer.profileA.findings.some(
+        (f) => f.findingId !== findingId && f.delivered && f.criterionMapping !== null && f.criterionMapping === criterionId,
+      );
 
     if (mappingStatus === "unmapped") reasons.push("finding is not mapped to a criterion");
     if (mappingStatus === "out-of-scope") reasons.push("finding maps to a criterion outside the frozen inventory");
@@ -193,7 +212,9 @@ export function admitProfileAFindings(input: ProfileAAdmissionInput): ProfileAAd
       referenceValid &&
       candidateBound &&
       snapshotBound &&
-      semanticSupported;
+      semanticSupported &&
+      !supportAmbiguous &&
+      !duplicateMapping;
 
     // Profile A has no criterion-level verdicts, so Truth is consulted through
     // the scorer's finding-level comparison ("matches" = the mapped criterion is
@@ -215,6 +236,8 @@ export function admitProfileAFindings(input: ProfileAAdmissionInput): ProfileAAd
     else if (!candidateBound) reason = "candidate binding mismatch";
     else if (!snapshotBound) reason = "snapshot binding mismatch";
     else if (!referenceValid) reason = reasons.filter((r) => r.startsWith("reference")).join("; ");
+    else if (duplicateMapping) reason = "duplicate/conflicting criterion mapping across findings";
+    else if (supportAmbiguous) reason = "semantic support is ambiguous for this finding";
     else if (!semanticSupported) reason = "reference does not semantically support the finding";
     else reason = "admitted with supporting evidence";
 
@@ -225,6 +248,8 @@ export function admitProfileAFindings(input: ProfileAAdmissionInput): ProfileAAd
       normalizationDropped: output?.normalizationDropped === true,
       mappingStatus,
       criterionId,
+      duplicateMapping,
+      supportAmbiguous,
       criteriaApplicable,
       references,
       referenceValid: referenceValid && references.length > 0,

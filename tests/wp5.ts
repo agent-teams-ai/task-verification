@@ -449,11 +449,13 @@ test("WP5 execution: failed execution withholds the admitted verdict and preserv
   assert.equal(result.executionValid, false);
   assert.equal(result.labelAgreement[0].admittedConclusion, null);
   assert.equal(result.labelAgreement[0].agrees, null);
-  assert.equal(result.labelAgreement[0].admitted, false);
+  assert.equal(result.labelAgreement[0].semanticConclusionAdmitted, false);
+  assert.equal(result.labelAgreement[0].consumerAdmitted, false);
   assert.equal(result.labelAgreement[0].reportedClaim, "violated");
   assert.equal(result.reportedClaims.entries[0].parsedClaim, "violated");
   assert.equal(result.reportedClaims.entries[0].comparison, "false-violation");
-  assert.equal(result.reportedClaims.entries[0].admitted, false);
+  assert.equal(result.reportedClaims.entries[0].semanticConclusionAdmitted, false);
+  assert.equal(result.reportedClaims.entries[0].consumerAdmitted, false);
   assert.ok(result.diagnostics.some((d) => d.includes("no admitted semantic verdict")));
   assert.equal(rc.assessments[0].originalReportedClaim, "this is a violated claim with details");
 });

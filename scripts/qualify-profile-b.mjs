@@ -609,6 +609,10 @@ for (const candidateId of ["S1-C1", "S1-C2", "S1-C3", "S1-C4"]) {
     truthBinding,
     claimRubrics: claimRubrics(),
     artifactRegistry: verified.accepted,
+    // Independently captured consumer-side identities: the label and the CONTENT
+    // digest the consumer currently holds, not the contract's own copies.
+    expectedCriteriaRevision: expectedCriteria.authoredRevision,
+    expectedCriteriaContentDigest: expectedCriteria.contentDigest,
   });
   if (scorer.truthBindingErrors.length) {
     throw new Error(`${candidateId}: truth binding invalid: ${scorer.truthBindingErrors.join("; ")}`);
@@ -715,6 +719,17 @@ for (const candidateId of ["S1-C1", "S1-C2", "S1-C3", "S1-C4"]) {
       correct: scorer.reportedClaims.correctReportedClaims,
       admittedSemanticConclusions: scorer.reportedClaims.admittedSemanticConclusions,
     },
+    /**
+     * Per-claim admission. `semanticConclusionAdmitted` is NOT consumer
+     * admission; `consumerAdmitted` requires every mandatory gate. The original
+     * claim wording is retained for rejected claims.
+     */
+    claims: {
+      total: scorer.claimAdmissions.length,
+      consumerAdmitted: scorer.claimAdmissions.filter((c) => c.consumerAdmitted).length,
+      rejected: scorer.claimAdmissions.filter((c) => !c.consumerAdmitted).length,
+      entries: scorer.claimAdmissions,
+    },
     admission: scorer.admission,
   };
   const readinessPath = path.join(ws, "readiness.json");
@@ -753,6 +768,14 @@ for (const candidateId of ["S1-C1", "S1-C2", "S1-C3", "S1-C4"]) {
       }),
     },
     { name: "admission.json", file: retain(candidateId, runId, "admission.json", scorer.admission) },
+    {
+      name: "claims.json",
+      file: retain(candidateId, runId, "claims.json", {
+        total: scorer.claimAdmissions.length,
+        consumerAdmitted: scorer.claimAdmissions.filter((c) => c.consumerAdmitted).length,
+        entries: scorer.claimAdmissions,
+      }),
+    },
     {
       name: "criteria-binding.json",
       file: retain(candidateId, runId, "criteria-binding.json", {
@@ -798,6 +821,8 @@ for (const candidateId of ["S1-C1", "S1-C2", "S1-C3", "S1-C4"]) {
       outputSha256: result.receipt.outputSha256,
       admitted: scorer.admission.admitted,
       admissionReason: scorer.admission.reason,
+      claimsAdmitted: scorer.claimAdmissions.filter((c) => c.consumerAdmitted).length,
+      claimsTotal: scorer.claimAdmissions.length,
       dispatches: fake.requests.length,
       ledgerEvents: ledgerRecords.length,
       providerInputComplete: missingInput.length === 0,
@@ -829,6 +854,7 @@ for (const c of candidates) {
       `digest ${c.report.headApplicationDigest.slice(0, 12)} admitted=${c.report.admitted} ` +
       `(${c.report.admissionReason}) dispatches=${c.report.dispatches} ledger=${c.report.ledgerEvents} ` +
       `inputComplete=${c.report.providerInputComplete} refsPreserved=${c.report.referencesPreserved} ` +
+      `claims=${c.report.claimsAdmitted}/${c.report.claimsTotal} ` +
       `falseSat=${c.report.falseSatisfaction} falseViol=${c.report.falseViolation}`,
   );
 }
