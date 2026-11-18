@@ -38,8 +38,8 @@
     },
     {
       "path": "repro-profile-b-conflicting-duplicate.json",
-      "bytes": 9872,
-      "sha256": "073c618f76fb372dfca7cf98032fb22ab1e450aee59067c9f423f04e6f6cd8e3"
+      "bytes": 12767,
+      "sha256": "0e3bafff9379dbabee37813f501ad2b2c417ab09a41fffb3645377e835e62191"
     }
   ]
 }

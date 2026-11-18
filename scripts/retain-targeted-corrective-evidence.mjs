@@ -247,14 +247,18 @@ function profileACollision() {
 // --- Profile B conflicting duplicate reproduction --------------------------
 
 function profileBDuplicate() {
+  // The maintainer's exact six-record input: five ordinary expected assessments,
+  // one per expected criterion AC-1..AC-5, then a sixth AC-3 record that
+  // contradicts the first AC-3 claim. The first AC-3 occurrence is part of the
+  // original five; the sixth is the duplicate conflicting occurrence.
   const rawReply = {
     assessments: [
       { criterionId: "AC-1", outcome: "satisfied", references: [APP], explanation: "AC-1 ok" },
       { criterionId: "AC-2", outcome: "violated", references: [APP], explanation: "AC-2 missing" },
+      { criterionId: "AC-3", outcome: "violated", references: [APP], explanation: "AC-3 route missing" },
       { criterionId: "AC-4", outcome: "satisfied", references: [APP], explanation: "AC-4 ok" },
       { criterionId: "AC-5", outcome: "satisfied", references: [APP], explanation: "AC-5 ok" },
-      { criterionId: "AC-3", outcome: "satisfied", references: [APP], explanation: "AC-3 satisfied" },
-      { criterionId: "AC-3", outcome: "violated", references: [SERIALIZER], explanation: "AC-3 violated" },
+      { criterionId: "AC-3", outcome: "satisfied", references: [SERIALIZER], explanation: "AC-3 route exists" },
     ],
   };
   const decoded = decodeProfileBAssessments(JSON.stringify(rawReply), CRITERIA);
@@ -266,10 +270,12 @@ function profileBDuplicate() {
     artifactRegistry: registry(),
   });
   return {
-    schema: "m2.repro.profile-b-conflicting-duplicate/v1",
+    schema: "m2.repro.profile-b-conflicting-duplicate/v2",
     note:
-      "Five ordinary expected assessments plus a sixth conflicting AC-3 record. Both AC-3 occurrences must survive into per-claim admission, share one conflict group, and be refused; the other criteria stay individually usable.",
+      "The maintainer's exact six-record input: five ordinary expected assessments (AC-1..AC-5) plus a sixth conflicting AC-3 record. Six occurrences are preserved; the two AC-3 occurrences share one conflict group and are individually rejected; AC-1, AC-2, AC-4 and AC-5 are independently consumer-admitted; the aggregate is rejected.",
     rawReply,
+    rawRecordCount: decoded.rawRecords.length,
+    occurrenceCount: rc.assessments.length,
     decoder: {
       assessments: decoded.assessments.map((a) => ({
         criterionId: a.expectedCriterionId,
@@ -289,15 +295,26 @@ function profileBDuplicate() {
       })),
     },
     contractCoverage: rc.coverage,
-    claimAdmissions: scorer.claimAdmissions.map((c) => ({
+    diagnostics: scorer.diagnostics,
+    claimAdmissions: scorer.claimAdmissions.map((c, i) => ({
       criterionId: c.criterionId,
       originalReportedClaim: c.originalReportedClaim,
+      admittedConclusion: rc.assessments[i]?.admittedConclusion ?? null,
+      references: rc.assessments[i]?.references ?? [],
+      explanation: rc.assessments[i]?.explanation ?? null,
       consumerAdmitted: c.consumerAdmitted,
       claimAssociationValid: c.claimAssociationValid,
       conflictStatus: c.conflictStatus,
       conflictGroup: c.conflictGroup,
       primaryFailureGate: c.primaryFailureGate,
       reason: c.reason,
+      diagnostics: c.diagnostics,
+    })),
+    claimAccounting: scorer.reportedClaims.entries.map((e) => ({
+      criterionId: e.criterionId,
+      originalReportedClaim: e.originalReportedClaim,
+      accounted: e.accounted,
+      consumerAdmitted: e.consumerAdmitted,
     })),
     aggregate: {
       admitted: scorer.admission.admitted,

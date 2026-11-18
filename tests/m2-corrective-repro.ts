@@ -581,6 +581,118 @@ test("repro B1 (maintainer): a sixth conflicting record survives decoding, cover
   );
 });
 
+test("repro B1x (maintainer, exact): five ordinary assessments for AC-1..AC-5 plus a sixth conflicting AC-3", () => {
+  // The maintainer's actual reproduction shape. The first AC-3 occurrence is
+  // one of the five ordinary expected assessments; the sixth record is the
+  // duplicate AC-3 occurrence that contradicts it. Same composition as
+  // `repro B1`: decoder → ResultContract → scorer.
+  const raw = JSON.stringify({
+    assessments: [
+      { criterionId: "AC-1", outcome: "satisfied", references: [APP], explanation: "AC-1 ok" },
+      { criterionId: "AC-2", outcome: "violated", references: [APP], explanation: "AC-2 missing" },
+      { criterionId: "AC-3", outcome: "violated", references: [APP], explanation: "AC-3 route missing" },
+      { criterionId: "AC-4", outcome: "satisfied", references: [APP], explanation: "AC-4 ok" },
+      { criterionId: "AC-5", outcome: "satisfied", references: [APP], explanation: "AC-5 ok" },
+      { criterionId: "AC-3", outcome: "satisfied", references: [SERIALIZER], explanation: "AC-3 route exists" },
+    ],
+  });
+  const { decoded, rc, scorer } = runBFromRawReply(raw);
+
+  // 1. Six raw provider records retained, none rewritten or dropped.
+  assert.equal(decoded.rawRecords.length, 6, "six raw provider records are retained");
+  assert.equal(decoded.assessments.length, 6, "six usable occurrences survive decoding");
+  assert.equal(rc.assessments.length, 6, "six occurrences reach the ResultContract");
+
+  // 2. All six occurrences reach the accounting and admission stages.
+  assert.equal(scorer.claimAdmissions.length, 6, "six per-claim admission decisions");
+  assert.equal(scorer.reportedClaims.attempted, 6);
+  assert.equal(scorer.reportedClaims.entries.length, 6, "six accounting entries");
+
+  // 3./4. The duplicate identity survives decoding and contract coverage.
+  assert.deepEqual(decoded.duplicateIds, ["AC-3"], "the decoder reports AC-3 as duplicated");
+  assert.deepEqual(rc.coverage.duplicateIds, ["AC-3"], "contract coverage preserves AC-3");
+  assert.equal(rc.coverage.wholeInventoryAdmitted, false, "a duplicated criterion is not complete coverage");
+
+  // Provider order is preserved: AC-3 at index 2 (ordinary) and index 5 (sixth).
+  assert.deepEqual(
+    rc.assessments.map((a) => a.expectedCriterionId),
+    ["AC-1", "AC-2", "AC-3", "AC-4", "AC-5", "AC-3"],
+  );
+
+  const ac3 = scorer.claimAdmissions.filter((c) => c.criterionId === "AC-3");
+  assert.equal(ac3.length, 2, "both AC-3 occurrences reach per-claim admission");
+
+  // 5. Both occurrences belong to one conflict group, classified as conflicting.
+  assert.ok(ac3[0].conflictGroup && ac3[0].conflictGroup.startsWith("cc-"));
+  assert.equal(ac3[0].conflictGroup, ac3[1].conflictGroup, "both occurrences share one conflict group");
+  assert.equal(ac3[0].conflictStatus, "conflicting-duplicate");
+  assert.equal(ac3[1].conflictStatus, "conflicting-duplicate");
+
+  // 6. Neither is consumer-admitted.
+  for (const claim of ac3) {
+    assert.equal(claim.consumerAdmitted, false, "a conflicted occurrence is never admitted");
+    assert.equal(claim.claimAssociationValid, false, "one criterion claimed twice is not a valid association");
+    assert.equal(claim.evidenceConflict, false, "the conflict is about the duplicate claim, not the evidence");
+    assert.equal(claim.primaryFailureGate, "claim-association");
+  }
+
+  // 7. Original wording, status, references and diagnostics are retained.
+  assert.equal(rc.assessments[2].originalReportedClaim, "violated");
+  assert.equal(rc.assessments[2].admittedConclusion, "violated");
+  assert.deepEqual(rc.assessments[2].references, [APP]);
+  assert.equal(rc.assessments[2].explanation, "AC-3 route missing");
+  assert.equal(rc.assessments[5].originalReportedClaim, "satisfied");
+  assert.equal(rc.assessments[5].admittedConclusion, "satisfied");
+  assert.deepEqual(rc.assessments[5].references, [SERIALIZER]);
+  assert.equal(rc.assessments[5].explanation, "AC-3 route exists");
+  assert.equal(ac3[0].originalReportedClaim, "violated");
+  assert.equal(ac3[1].originalReportedClaim, "satisfied");
+  for (const claim of ac3) {
+    assert.ok(claim.diagnostics.some((d) => d.includes("claim association")));
+    assert.ok(claim.diagnostics.some((d) => d.includes("conflict group")));
+    assert.ok(claim.reason.length > 0);
+  }
+
+  // 8. The four unrelated criteria stay individually consumer-admitted.
+  for (const id of ["AC-1", "AC-2", "AC-4", "AC-5"]) {
+    const claim = scorer.claimAdmissions.filter((c) => c.criterionId === id);
+    assert.equal(claim.length, 1);
+    assert.equal(claim[0].consumerAdmitted, true, `${id} is independent and passes its own gates`);
+    assert.equal(claim[0].conflictStatus, "none");
+    assert.equal(claim[0].claimAssociationValid, true);
+  }
+
+  // 9. The aggregate is rejected because the required result carries a
+  // duplicate/conflicting criterion — not by invalidating the other claims.
+  assert.equal(scorer.admission.admitted, false, "the aggregate refuses the duplicated result");
+  assert.equal(scorer.admission.primaryFailureGate, "coverage-completeness");
+  const coverageGate = scorer.admission.gates?.find((g) => g.id === "coverage-completeness");
+  assert.equal(coverageGate?.status, "fail");
+  assert.match(coverageGate?.reason ?? "", /incomplete coverage/);
+  assert.ok(
+    scorer.diagnostics.includes("duplicate IDs: AC-3"),
+    "the aggregate records AC-3 as the duplicated/conflicting criterion",
+  );
+  const claimGate = scorer.admission.gates?.find((g) => g.id === "claim-admission");
+  assert.equal(claimGate?.status, "fail", "the aggregate also records that not every claim was admitted");
+  assert.match(claimGate?.reason ?? "", /AC-3/);
+
+  // 10. Original reported-claim accounting still contains all six occurrences.
+  assert.deepEqual(
+    scorer.reportedClaims.entries.map((e) => e.criterionId),
+    ["AC-1", "AC-2", "AC-3", "AC-4", "AC-5", "AC-3"],
+  );
+  assert.deepEqual(
+    scorer.reportedClaims.entries.map((e) => e.originalReportedClaim),
+    ["satisfied", "violated", "violated", "satisfied", "satisfied", "satisfied"],
+  );
+  assert.equal(scorer.reportedClaims.entries.every((e) => e.accounted), true);
+  assert.deepEqual(
+    scorer.reportedClaims.entries.map((e) => e.consumerAdmitted),
+    [true, true, false, true, true, false],
+  );
+});
+
 test("repro B2: identical duplicates and conflicting duplicates are classified separately", () => {
   const identical = runBFromRawReply(
     JSON.stringify({

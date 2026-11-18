@@ -1,6 +1,6 @@
 {
-  "schema": "m2.repro.profile-b-conflicting-duplicate/v1",
-  "note": "Five ordinary expected assessments plus a sixth conflicting AC-3 record. Both AC-3 occurrences must survive into per-claim admission, share one conflict group, and be refused; the other criteria stay individually usable.",
+  "schema": "m2.repro.profile-b-conflicting-duplicate/v2",
+  "note": "The maintainer's exact six-record input: five ordinary expected assessments (AC-1..AC-5) plus a sixth conflicting AC-3 record. Six occurrences are preserved; the two AC-3 occurrences share one conflict group and are individually rejected; AC-1, AC-2, AC-4 and AC-5 are independently consumer-admitted; the aggregate is rejected.",
   "rawReply": {
     "assessments": [
       {
@@ -18,6 +18,14 @@
           "artifact://app.ts"
         ],
         "explanation": "AC-2 missing"
+      },
+      {
+        "criterionId": "AC-3",
+        "outcome": "violated",
+        "references": [
+          "artifact://app.ts"
+        ],
+        "explanation": "AC-3 route missing"
       },
       {
         "criterionId": "AC-4",
@@ -39,20 +47,14 @@
         "criterionId": "AC-3",
         "outcome": "satisfied",
         "references": [
-          "artifact://app.ts"
-        ],
-        "explanation": "AC-3 satisfied"
-      },
-      {
-        "criterionId": "AC-3",
-        "outcome": "violated",
-        "references": [
           "artifact://serializer.ts"
         ],
-        "explanation": "AC-3 violated"
+        "explanation": "AC-3 route exists"
       }
     ]
   },
+  "rawRecordCount": 6,
+  "occurrenceCount": 6,
   "decoder": {
     "assessments": [
       {
@@ -72,6 +74,24 @@
         ],
         "explanation": "AC-2 missing",
         "conflict": null
+      },
+      {
+        "criterionId": "AC-3",
+        "originalReportedClaim": "violated",
+        "references": [
+          "artifact://app.ts"
+        ],
+        "explanation": "AC-3 route missing",
+        "conflict": {
+          "group": "cc-42434bc8dd12",
+          "kind": "conflicting-duplicate",
+          "occurrences": 2,
+          "indexes": [
+            2,
+            5
+          ],
+          "reason": "criterion reported 2 times with conflicting conclusion, references or explanation"
+        }
       },
       {
         "criterionId": "AC-4",
@@ -95,33 +115,15 @@
         "criterionId": "AC-3",
         "originalReportedClaim": "satisfied",
         "references": [
-          "artifact://app.ts"
-        ],
-        "explanation": "AC-3 satisfied",
-        "conflict": {
-          "group": "cc-8d0bd175c9a9",
-          "kind": "conflicting-duplicate",
-          "occurrences": 2,
-          "indexes": [
-            4,
-            5
-          ],
-          "reason": "criterion reported 2 times with conflicting conclusion, references or explanation"
-        }
-      },
-      {
-        "criterionId": "AC-3",
-        "originalReportedClaim": "violated",
-        "references": [
           "artifact://serializer.ts"
         ],
-        "explanation": "AC-3 violated",
+        "explanation": "AC-3 route exists",
         "conflict": {
-          "group": "cc-8d0bd175c9a9",
+          "group": "cc-42434bc8dd12",
           "kind": "conflicting-duplicate",
           "occurrences": 2,
           "indexes": [
-            4,
+            2,
             5
           ],
           "reason": "criterion reported 2 times with conflicting conclusion, references or explanation"
@@ -133,16 +135,16 @@
     ],
     "conflicts": [
       {
-        "group": "cc-8d0bd175c9a9",
+        "group": "cc-42434bc8dd12",
         "criterionId": "AC-3",
         "kind": "conflicting-duplicate",
         "indexes": [
-          4,
+          2,
           5
         ],
         "conclusions": [
-          "satisfied",
-          "violated"
+          "violated",
+          "satisfied"
         ],
         "referenceSets": [
           [
@@ -153,28 +155,28 @@
           ]
         ],
         "explanations": [
-          "AC-3 satisfied",
-          "AC-3 violated"
+          "AC-3 route missing",
+          "AC-3 route exists"
         ]
       }
     ],
     "recordDiagnostics": [
       {
-        "index": 4,
+        "index": 2,
         "criterionId": "AC-3",
         "errors": [
-          "duplicate criterionId (conflicting-duplicate, group cc-8d0bd175c9a9)"
+          "duplicate criterionId (conflicting-duplicate, group cc-42434bc8dd12)"
         ],
-        "conflictGroup": "cc-8d0bd175c9a9",
+        "conflictGroup": "cc-42434bc8dd12",
         "conflictKind": "conflicting-duplicate"
       },
       {
         "index": 5,
         "criterionId": "AC-3",
         "errors": [
-          "duplicate criterionId (conflicting-duplicate, group cc-8d0bd175c9a9)"
+          "duplicate criterionId (conflicting-duplicate, group cc-42434bc8dd12)"
         ],
-        "conflictGroup": "cc-8d0bd175c9a9",
+        "conflictGroup": "cc-42434bc8dd12",
         "conflictKind": "conflicting-duplicate"
       }
     ]
@@ -190,9 +192,9 @@
     "presentIds": [
       "AC-1",
       "AC-2",
+      "AC-3",
       "AC-4",
       "AC-5",
-      "AC-3",
       "AC-3"
     ],
     "individuallyValidIds": [
@@ -209,66 +211,153 @@
     "invalidIds": [],
     "wholeInventoryAdmitted": false
   },
+  "diagnostics": [
+    "consumer admission rejected: incomplete coverage",
+    "duplicate IDs: AC-3"
+  ],
   "claimAdmissions": [
     {
       "criterionId": "AC-1",
       "originalReportedClaim": "satisfied",
+      "admittedConclusion": "satisfied",
+      "references": [
+        "artifact://app.ts"
+      ],
+      "explanation": "AC-1 ok",
       "consumerAdmitted": true,
       "claimAssociationValid": true,
       "conflictStatus": "none",
       "conflictGroup": null,
       "primaryFailureGate": null,
-      "reason": "admitted"
+      "reason": "admitted",
+      "diagnostics": []
     },
     {
       "criterionId": "AC-2",
       "originalReportedClaim": "violated",
+      "admittedConclusion": "violated",
+      "references": [
+        "artifact://app.ts"
+      ],
+      "explanation": "AC-2 missing",
       "consumerAdmitted": true,
       "claimAssociationValid": true,
       "conflictStatus": "none",
       "conflictGroup": null,
       "primaryFailureGate": null,
-      "reason": "admitted"
-    },
-    {
-      "criterionId": "AC-4",
-      "originalReportedClaim": "satisfied",
-      "consumerAdmitted": true,
-      "claimAssociationValid": true,
-      "conflictStatus": "none",
-      "conflictGroup": null,
-      "primaryFailureGate": null,
-      "reason": "admitted"
-    },
-    {
-      "criterionId": "AC-5",
-      "originalReportedClaim": "satisfied",
-      "consumerAdmitted": true,
-      "claimAssociationValid": true,
-      "conflictStatus": "none",
-      "conflictGroup": null,
-      "primaryFailureGate": null,
-      "reason": "admitted"
-    },
-    {
-      "criterionId": "AC-3",
-      "originalReportedClaim": "satisfied",
-      "consumerAdmitted": false,
-      "claimAssociationValid": false,
-      "conflictStatus": "conflicting-duplicate",
-      "conflictGroup": "cc-8d0bd175c9a9",
-      "primaryFailureGate": "claim-association",
-      "reason": "invalid claim association (duplicate, unknown or outside the inventory) for AC-3"
+      "reason": "admitted",
+      "diagnostics": []
     },
     {
       "criterionId": "AC-3",
       "originalReportedClaim": "violated",
+      "admittedConclusion": "violated",
+      "references": [
+        "artifact://app.ts"
+      ],
+      "explanation": "AC-3 route missing",
       "consumerAdmitted": false,
       "claimAssociationValid": false,
       "conflictStatus": "conflicting-duplicate",
-      "conflictGroup": "cc-8d0bd175c9a9",
+      "conflictGroup": "cc-42434bc8dd12",
       "primaryFailureGate": "claim-association",
-      "reason": "invalid claim association (duplicate, unknown or outside the inventory) for AC-3"
+      "reason": "invalid claim association (duplicate, unknown or outside the inventory) for AC-3",
+      "diagnostics": [
+        "duplicate criterionId (conflicting-duplicate, group cc-42434bc8dd12)",
+        "AC-3: claim association is not valid (duplicate, unknown or outside the inventory)",
+        "conflict group cc-42434bc8dd12 (conflicting-duplicate): criterion reported 2 times with conflicting conclusion, references or explanation"
+      ]
+    },
+    {
+      "criterionId": "AC-4",
+      "originalReportedClaim": "satisfied",
+      "admittedConclusion": "satisfied",
+      "references": [
+        "artifact://app.ts"
+      ],
+      "explanation": "AC-4 ok",
+      "consumerAdmitted": true,
+      "claimAssociationValid": true,
+      "conflictStatus": "none",
+      "conflictGroup": null,
+      "primaryFailureGate": null,
+      "reason": "admitted",
+      "diagnostics": []
+    },
+    {
+      "criterionId": "AC-5",
+      "originalReportedClaim": "satisfied",
+      "admittedConclusion": "satisfied",
+      "references": [
+        "artifact://app.ts"
+      ],
+      "explanation": "AC-5 ok",
+      "consumerAdmitted": true,
+      "claimAssociationValid": true,
+      "conflictStatus": "none",
+      "conflictGroup": null,
+      "primaryFailureGate": null,
+      "reason": "admitted",
+      "diagnostics": []
+    },
+    {
+      "criterionId": "AC-3",
+      "originalReportedClaim": "satisfied",
+      "admittedConclusion": "satisfied",
+      "references": [
+        "artifact://serializer.ts"
+      ],
+      "explanation": "AC-3 route exists",
+      "consumerAdmitted": false,
+      "claimAssociationValid": false,
+      "conflictStatus": "conflicting-duplicate",
+      "conflictGroup": "cc-42434bc8dd12",
+      "primaryFailureGate": "claim-association",
+      "reason": "invalid claim association (duplicate, unknown or outside the inventory) for AC-3",
+      "diagnostics": [
+        "duplicate criterionId (conflicting-duplicate, group cc-42434bc8dd12)",
+        "AC-3: reference artifact://serializer.ts — no semantic support decision for this claim",
+        "AC-3: claim association is not valid (duplicate, unknown or outside the inventory)",
+        "conflict group cc-42434bc8dd12 (conflicting-duplicate): criterion reported 2 times with conflicting conclusion, references or explanation"
+      ]
+    }
+  ],
+  "claimAccounting": [
+    {
+      "criterionId": "AC-1",
+      "originalReportedClaim": "satisfied",
+      "accounted": true,
+      "consumerAdmitted": true
+    },
+    {
+      "criterionId": "AC-2",
+      "originalReportedClaim": "violated",
+      "accounted": true,
+      "consumerAdmitted": true
+    },
+    {
+      "criterionId": "AC-3",
+      "originalReportedClaim": "violated",
+      "accounted": true,
+      "consumerAdmitted": false
+    },
+    {
+      "criterionId": "AC-4",
+      "originalReportedClaim": "satisfied",
+      "accounted": true,
+      "consumerAdmitted": true
+    },
+    {
+      "criterionId": "AC-5",
+      "originalReportedClaim": "satisfied",
+      "accounted": true,
+      "consumerAdmitted": true
+    },
+    {
+      "criterionId": "AC-3",
+      "originalReportedClaim": "satisfied",
+      "accounted": true,
+      "consumerAdmitted": false
     }
   ],
   "aggregate": {

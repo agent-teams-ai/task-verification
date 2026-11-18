@@ -7,7 +7,7 @@ loopback fake provider, offline.
 | File | What it records | Regenerate with |
 | --- | --- | --- |
 | `repro-profile-a-finding-collision.json` | The maintainer's Profile A reproduction: two raw findings sharing external id `f-1` (AC-1 unsupported/contradicts, AC-3 supported/matches), each scored occurrence, the admission decision per occurrence, and the single supported detection. |
-| `repro-profile-b-conflicting-duplicate.json` | The maintainer's Profile B reproduction: five ordinary assessments plus a sixth conflicting AC-3 record, the decoder's conflict group, the contract coverage, all six claim decisions and the aggregate gate outcome. |
+| `repro-profile-b-conflicting-duplicate.json` | The maintainer's exact Profile B reproduction: six raw provider records — five ordinary expected assessments (one each for AC-1…AC-5) plus a sixth AC-3 record that contradicts the first AC-3 claim. Records the decoder's conflict group, the contract coverage, all six claim decisions (two AC-3 rejected, AC-1/AC-2/AC-4/AC-5 admitted individually), the original reported-claim accounting and the aggregate outcome (rejected). |
 | `native-tool-transcript.jsonl` | The rr.7 `file_read` transcript with observed-call/observed-result/request-inclusion states, observed content digests and separately reported expected snapshot digests. |
 | `native-tool-chain-unchanged-dependency-read.json` | The captured provider request chain behind the verified `audit.ts` read: per-request body digests and the call/result item identities. |
 | `native-tool-chain-out-of-scope-read.json` | The same chain for the denied out-of-scope reads. |
@@ -29,7 +29,7 @@ same files.
 
 Test coverage for these artefacts lives in:
 
-- `tests/m2-corrective-repro.ts` (exact reproductions, 21 tests)
+- `tests/m2-corrective-repro.ts` (exact reproductions, 22 tests)
 - `tests/m2-gate-matrix.ts` (per-gate positive/negative/aggregate matrix, 27 tests)
 - `tests/native-tool-transcript.ts` (10 negative controls + 1 positive, cross-platform)
 - `tests/rr7/wp8-profile-a.test.ts` (the native runs that produce the transcript and chain)
