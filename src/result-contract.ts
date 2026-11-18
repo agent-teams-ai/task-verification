@@ -65,6 +65,28 @@ export interface AssessmentRecord {
   references: string[];
   explanation: string | null;
   diagnostics: string[];
+  /**
+   * Explicit duplicate/conflict state assigned by the decoder. Every member of
+   * a conflicting group carries the same group identity: no member is selected
+   * as a winner and none is admitted as an ordinary claim.
+   */
+  conflict?: AssessmentConflict;
+}
+
+export type AssessmentConflictKind =
+  | "identical-duplicate"
+  | "conflicting-duplicate"
+  | "unclassified-duplicate";
+
+export interface AssessmentConflict {
+  /** Conflict-group identity shared by every occurrence of the criterion. */
+  group: string;
+  kind: AssessmentConflictKind;
+  /** Number of provider records claiming this criterion. */
+  occurrences: number;
+  /** Provider record positions in the raw response, in provider order. */
+  indexes: number[];
+  reason: string;
 }
 
 // --- Findings (Profile A) ---

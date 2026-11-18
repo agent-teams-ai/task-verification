@@ -15,10 +15,22 @@
  * Licensed under Apache 2.0. See LICENSE.
  */
 
+import * as crypto from "node:crypto";
+
 import { consumerAdmit, type AdmissionDecision, type AssessmentBinding } from "./controls.ts";
+import {
+  booleanGate,
+  decide,
+  evaluateRunGates,
+  failGate,
+  notApplicableGate,
+  passGate,
+  type GateResult,
+} from "./admission-gates.ts";
 import { validateResultContract } from "./result-contract.ts";
 import type {
   AdmittedConclusion,
+  AssessmentConflictKind,
   ExecutionState,
   ResultContract,
 } from "./result-contract.ts";
@@ -45,6 +57,12 @@ export interface RubricDecision {
    * things; a decision bound to one of them never supports the other.
    */
   findingId?: string;
+  /**
+   * Internal finding-occurrence identity this judgment is about. An external
+   * `findingId` may collide, so a decision that must distinguish two
+   * occurrences binds to the occurrence identity instead.
+   */
+  occurrenceId?: string;
   supportsBehavior: boolean;
   coversSubclauses: boolean;
   relevantCurrentApplicable: boolean;
@@ -58,9 +76,54 @@ export interface RubricDecision {
  * to one finding never supports a different finding that happens to cite the
  * same criterion and reference.
  */
-export function claimSupportKey(criterionId: string, reference: string, findingId?: string): string {
+export function claimSupportKey(
+  criterionId: string,
+  reference: string,
+  findingId?: string,
+  occurrenceId?: string,
+): string {
   const base = `${criterionId}::${reference}`;
-  return findingId === undefined ? base : `${base}::${findingId}`;
+  if (findingId === undefined) return base;
+  const scoped = `${base}::${findingId}`;
+  return occurrenceId === undefined ? scoped : `${scoped}@${occurrenceId}`;
+}
+
+/**
+ * Authoritative occurrence provenance for one finding slot in the native
+ * output. The identity is derived from the run, attempt, candidate, snapshot
+ * and native output identity already present in the contract, plus the exact
+ * position of the occurrence. It never trusts the display `findingId`, which
+ * may be supplied externally, duplicated or absent.
+ */
+export interface FindingOccurrenceIdentity {
+  occurrenceId: string;
+  index: number;
+  /** Complete provenance components were present and non-empty. */
+  provenanceComplete: boolean;
+  missingProvenance: string[];
+}
+
+export function findingOccurrenceIdentity(rc: ResultContract, index: number): FindingOccurrenceIdentity {
+  const components: { name: string; value: string }[] = [
+    { name: "execution.runId", value: rc.execution.runId },
+    { name: "execution.attemptId", value: rc.execution.attemptId },
+    { name: "candidate.repositoryMaterializationId", value: rc.candidate.repositoryMaterializationId },
+    { name: "candidate.runtimeSnapshotDigest", value: rc.candidate.runtimeSnapshotDigest },
+    { name: "profile.inputIdentity", value: rc.profile.inputIdentity },
+  ];
+  const missingProvenance = components
+    .filter((c) => typeof c.value !== "string" || c.value.trim() === "")
+    .map((c) => c.name);
+  const digest = crypto
+    .createHash("sha256")
+    .update([...components.map((c) => c.value ?? ""), String(index)].join("\u0000"))
+    .digest("hex");
+  return {
+    occurrenceId: `fo-${digest.slice(0, 16)}`,
+    index,
+    provenanceComplete: missingProvenance.length === 0,
+    missingProvenance,
+  };
 }
 
 interface SupportSource {
@@ -79,46 +142,117 @@ interface ClaimSupportLookup {
    * judgment can be made without inventing one.
    */
   ambiguous?: boolean;
+  /** Which binding the decision was resolved from. */
+  decisionSource?: "occurrence" | "finding" | "claim" | "reference" | "none";
+}
+
+/** One finding's identities, as resolved by the scorer. */
+export interface FindingSupportRef {
+  findingId: string;
+  occurrenceId: string;
+  /**
+   * True when the external `findingId` is shared by more than one finding
+   * occurrence in this native output. A decision bound only to such an id
+   * cannot identify which occurrence it is about.
+   */
+  findingIdAmbiguous: boolean;
 }
 
 /**
- * Resolve the semantic-support decision for ONE claim. A reference-level entry
- * is only usable when it explicitly names the criterion; otherwise the claim is
- * unsupported with an explanatory reason rather than inheriting another claim's
- * judgment.
+ * Resolve the semantic-support decision for ONE claim.
+ *
+ * Resolution is by finding OCCURRENCE, not by the display `findingId`. An
+ * external id that is shared by several occurrences cannot select one of them,
+ * so a decision bound only to that id is refused as ambiguous. A finding-scoped
+ * decision that names the occurrence identity is usable even when the external
+ * id collides.
+ *
+ * A reference-level entry is only usable when it explicitly names the criterion
+ * AND does not name a different finding; otherwise the claim is unsupported
+ * with an explanatory reason rather than inheriting another claim's judgment.
  */
 function lookupClaimSupport(
   support: SupportSource,
   criterionId: string | null,
   reference: string,
-  findingId?: string,
+  finding?: FindingSupportRef,
   sharedAcrossFindings?: readonly string[],
 ): ClaimSupportLookup {
   if (criterionId === null) {
-    return { decision: null, reason: "no criterion mapping, so no claim-specific support decision applies" };
+    return {
+      decision: null,
+      reason: "no criterion mapping, so no claim-specific support decision applies",
+      decisionSource: "none",
+    };
   }
 
+  const findingId = finding?.findingId;
+  const occurrenceId = finding?.occurrenceId;
   const shared = sharedAcrossFindings !== undefined && sharedAcrossFindings.length > 1;
   const sharedReason = `criterion ${criterionId} and reference ${reference} are claimed by findings ${(sharedAcrossFindings ?? []).join(", ")}; a shared judgment cannot support each of them individually`;
 
-  // A finding-scoped decision is the only one that can bind support to one
-  // finding when the (criterion, reference) pair is shared.
-  if (findingId !== undefined) {
+  // 1. A decision bound to the exact occurrence is the only one that can always
+  //    distinguish two occurrences.
+  if (occurrenceId !== undefined) {
+    const occurrenceScoped = support.claimRubrics?.[claimSupportKey(criterionId, reference, findingId, occurrenceId)];
+    if (occurrenceScoped) {
+      if (occurrenceScoped.occurrenceId !== undefined && occurrenceScoped.occurrenceId !== occurrenceId) {
+        return {
+          decision: null,
+          reason: `support decision is bound to occurrence ${occurrenceScoped.occurrenceId}, not ${occurrenceId}`,
+          decisionSource: "none",
+        };
+      }
+      if (occurrenceScoped.findingId !== undefined && occurrenceScoped.findingId !== findingId) {
+        return {
+          decision: null,
+          reason: `finding-scoped support decision is bound to finding ${occurrenceScoped.findingId}, not ${findingId}`,
+          decisionSource: "none",
+        };
+      }
+      return { decision: occurrenceScoped, reason: "occurrence-scoped support decision", decisionSource: "occurrence" };
+    }
+  }
+
+  // 2. An external-id-bound decision is unusable when that id names several
+  //    occurrences: accepting it would transfer support to a different one.
+  if (finding !== undefined && finding.findingIdAmbiguous) {
+    const scoped = support.claimRubrics?.[claimSupportKey(criterionId, reference, finding.findingId)];
+    const claimLevel = support.claimRubrics?.[claimSupportKey(criterionId, reference)];
+    if (scoped || (claimLevel && claimLevel.findingId === finding.findingId)) {
+      return {
+        decision: null,
+        reason: `external finding id ${finding.findingId} identifies more than one finding occurrence; a decision bound to it cannot disambiguate them`,
+        ambiguous: true,
+        decisionSource: "none",
+      };
+    }
+  }
+
+  // 3. A uniquely bound finding-scoped decision.
+  if (findingId !== undefined && !finding?.findingIdAmbiguous) {
     const scoped = support.claimRubrics?.[claimSupportKey(criterionId, reference, findingId)];
     if (scoped) {
       if (scoped.findingId !== undefined && scoped.findingId !== findingId) {
         return {
           decision: null,
           reason: `finding-scoped support decision is bound to finding ${scoped.findingId}, not ${findingId}`,
+          decisionSource: "none",
         };
       }
-      return { decision: scoped, reason: "finding-scoped support decision" };
+      if (scoped.occurrenceId !== undefined && scoped.occurrenceId !== occurrenceId) {
+        return {
+          decision: null,
+          reason: `support decision is bound to occurrence ${scoped.occurrenceId}, not ${occurrenceId ?? "the unnamed occurrence"}`,
+          decisionSource: "none",
+        };
+      }
+      return { decision: scoped, reason: "finding-scoped support decision", decisionSource: "finding" };
     }
   }
 
-  // When several findings claim this pair and none of them has its own
-  // decision, no individual support judgment exists: refuse rather than let one
-  // finding's judgment (or the absence of one) stand in for another's.
+  // 4. A (criterion, reference) pair claimed by several occurrences never
+  //    inherits one occurrence's judgment. Refuse rather than attribute.
   if (shared) {
     const claimLevel = support.claimRubrics?.[claimSupportKey(criterionId, reference)];
     if (claimLevel && claimLevel.findingId !== undefined && claimLevel.findingId !== findingId) {
@@ -126,41 +260,74 @@ function lookupClaimSupport(
         decision: null,
         reason: `support decision is bound to finding ${claimLevel.findingId}, not ${findingId ?? "the unnamed finding"}`,
         ambiguous: true,
+        decisionSource: "none",
       };
     }
-    return { decision: null, reason: sharedReason, ambiguous: true };
+    return { decision: null, reason: sharedReason, ambiguous: true, decisionSource: "none" };
   }
 
+  // 5. Claim-level decision. It must not name a different finding/occurrence.
   const claimed = support.claimRubrics?.[claimSupportKey(criterionId, reference)];
   if (claimed) {
     if (claimed.findingId !== undefined && claimed.findingId !== findingId) {
       return {
         decision: null,
         reason: `support decision is bound to finding ${claimed.findingId}, not ${findingId ?? "the unnamed finding"}`,
+        ambiguous: shared,
+        decisionSource: "none",
       };
     }
-    if (shared) return { decision: null, reason: sharedReason, ambiguous: true };
-    return { decision: claimed, reason: "claim-scoped support decision" };
+    if (claimed.occurrenceId !== undefined && claimed.occurrenceId !== occurrenceId) {
+      return {
+        decision: null,
+        reason: `support decision is bound to occurrence ${claimed.occurrenceId}, not ${occurrenceId ?? "the unnamed occurrence"}`,
+        ambiguous: shared,
+        decisionSource: "none",
+      };
+    }
+    return { decision: claimed, reason: "claim-scoped support decision", decisionSource: "claim" };
   }
 
+  // 6. Compatibility reference-level decision. The same finding restriction
+  //    applies: a decision that names a foreign finding never supports this one.
   const referenceLevel = support.referenceRubrics?.[reference];
   if (referenceLevel) {
+    if (referenceLevel.findingId !== undefined && referenceLevel.findingId !== findingId) {
+      return {
+        decision: null,
+        reason: `reference rubric is bound to finding ${referenceLevel.findingId}, not ${findingId ?? "the unnamed finding"}`,
+        decisionSource: "none",
+      };
+    }
+    if (referenceLevel.occurrenceId !== undefined && referenceLevel.occurrenceId !== occurrenceId) {
+      return {
+        decision: null,
+        reason: `reference rubric is bound to occurrence ${referenceLevel.occurrenceId}, not ${occurrenceId ?? "the unnamed occurrence"}`,
+        decisionSource: "none",
+      };
+    }
     if (referenceLevel.criterionId === criterionId) {
-      if (shared) return { decision: null, reason: sharedReason, ambiguous: true };
-      return { decision: referenceLevel, reason: "reference rubric explicitly bound to this criterion" };
+      if (shared) return { decision: null, reason: sharedReason, ambiguous: true, decisionSource: "none" };
+      return {
+        decision: referenceLevel,
+        reason: "reference rubric explicitly bound to this criterion",
+        decisionSource: "reference",
+      };
     }
     if (referenceLevel.criterionId === undefined) {
       return {
         decision: null,
         reason: "reference-level rubric is not bound to a claim; a shared reference does not support every claim citing it",
+        decisionSource: "none",
       };
     }
     return {
       decision: null,
       reason: `reference rubric is bound to criterion ${referenceLevel.criterionId}, not ${criterionId}`,
+      decisionSource: "none",
     };
   }
-  return { decision: null, reason: "no semantic support decision for this claim" };
+  return { decision: null, reason: "no semantic support decision for this claim", decisionSource: "none" };
 }
 
 /** Human-review provenance for a semantic-support decision. */
@@ -338,6 +505,18 @@ export interface ClaimAdmission {
   reason: string;
   /** Claim-level diagnostics retained for a rejected claim. */
   diagnostics: string[];
+  /** Structured outcome of every mandatory gate for this claim. */
+  gates: GateResult[];
+  /** Identity of the first failing gate, when rejected. */
+  primaryFailureGate: string | null;
+  /** Duplicate/conflict state carried from the provider records. */
+  conflictStatus: "none" | AssessmentConflictKind;
+  /** Conflict-group identity shared by every occurrence of the conflicted criterion. */
+  conflictGroup: string | null;
+  /** A cited reference is explicitly marked as contradicting this claim. */
+  evidenceConflict: boolean;
+  /** References whose support decision marks them as contradicting. */
+  contradictoryReferences: string[];
 }
 
 // --- Reported-claim accounting (WP5) ---
@@ -484,6 +663,8 @@ export interface ScorerResult {
   executionState: ExecutionState;
   /** Shared deterministic consumer-admission decision for this result. */
   admission: AdmissionDecision;
+  /** Structured outcome of every run-level mandatory gate. */
+  runGates: GateResult[];
   /**
    * Per-claim admission (Profile B). Each dimension is separate; only
    * `consumerAdmitted` means a claim may reach a consumer.
@@ -500,7 +681,16 @@ export interface ScorerResult {
 }
 
 export interface ProfileAFindingOutput {
+  /** External display identity exactly as delivered (never rewritten). */
   findingId: string;
+  /** Internal occurrence identity derived from run/candidate/snapshot/index. */
+  occurrenceId: string;
+  /** Position of this occurrence in the native output. */
+  occurrenceIndex: number;
+  /** The external findingId is shared by another occurrence. */
+  findingIdAmbiguous: boolean;
+  occurrenceProvenanceComplete: boolean;
+  missingOccurrenceProvenance: string[];
   nativeComment: string;
   normalizedFinding: string | null;
   /** False for skipped findings and findings dropped by normalization. */
@@ -709,14 +899,14 @@ function resolveFindingReferences(
   registry: ArtifactRegistry | undefined,
   support: SupportSource,
   criterionId: string | null,
-  findingId?: string,
+  finding?: FindingSupportRef,
   sharedPairs?: Map<string, string[]>,
 ): ResolvedFindingReference[] {
   const out: ResolvedFindingReference[] = [];
   for (const ref of refs ?? []) {
     const resolved = resolveReference(ref, rc, registry);
     const shared = criterionId === null ? undefined : sharedPairs?.get(claimSupportKey(criterionId, ref));
-    const lookup = lookupClaimSupport(support, criterionId, ref, findingId, shared);
+    const lookup = lookupClaimSupport(support, criterionId, ref, finding, shared);
     const supportsBehavior =
       resolved.mechanicallyValid && lookup.decision !== null && isReferenceSupporting(lookup.decision);
     out.push({
@@ -736,7 +926,7 @@ function resolveFindingReferences(
  */
 function computeClaimAdmissions(ctx: {
   rc: ResultContract;
-  contractValid: boolean;
+  runGates: readonly GateResult[];
   executionAdmissible: boolean;
   evidenceApplicable: boolean;
   expectedCriteriaRevision: string;
@@ -757,6 +947,7 @@ function computeClaimAdmissions(ctx: {
     const diagnostics: string[] = [...(a.diagnostics ?? [])];
     const refs = a.references ?? [];
     const supporting: boolean[] = [];
+    const contradictoryReferences: string[] = [];
     let candidateBound = refs.length > 0;
     let snapshotBound = refs.length > 0;
     let referenceValid = refs.length > 0;
@@ -765,6 +956,9 @@ function computeClaimAdmissions(ctx: {
       const resolved = resolveReference(ref, rc, ctx.registry);
       const lookup = lookupClaimSupport(ctx.support, criterionId, ref);
       supporting.push(resolved.mechanicallyValid && lookup.decision !== null && isReferenceSupporting(lookup.decision));
+      if (resolved.mechanicallyValid && lookup.decision !== null && lookup.decision.contradictsClaim) {
+        contradictoryReferences.push(ref);
+      }
       if (!resolved.candidateBound) {
         candidateBound = false;
         diagnostics.push(`${criterionId}: reference ${ref} is bound to a different candidate`);
@@ -782,7 +976,16 @@ function computeClaimAdmissions(ctx: {
       }
     }
 
-    const referenceSufficient = a.admittedConclusion !== null && supporting.some(Boolean);
+    const evidenceConflict = contradictoryReferences.length > 0 && supporting.some(Boolean);
+    if (evidenceConflict) {
+      diagnostics.push(
+        `${criterionId}: contradictory evidence conflicts with the supporting reference(s): ${contradictoryReferences.join(", ")}`,
+      );
+    }
+
+    // Semantic support is about the cited artifacts, not the conclusion string:
+    // a missing conclusion is reported by its own `semantic-conclusion` gate.
+    const referenceSufficient = supporting.some(Boolean) && !evidenceConflict;
     const semanticConclusionAdmitted = ctx.executionAdmissible && a.admittedConclusion !== null;
     const claimAssociationValid =
       rc.criteria.expectedCriterionIds.includes(criterionId) &&
@@ -791,6 +994,8 @@ function computeClaimAdmissions(ctx: {
       (claimsPerCriterion.get(criterionId) ?? 0) === 1;
     const criteriaRevisionBound = rc.criteria.authoredCriteriaRevision === ctx.expectedCriteriaRevision;
     const criteriaContentBound = rc.criteria.criteriaTextDigest === ctx.expectedCriteriaContentDigest;
+    const conflictStatus: "none" | AssessmentConflictKind = a.conflict?.kind ?? "none";
+    const conflictGroup = a.conflict?.group ?? null;
 
     if (!claimAssociationValid) {
       diagnostics.push(`${criterionId}: claim association is not valid (duplicate, unknown or outside the inventory)`);
@@ -798,40 +1003,103 @@ function computeClaimAdmissions(ctx: {
     if (a.admittedConclusion !== null && refs.length === 0) {
       diagnostics.push(`${criterionId}: conclusion cites no reference`);
     }
+    if (a.conflict) {
+      diagnostics.push(`conflict group ${a.conflict.group} (${a.conflict.kind}): ${a.conflict.reason}`);
+    }
 
-    const consumerAdmitted =
-      ctx.contractValid &&
-      ctx.executionAdmissible &&
-      ctx.evidenceApplicable &&
-      criteriaRevisionBound &&
-      criteriaContentBound &&
-      claimAssociationValid &&
-      candidateBound &&
-      snapshotBound &&
-      referenceValid &&
-      referenceSufficient &&
-      semanticConclusionAdmitted;
+    // Claim-level gates. Run-level gates are shared with the aggregate decision
+    // and with Profile A, so the same mandatory gate cannot be enforced here and
+    // omitted there.
+    const claimGates: GateResult[] = [
+      booleanGate({
+        id: "claim-association",
+        scope: "claim",
+        passed: claimAssociationValid,
+        source: "result-contract.assessments vs coverage/expected inventory",
+        passReason: `criterion ${criterionId} is claimed exactly once and is in the expected inventory`,
+        failReason: `invalid claim association (duplicate, unknown or outside the inventory) for ${criterionId}`,
+      }),
+      refs.length === 0
+        ? notApplicableGate(
+            "candidate-binding",
+            "claim",
+            "result-contract.assessments[].references",
+            "the claim cites no reference to bind",
+          )
+        : booleanGate({
+            id: "candidate-binding",
+            scope: "claim",
+            passed: candidateBound,
+            source: "artifact registry candidateBinding",
+            passReason: "every cited artifact is bound to this candidate",
+            failReason: "candidate binding mismatch",
+          }),
+      refs.length === 0
+        ? notApplicableGate(
+            "snapshot-binding",
+            "claim",
+            "result-contract.assessments[].references",
+            "the claim cites no reference to bind",
+          )
+        : booleanGate({
+            id: "snapshot-binding",
+            scope: "claim",
+            passed: snapshotBound,
+            source: "artifact registry snapshotDigest",
+            passReason: "every cited artifact is bound to this snapshot",
+            failReason: "snapshot binding mismatch",
+          }),
+      refs.length === 0
+        ? failGate("reference-validity", "claim", "result-contract.assessments[].references", "conclusion cites no reference")
+        : booleanGate({
+            id: "reference-validity",
+            scope: "claim",
+            passed: referenceValid,
+            source: "artifact registry resolution",
+            passReason: "every cited artifact resolves as allowed, current and applicable",
+            failReason: "invalid reference",
+          }),
+      booleanGate({
+        id: "evidence-conflict",
+        scope: "claim",
+        passed: !evidenceConflict,
+        source: "rubric contradictions",
+        passReason: "no cited reference contradicts this claim",
+        failReason: `contradictory evidence conflicts with supporting evidence: ${contradictoryReferences.join(", ")}`,
+      }),
+      booleanGate({
+        id: "reference-sufficiency",
+        scope: "claim",
+        passed: referenceSufficient,
+        source: "claim-scoped semantic support decisions",
+        passReason: "at least one cited artifact semantically supports the claim",
+        failReason: "insufficient reference support",
+      }),
+      booleanGate({
+        id: "semantic-conclusion",
+        scope: "claim",
+        passed: semanticConclusionAdmitted,
+        source: "result-contract.assessments[].admittedConclusion",
+        passReason: "an admissible semantic conclusion exists",
+        failReason: "no admitted semantic conclusion",
+      }),
+      a.conflict === undefined
+        ? passGate("conflict-status", "claim", "provider duplicate classification", "no duplicate/conflict group")
+        : failGate(
+            "conflict-status",
+            "claim",
+            "provider duplicate classification",
+            `criterion ${criterionId} is part of conflict group ${a.conflict.group} (${a.conflict.kind}); no occurrence is admitted`,
+          ),
+    ];
 
-    let reason: string;
-    if (!ctx.contractValid) reason = "result contract is not schema-valid";
-    else if (!ctx.executionAdmissible) reason = "execution not admissible";
-    else if (!ctx.evidenceApplicable) reason = "evidence not applicable";
-    else if (!criteriaRevisionBound) reason = "criteria revision mismatch";
-    else if (!criteriaContentBound) reason = "criteria content mismatch (stale criteria)";
-    else if (!claimAssociationValid) reason = "invalid claim association";
-    else if (refs.length === 0) reason = "conclusion cites no reference";
-    else if (!candidateBound) reason = "candidate binding mismatch";
-    else if (!snapshotBound) reason = "snapshot binding mismatch";
-    else if (!referenceValid) reason = refs.length === 0 ? "conclusion cites no reference" : "invalid reference";
-    else if (!referenceSufficient) reason = "insufficient reference support";
-    else if (!semanticConclusionAdmitted) reason = "no admitted semantic conclusion";
-    else reason = "admitted";
+    const outcome = decide([...ctx.runGates, ...claimGates], "admitted");
 
     return {
       criterionId,
       originalReportedClaim: a.originalReportedClaim,
       parsedClaim: parseReportedClaim(a.originalReportedClaim),
-      contractValid: ctx.contractValid,
+      contractValid: ctx.runGates.find((g) => g.id === "contract-schema")?.status === "pass",
       executionAdmissible: ctx.executionAdmissible,
       evidenceApplicable: ctx.evidenceApplicable,
       criteriaRevisionBound,
@@ -842,9 +1110,15 @@ function computeClaimAdmissions(ctx: {
       referenceSufficient,
       claimAssociationValid,
       semanticConclusionAdmitted,
-      consumerAdmitted,
-      reason,
+      consumerAdmitted: outcome.admitted,
+      reason: outcome.reason,
       diagnostics,
+      gates: outcome.gates,
+      primaryFailureGate: outcome.primaryFailureGate,
+      conflictStatus,
+      conflictGroup,
+      evidenceConflict,
+      contradictoryReferences,
     };
   });
 }
@@ -948,21 +1222,31 @@ function computeProfileAOutput(
   truthBindingValid: boolean,
 ): ProfileAOutput {
   const findings: ProfileAFindingOutput[] = [];
-  const mappedFindings: { findingId: string; criterionId: string }[] = [];
+  const mappedFindings: { occurrenceId: string; findingId: string; criterionId: string }[] = [];
 
-  // Which delivered findings claim each (criterion, reference) pair. A pair
-  // claimed by more than one finding cannot inherit a single support judgment.
+  // How many raw occurrences carry each external finding id. An id used by more
+  // than one occurrence cannot identify any one of them.
+  const findingIdCounts = new Map<string, number>();
+  rc.findings.forEach((f, i) => {
+    const id = f.findingId ?? `finding-${i}`;
+    findingIdCounts.set(id, (findingIdCounts.get(id) ?? 0) + 1);
+  });
+
+  // Which delivered finding OCCURRENCES claim each (criterion, reference) pair.
+  // Keying by occurrence (not by the colliding display id) keeps the sharing
+  // accounting exact. A pair claimed by more than one occurrence cannot inherit
+  // a single support judgment.
   const sharedPairs = new Map<string, string[]>();
   rc.findings.forEach((f, i) => {
     if (f.skipped) return;
     if (f.normalizedFinding === null && (f.nativeComment ?? "").trim().length > 0) return;
     const mapped = f.criterionMapping;
     if (mapped === null || mapped === undefined || !rc.criteria.expectedCriterionIds.includes(mapped)) return;
-    const fid = f.findingId ?? `finding-${i}`;
+    const occurrenceId = findingOccurrenceIdentity(rc, i).occurrenceId;
     for (const ref of f.references ?? []) {
       const key = claimSupportKey(mapped, ref);
       const list = sharedPairs.get(key) ?? [];
-      if (!list.includes(fid)) list.push(fid);
+      if (!list.includes(occurrenceId)) list.push(occurrenceId);
       sharedPairs.set(key, list);
     }
   });
@@ -979,12 +1263,21 @@ function computeProfileAOutput(
   for (let i = 0; i < rc.findings.length; i++) {
     const f = rc.findings[i];
     const findingId = f.findingId ?? `finding-${i}`;
+    const occurrence = findingOccurrenceIdentity(rc, i);
+    const occurrenceId = occurrence.occurrenceId;
+    const findingIdAmbiguous = (findingIdCounts.get(findingId) ?? 0) > 1;
+    const supportRef: FindingSupportRef = { findingId, occurrenceId, findingIdAmbiguous };
     const nativeComment = f.nativeComment;
 
     if (f.skipped) {
       skippedCount++;
       findings.push({
         findingId,
+        occurrenceId,
+        occurrenceIndex: i,
+        findingIdAmbiguous,
+        occurrenceProvenanceComplete: occurrence.provenanceComplete,
+        missingOccurrenceProvenance: occurrence.missingProvenance,
         nativeComment,
         normalizedFinding: f.normalizedFinding,
         delivered: false,
@@ -1009,6 +1302,11 @@ function computeProfileAOutput(
       normalizationDroppedCount++;
       findings.push({
         findingId,
+        occurrenceId,
+        occurrenceIndex: i,
+        findingIdAmbiguous,
+        occurrenceProvenanceComplete: occurrence.provenanceComplete,
+        missingOccurrenceProvenance: occurrence.missingProvenance,
         nativeComment,
         normalizedFinding: null,
         delivered: false,
@@ -1039,7 +1337,7 @@ function computeProfileAOutput(
         mappingStatus = "mapped";
         criterionMapping = mappedId;
         mappedCount++;
-        mappedFindings.push({ findingId, criterionId: mappedId });
+        mappedFindings.push({ occurrenceId, findingId, criterionId: mappedId });
       } else {
         mappingStatus = "out-of-scope";
         criterionMapping = mappedId;
@@ -1059,11 +1357,18 @@ function computeProfileAOutput(
       registry,
       support,
       criterionMapping,
-      findingId,
+      supportRef,
       sharedPairs,
     );
+    // A colliding display id is diagnosed above, but support is only ambiguous
+    // when resolution could not actually bind a judgment to this occurrence.
     const supportAmbiguous = resolvedRefs.some((r) => r.supportAmbiguous);
-    if (supportAmbiguous) {
+    if (findingIdAmbiguous) {
+      findingDiagnostics.push(
+        `external finding id ${findingId} is shared by ${findingIdCounts.get(findingId)} occurrences; a decision bound only to that id cannot disambiguate them`,
+      );
+    }
+    if (resolvedRefs.some((r) => r.supportAmbiguous)) {
       findingDiagnostics.push(
         "semantic support is ambiguous: the criterion and reference are shared with another finding and no finding-scoped decision exists",
       );
@@ -1111,6 +1416,11 @@ function computeProfileAOutput(
 
     findings.push({
       findingId,
+      occurrenceId,
+      occurrenceIndex: i,
+      findingIdAmbiguous,
+      occurrenceProvenanceComplete: occurrence.provenanceComplete,
+      missingOccurrenceProvenance: occurrence.missingProvenance,
       nativeComment,
       normalizedFinding: f.normalizedFinding,
       delivered: true,
@@ -1130,22 +1440,26 @@ function computeProfileAOutput(
   }
 
   // Duplicate/conflicting mappings: a criterion may not be claimed by more than
-  // one delivered finding. Keep both visible and flag them.
-  const byCriterion = new Map<string, string[]>();
+  // one delivered finding. Keep every occurrence visible and flag it by
+  // occurrence identity, so colliding external ids cannot mislabel one another.
+  const byCriterion = new Map<string, { occurrenceId: string; findingId: string }[]>();
   for (const m of mappedFindings) {
     const list = byCriterion.get(m.criterionId) ?? [];
-    list.push(m.findingId);
+    list.push({ occurrenceId: m.occurrenceId, findingId: m.findingId });
     byCriterion.set(m.criterionId, list);
   }
   let duplicateMappings = 0;
-  for (const [criterionId, ids] of byCriterion) {
-    if (ids.length > 1) {
-      duplicateMappings += ids.length;
+  for (const [criterionId, members] of byCriterion) {
+    if (members.length > 1) {
+      duplicateMappings += members.length;
+      const occurrences = members.map((m) => m.occurrenceId);
       for (const finding of findings) {
-        if (ids.includes(finding.findingId)) {
+        if (occurrences.includes(finding.occurrenceId)) {
           finding.duplicateMapping = true;
           finding.diagnostics.push(
-            `duplicate/conflicting mapping: criterion ${criterionId} claimed by ${ids.join(", ")}`,
+            `duplicate/conflicting mapping: criterion ${criterionId} claimed by ${members
+              .map((m) => `${m.findingId} (${m.occurrenceId})`)
+              .join(", ")}`,
           );
         }
       }
@@ -1215,9 +1529,30 @@ export function scoreResult(input: ScorerInput): ScorerResult {
   const expectedCriteriaRevision = input.expectedCriteriaRevision ?? rc.criteria.authoredCriteriaRevision;
   const expectedCriteriaContentDigest =
     input.expectedCriteriaContentDigest ?? rc.criteria.criteriaTextDigest;
+  // Run-level gates are evaluated once, from the same definitions Profile A and
+  // the aggregate decision use.
+  const runGates = evaluateRunGates({
+    contractValid,
+    contractErrors,
+    executionState: execState,
+    supersededBy,
+    executionAdmissible: admissible,
+    evidenceApplicability: rc.evidence.applicability,
+    authoredCriteriaRevision: rc.criteria.authoredCriteriaRevision,
+    expectedCriteriaRevision,
+    criteriaTextDigest: rc.criteria.criteriaTextDigest,
+    expectedCriteriaContentDigest,
+    candidateMaterializationId: rc.candidate.repositoryMaterializationId,
+    // Profile B binds evidence per claim against the artifact registry; the
+    // scorer has no separate expected candidate at result scope, so the run-level
+    // gate is explicitly not applicable rather than compared with itself.
+    expectedCandidateBinding: null,
+    runtimeSnapshotDigest: rc.candidate.runtimeSnapshotDigest,
+    expectedSnapshotDigest: null,
+  });
   const claimAdmissions = computeClaimAdmissions({
     rc,
-    contractValid,
+    runGates,
     executionAdmissible: admissible,
     evidenceApplicable: rc.evidence.applicability === "applicable",
     expectedCriteriaRevision,
@@ -1350,6 +1685,8 @@ export function scoreResult(input: ScorerInput): ScorerResult {
 
   const binding: AssessmentBinding = {
     assessmentId: rc.contractId,
+    // The binding describes the ASSESSMENT's bounded identity; the consumer's
+    // independent revision is supplied separately below.
     criteriaRevision: rc.criteria.authoredCriteriaRevision,
     criteriaTextDigest: rc.criteria.criteriaTextDigest,
     candidateSnapshot: rc.candidate.runtimeSnapshotDigest,
@@ -1364,11 +1701,14 @@ export function scoreResult(input: ScorerInput): ScorerResult {
   const admission = consumerAdmit(
     binding,
     {
-      revisionId: rc.criteria.authoredCriteriaRevision,
+      // Same independent revision the per-claim decisions use. Using the
+      // contract's own label here made the aggregate admit a result whose every
+      // claim was rejected for a stale revision.
+      revisionId: expectedCriteriaRevision,
       // The current content digest is the independently captured one when the
       // caller supplies it; comparing the contract's digest to itself would
       // never detect edited criteria under an unchanged revision label.
-      textDigest: input.expectedCriteriaContentDigest ?? rc.criteria.criteriaTextDigest,
+      textDigest: expectedCriteriaContentDigest,
       parentRevision: null,
     },
     rc.candidate.runtimeSnapshotDigest,
@@ -1377,7 +1717,29 @@ export function scoreResult(input: ScorerInput): ScorerResult {
     cancelledOrSuperseded,
     admissible,
   );
-  if (!admission.admitted) diagnostics.push(`consumer admission rejected: ${admission.reason}`);
+  // The aggregate decision must also agree with the per-claim decisions: a
+  // result can never be admitted while one of its required claims failed a
+  // mandatory gate.
+  const claimConsistencyGate = booleanGate({
+    id: "claim-admission",
+    scope: "aggregate",
+    passed: claimAdmissions.every((c) => c.consumerAdmitted),
+    source: "claimAdmissions",
+    passReason: "every claim passed its own mandatory gates",
+    failReason: `at least one claim failed a mandatory gate: ${claimAdmissions
+      .filter((c) => !c.consumerAdmitted)
+      .map((c) => `${c.criterionId} (${c.primaryFailureGate ?? c.reason})`)
+      .join(", ")}`,
+  });
+  const aggregateOutcome = decide([...(admission.gates ?? []), claimConsistencyGate], "admitted");
+  const finalAdmission: AdmissionDecision = {
+    ...admission,
+    admitted: aggregateOutcome.admitted,
+    reason: aggregateOutcome.reason,
+    gates: aggregateOutcome.gates,
+    primaryFailureGate: aggregateOutcome.primaryFailureGate,
+  };
+  if (!finalAdmission.admitted) diagnostics.push(`consumer admission rejected: ${finalAdmission.reason}`);
 
   // --- Polarity preserved ---
   const polarityPreserved = rc.assessments.every(
@@ -1434,7 +1796,8 @@ export function scoreResult(input: ScorerInput): ScorerResult {
     polarityPreserved,
     executionValid: admissible,
     executionState: execState,
-    admission,
+    admission: finalAdmission,
+    runGates,
     claimAdmissions,
     contractValid,
     contractErrors,

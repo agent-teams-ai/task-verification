@@ -10,6 +10,8 @@
 
 import * as crypto from "node:crypto";
 
+import { booleanGate, decide, notApplicableGate, type GateResult } from "./admission-gates.ts";
+
 // --- CT-1: Criteria revision freshness ---
 
 export interface CriteriaRevision {
@@ -156,6 +158,10 @@ export interface AdmissionDecision {
   assessmentAdmitted: boolean;
   referencesValid: boolean;
   referencesSufficient: boolean;
+  /** Structured outcome of every gate this decision evaluated. */
+  gates?: GateResult[];
+  /** Identity of the first failing gate, when rejected. */
+  primaryFailureGate?: string | null;
 }
 
 export function consumerAdmit(
@@ -204,33 +210,117 @@ export function consumerAdmit(
 
   const evidenceApp = evidenceApplicable;
 
-  const admitted =
-    criteriaMatch &&
-    criteriaContentMatch &&
-    snapshotMatch &&
-    lcValid &&
-    assessmentAdmitted &&
-    coverageComplete &&
-    evidenceApp &&
-    admittedIdsValid &&
-    referencesValid &&
-    referencesSufficient;
-
-  let reason = "admitted";
-  if (!criteriaMatch) reason = "criteria revision mismatch";
-  else if (!criteriaContentMatch) reason = "criteria content mismatch (stale criteria)";
-  else if (!snapshotMatch) reason = "snapshot mismatch";
-  else if (!lcValid) reason = "cancelled or superseded";
-  else if (!assessmentAdmitted) reason = "assessment not admitted";
-  else if (!coverageComplete) reason = "incomplete coverage";
-  else if (!evidenceApp) reason = "evidence not applicable";
-  else if (!admittedIdsValid) reason = "invalid admitted IDs";
-  else if (!referencesValid) reason = "invalid reference";
-  else if (!referencesSufficient) reason = "insufficient reference support";
+  // Every mandatory gate is evaluated once and reported structurally. The
+  // admission is derived only by `decide`, so this aggregate path cannot omit a
+  // gate that a per-claim path enforces.
+  const gates: GateResult[] = [
+    booleanGate({
+      id: "criteria-revision",
+      scope: "aggregate",
+      passed: criteriaMatch,
+      source: "AssessmentBinding.criteriaRevision vs current revision",
+      passReason: "criteria revision matches the current revision",
+      failReason: "criteria revision mismatch",
+    }),
+    assessment.criteriaTextDigest === undefined
+      ? notApplicableGate(
+          "criteria-content-digest",
+          "aggregate",
+          "AssessmentBinding.criteriaTextDigest",
+          "no independent criteria content digest was supplied",
+        )
+      : booleanGate({
+          id: "criteria-content-digest",
+          scope: "aggregate",
+          passed: criteriaContentMatch,
+          source: "AssessmentBinding.criteriaTextDigest vs current content",
+          passReason: "criteria content matches",
+          failReason: "criteria content mismatch (stale criteria)",
+        }),
+    booleanGate({
+      id: "snapshot-binding",
+      scope: "aggregate",
+      passed: snapshotMatch,
+      source: "AssessmentBinding.candidateSnapshot",
+      passReason: "candidate snapshot matches",
+      failReason: "snapshot mismatch",
+    }),
+    booleanGate({
+      id: "execution-state",
+      scope: "aggregate",
+      passed: lcValid,
+      source: "attempt lifecycle",
+      passReason: "attempt lifecycle is valid",
+      failReason: "cancelled or superseded",
+    }),
+    booleanGate({
+      id: "assessment-admitted",
+      scope: "aggregate",
+      passed: assessmentAdmitted,
+      source: "AssessmentBinding.admitted",
+      passReason: "the producer admitted the assessment",
+      failReason: "assessment not admitted",
+    }),
+    booleanGate({
+      id: "coverage-completeness",
+      scope: "aggregate",
+      passed: coverageComplete,
+      source: "AssessmentBinding.reportedCriterionIds",
+      passReason: "reported criteria cover the expected inventory exactly",
+      failReason: "incomplete coverage",
+    }),
+    booleanGate({
+      id: "evidence-applicability",
+      scope: "aggregate",
+      passed: evidenceApp,
+      source: "result-contract.evidence.applicability",
+      passReason: "evidence is applicable",
+      failReason: "evidence not applicable",
+    }),
+    booleanGate({
+      id: "admitted-ids",
+      scope: "aggregate",
+      passed: admittedIdsValid,
+      source: "AssessmentBinding.admittedCriterionIds",
+      passReason: "admitted criterion ids are a known subset of the reported ids",
+      failReason: "invalid admitted IDs",
+    }),
+    assessment.referenceValidity === null || assessment.referenceValidity === undefined
+      ? notApplicableGate(
+          "reference-validity",
+          "aggregate",
+          "AssessmentBinding.referenceValidity",
+          "the policy does not require mechanical references for this control",
+        )
+      : booleanGate({
+          id: "reference-validity",
+          scope: "aggregate",
+          passed: referencesValid,
+          source: "AssessmentBinding.referenceValidity",
+          passReason: "references are mechanically valid",
+          failReason: "invalid reference",
+        }),
+    assessment.referenceSufficiency === null || assessment.referenceSufficiency === undefined
+      ? notApplicableGate(
+          "reference-sufficiency",
+          "aggregate",
+          "AssessmentBinding.referenceSufficiency",
+          "the policy does not require semantic reference sufficiency for this control",
+        )
+      : booleanGate({
+          id: "reference-sufficiency",
+          scope: "aggregate",
+          passed: referencesSufficient,
+          source: "AssessmentBinding.referenceSufficiency",
+          passReason: "references are semantically sufficient",
+          failReason: "insufficient reference support",
+        }),
+  ];
+  const outcome = decide(gates);
 
   return {
-    admitted,
-    reason,
+    admitted: outcome.admitted,
+    reason: outcome.reason,
     criteriaMatch,
     criteriaContentMatch,
     snapshotMatch,
@@ -242,5 +332,7 @@ export function consumerAdmit(
     assessmentAdmitted,
     referencesValid,
     referencesSufficient,
+    gates: outcome.gates,
+    primaryFailureGate: outcome.primaryFailureGate,
   };
 }

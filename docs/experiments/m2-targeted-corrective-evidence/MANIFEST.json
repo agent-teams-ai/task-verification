@@ -1,0 +1,45 @@
+{
+  "schema": "m2.targeted-corrective-evidence/v1",
+  "files": [
+    {
+      "path": "README.md",
+      "bytes": 2742,
+      "sha256": "a249b841acd53312b158b8f04b33ab3cb86755be802e620b685453034188f8ef"
+    },
+    {
+      "path": "native-tool-chain-out-of-scope-read.json",
+      "bytes": 2409,
+      "sha256": "08319623f5391edacf2f0b4671f2663374619b67ef9fc19d89f1764661ca563d"
+    },
+    {
+      "path": "native-tool-chain-unchanged-dependency-read.json",
+      "bytes": 1340,
+      "sha256": "fe08b5ae383a6226ecd3dc4c486854d99d4d7ba5a3aa450f59dd8864cd907ddc"
+    },
+    {
+      "path": "native-tool-transcript.jsonl",
+      "bytes": 4266,
+      "sha256": "e097d59836bc84f2e4d9be39536e4180acf27fa677cb33e0c9c6cffbaf49b211"
+    },
+    {
+      "path": "pr349-development-case-sources.json",
+      "bytes": 2116,
+      "sha256": "998bf35b7b08bf73904d5245a3afb5a7ee395c097551cc00101b71e5c5dc5144"
+    },
+    {
+      "path": "pr349-memory-delivery-probe.json",
+      "bytes": 1325,
+      "sha256": "64afa71be1396200a0698b1eb7a1dd238c76f6b8bb86e0eca0441268fa36815c"
+    },
+    {
+      "path": "repro-profile-a-finding-collision.json",
+      "bytes": 2571,
+      "sha256": "c6f854476695dc102404584061512fe4ef174b650d8529f7c2a1d09e92da3f1a"
+    },
+    {
+      "path": "repro-profile-b-conflicting-duplicate.json",
+      "bytes": 9872,
+      "sha256": "073c618f76fb372dfca7cf98032fb22ab1e450aee59067c9f423f04e6f6cd8e3"
+    }
+  ]
+}

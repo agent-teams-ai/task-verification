@@ -1,0 +1,44 @@
+{
+  "schema": "m2.native-tool-chain/v1",
+  "runId": "ocr-0398ef22d1be",
+  "candidateId": "S1-C3",
+  "scenario": "unchanged-dependency-read",
+  "snapshot": {
+    "baseCommit": "36eb1135d275935f2c17d50ee7fffce8250833c3",
+    "headCommit": "1fda97c2cca6cfb976b901b61dde2cc52b17a44f",
+    "headApplicationDigest": "4fb700863d2a942aa6f5a43747b3c0da252a6911b454e87d1c6c7efb37bddbda"
+  },
+  "requests": [
+    {
+      "index": 0,
+      "bodyBytes": 18946,
+      "bodySha256": "0398ef22d1beca691eca17f53a4e5b845fb420fca1801dd8b669b6edbe80ff74",
+      "items": []
+    },
+    {
+      "index": 1,
+      "bodyBytes": 23390,
+      "bodySha256": "fa215b04c1806db0b2cd2da307cc545bc5ab367fa579b3b646f8d0a38aa381e7",
+      "items": []
+    },
+    {
+      "index": 2,
+      "bodyBytes": 25224,
+      "bodySha256": "0a63391246f934438160fc375ae45ad1aad48b7123a6400228f9b90c1e7fbe41",
+      "items": [
+        {
+          "type": "function_call",
+          "callId": "call_c45f54fc-2c0b-43c0-a2fa-3d4882b03200",
+          "name": "file_read",
+          "requestedPath": "audit.ts"
+        },
+        {
+          "type": "function_call_output",
+          "callId": "call_c45f54fc-2c0b-43c0-a2fa-3d4882b03200",
+          "outputBytes": 1493,
+          "outputSha256": "d7ebfffc852e2395b598f58ce1d6875f8be0e8509543365d3d917f3e7228e290"
+        }
+      ]
+    }
+  ]
+}

@@ -710,13 +710,18 @@ test("M2 corrective: one malformed record does not discard the valid records", (
   };
   const decoded = decodeProfileBAssessments(JSON.stringify(reply), CRITERIA);
   assert.equal(decoded.assessments.length, 2, "valid partial records must remain available");
-  assert.equal(decoded.rejectedCount, 1);
+  // The malformed AC-2 record and its valid sibling both claimed AC-2, so the
+  // criterion is now a duplicate whose disagreement cannot be classified.
+  assert.equal(decoded.rejectedCount, 2);
   assert.equal(decoded.recordDiagnostics[0].index, 1);
   assert.ok(decoded.recordDiagnostics[0].errors.some((e) => e.includes("outcome must be")));
   assert.deepEqual(
     decoded.assessments.map((a) => a.expectedCriterionId),
     ["AC-1", "AC-2"],
   );
+  assert.equal(decoded.assessments[0].conflict, undefined, "AC-1 is unaffected");
+  assert.equal(decoded.assessments[1].conflict?.kind, "unclassified-duplicate");
+  assert.deepEqual(decoded.assessments[1].conflict?.indexes, [1, 2]);
   // The raw rejected record is retained for diagnostics.
   assert.equal((decoded.recordDiagnostics[0].raw as { outcome: string }).outcome, "banana");
 });
@@ -773,8 +778,12 @@ test("M2 corrective: duplicate and unknown criterion identifiers are reported, n
   assert.deepEqual(decoded.duplicateIds, ["AC-1"]);
   assert.deepEqual(decoded.unknownIds, ["AC-99"]);
   const ac1 = decoded.assessments.filter((a) => a.expectedCriterionId === "AC-1");
-  assert.equal(ac1.length, 1, "the duplicate must not be merged or overwritten");
-  assert.equal(ac1[0].explanation, "first");
+  assert.equal(ac1.length, 2, "neither occurrence may be merged or overwritten");
+  assert.deepEqual(ac1.map((a) => a.explanation), ["first", "second"]);
+  assert.deepEqual(ac1.map((a) => a.admittedConclusion), ["satisfied", "violated"]);
+  assert.equal(ac1[0].conflict?.kind, "conflicting-duplicate");
+  assert.equal(ac1[0].conflict?.group, ac1[1].conflict?.group, "both occurrences share one conflict group");
+  assert.deepEqual(ac1[0].conflict?.indexes, [0, 1]);
 });
 
 test("M2 corrective: partial JSON yields diagnostics and no invented records", () => {

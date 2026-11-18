@@ -1,0 +1,369 @@
+{
+  "schema": "m2.repro.profile-b-conflicting-duplicate/v1",
+  "note": "Five ordinary expected assessments plus a sixth conflicting AC-3 record. Both AC-3 occurrences must survive into per-claim admission, share one conflict group, and be refused; the other criteria stay individually usable.",
+  "rawReply": {
+    "assessments": [
+      {
+        "criterionId": "AC-1",
+        "outcome": "satisfied",
+        "references": [
+          "artifact://app.ts"
+        ],
+        "explanation": "AC-1 ok"
+      },
+      {
+        "criterionId": "AC-2",
+        "outcome": "violated",
+        "references": [
+          "artifact://app.ts"
+        ],
+        "explanation": "AC-2 missing"
+      },
+      {
+        "criterionId": "AC-4",
+        "outcome": "satisfied",
+        "references": [
+          "artifact://app.ts"
+        ],
+        "explanation": "AC-4 ok"
+      },
+      {
+        "criterionId": "AC-5",
+        "outcome": "satisfied",
+        "references": [
+          "artifact://app.ts"
+        ],
+        "explanation": "AC-5 ok"
+      },
+      {
+        "criterionId": "AC-3",
+        "outcome": "satisfied",
+        "references": [
+          "artifact://app.ts"
+        ],
+        "explanation": "AC-3 satisfied"
+      },
+      {
+        "criterionId": "AC-3",
+        "outcome": "violated",
+        "references": [
+          "artifact://serializer.ts"
+        ],
+        "explanation": "AC-3 violated"
+      }
+    ]
+  },
+  "decoder": {
+    "assessments": [
+      {
+        "criterionId": "AC-1",
+        "originalReportedClaim": "satisfied",
+        "references": [
+          "artifact://app.ts"
+        ],
+        "explanation": "AC-1 ok",
+        "conflict": null
+      },
+      {
+        "criterionId": "AC-2",
+        "originalReportedClaim": "violated",
+        "references": [
+          "artifact://app.ts"
+        ],
+        "explanation": "AC-2 missing",
+        "conflict": null
+      },
+      {
+        "criterionId": "AC-4",
+        "originalReportedClaim": "satisfied",
+        "references": [
+          "artifact://app.ts"
+        ],
+        "explanation": "AC-4 ok",
+        "conflict": null
+      },
+      {
+        "criterionId": "AC-5",
+        "originalReportedClaim": "satisfied",
+        "references": [
+          "artifact://app.ts"
+        ],
+        "explanation": "AC-5 ok",
+        "conflict": null
+      },
+      {
+        "criterionId": "AC-3",
+        "originalReportedClaim": "satisfied",
+        "references": [
+          "artifact://app.ts"
+        ],
+        "explanation": "AC-3 satisfied",
+        "conflict": {
+          "group": "cc-8d0bd175c9a9",
+          "kind": "conflicting-duplicate",
+          "occurrences": 2,
+          "indexes": [
+            4,
+            5
+          ],
+          "reason": "criterion reported 2 times with conflicting conclusion, references or explanation"
+        }
+      },
+      {
+        "criterionId": "AC-3",
+        "originalReportedClaim": "violated",
+        "references": [
+          "artifact://serializer.ts"
+        ],
+        "explanation": "AC-3 violated",
+        "conflict": {
+          "group": "cc-8d0bd175c9a9",
+          "kind": "conflicting-duplicate",
+          "occurrences": 2,
+          "indexes": [
+            4,
+            5
+          ],
+          "reason": "criterion reported 2 times with conflicting conclusion, references or explanation"
+        }
+      }
+    ],
+    "duplicateIds": [
+      "AC-3"
+    ],
+    "conflicts": [
+      {
+        "group": "cc-8d0bd175c9a9",
+        "criterionId": "AC-3",
+        "kind": "conflicting-duplicate",
+        "indexes": [
+          4,
+          5
+        ],
+        "conclusions": [
+          "satisfied",
+          "violated"
+        ],
+        "referenceSets": [
+          [
+            "artifact://app.ts"
+          ],
+          [
+            "artifact://serializer.ts"
+          ]
+        ],
+        "explanations": [
+          "AC-3 satisfied",
+          "AC-3 violated"
+        ]
+      }
+    ],
+    "recordDiagnostics": [
+      {
+        "index": 4,
+        "criterionId": "AC-3",
+        "errors": [
+          "duplicate criterionId (conflicting-duplicate, group cc-8d0bd175c9a9)"
+        ],
+        "conflictGroup": "cc-8d0bd175c9a9",
+        "conflictKind": "conflicting-duplicate"
+      },
+      {
+        "index": 5,
+        "criterionId": "AC-3",
+        "errors": [
+          "duplicate criterionId (conflicting-duplicate, group cc-8d0bd175c9a9)"
+        ],
+        "conflictGroup": "cc-8d0bd175c9a9",
+        "conflictKind": "conflicting-duplicate"
+      }
+    ]
+  },
+  "contractCoverage": {
+    "expectedIds": [
+      "AC-1",
+      "AC-2",
+      "AC-3",
+      "AC-4",
+      "AC-5"
+    ],
+    "presentIds": [
+      "AC-1",
+      "AC-2",
+      "AC-4",
+      "AC-5",
+      "AC-3",
+      "AC-3"
+    ],
+    "individuallyValidIds": [
+      "AC-1",
+      "AC-2",
+      "AC-4",
+      "AC-5"
+    ],
+    "missingIds": [],
+    "duplicateIds": [
+      "AC-3"
+    ],
+    "unknownIds": [],
+    "invalidIds": [],
+    "wholeInventoryAdmitted": false
+  },
+  "claimAdmissions": [
+    {
+      "criterionId": "AC-1",
+      "originalReportedClaim": "satisfied",
+      "consumerAdmitted": true,
+      "claimAssociationValid": true,
+      "conflictStatus": "none",
+      "conflictGroup": null,
+      "primaryFailureGate": null,
+      "reason": "admitted"
+    },
+    {
+      "criterionId": "AC-2",
+      "originalReportedClaim": "violated",
+      "consumerAdmitted": true,
+      "claimAssociationValid": true,
+      "conflictStatus": "none",
+      "conflictGroup": null,
+      "primaryFailureGate": null,
+      "reason": "admitted"
+    },
+    {
+      "criterionId": "AC-4",
+      "originalReportedClaim": "satisfied",
+      "consumerAdmitted": true,
+      "claimAssociationValid": true,
+      "conflictStatus": "none",
+      "conflictGroup": null,
+      "primaryFailureGate": null,
+      "reason": "admitted"
+    },
+    {
+      "criterionId": "AC-5",
+      "originalReportedClaim": "satisfied",
+      "consumerAdmitted": true,
+      "claimAssociationValid": true,
+      "conflictStatus": "none",
+      "conflictGroup": null,
+      "primaryFailureGate": null,
+      "reason": "admitted"
+    },
+    {
+      "criterionId": "AC-3",
+      "originalReportedClaim": "satisfied",
+      "consumerAdmitted": false,
+      "claimAssociationValid": false,
+      "conflictStatus": "conflicting-duplicate",
+      "conflictGroup": "cc-8d0bd175c9a9",
+      "primaryFailureGate": "claim-association",
+      "reason": "invalid claim association (duplicate, unknown or outside the inventory) for AC-3"
+    },
+    {
+      "criterionId": "AC-3",
+      "originalReportedClaim": "violated",
+      "consumerAdmitted": false,
+      "claimAssociationValid": false,
+      "conflictStatus": "conflicting-duplicate",
+      "conflictGroup": "cc-8d0bd175c9a9",
+      "primaryFailureGate": "claim-association",
+      "reason": "invalid claim association (duplicate, unknown or outside the inventory) for AC-3"
+    }
+  ],
+  "aggregate": {
+    "admitted": false,
+    "reason": "incomplete coverage",
+    "primaryFailureGate": "coverage-completeness",
+    "gates": [
+      {
+        "id": "criteria-revision",
+        "scope": "aggregate",
+        "applicable": true,
+        "status": "pass",
+        "source": "AssessmentBinding.criteriaRevision vs current revision",
+        "reason": "criteria revision matches the current revision"
+      },
+      {
+        "id": "criteria-content-digest",
+        "scope": "aggregate",
+        "applicable": true,
+        "status": "pass",
+        "source": "AssessmentBinding.criteriaTextDigest vs current content",
+        "reason": "criteria content matches"
+      },
+      {
+        "id": "snapshot-binding",
+        "scope": "aggregate",
+        "applicable": true,
+        "status": "pass",
+        "source": "AssessmentBinding.candidateSnapshot",
+        "reason": "candidate snapshot matches"
+      },
+      {
+        "id": "execution-state",
+        "scope": "aggregate",
+        "applicable": true,
+        "status": "pass",
+        "source": "attempt lifecycle",
+        "reason": "attempt lifecycle is valid"
+      },
+      {
+        "id": "assessment-admitted",
+        "scope": "aggregate",
+        "applicable": true,
+        "status": "pass",
+        "source": "AssessmentBinding.admitted",
+        "reason": "the producer admitted the assessment"
+      },
+      {
+        "id": "coverage-completeness",
+        "scope": "aggregate",
+        "applicable": true,
+        "status": "fail",
+        "source": "AssessmentBinding.reportedCriterionIds",
+        "reason": "incomplete coverage"
+      },
+      {
+        "id": "evidence-applicability",
+        "scope": "aggregate",
+        "applicable": true,
+        "status": "pass",
+        "source": "result-contract.evidence.applicability",
+        "reason": "evidence is applicable"
+      },
+      {
+        "id": "admitted-ids",
+        "scope": "aggregate",
+        "applicable": true,
+        "status": "pass",
+        "source": "AssessmentBinding.admittedCriterionIds",
+        "reason": "admitted criterion ids are a known subset of the reported ids"
+      },
+      {
+        "id": "reference-validity",
+        "scope": "aggregate",
+        "applicable": true,
+        "status": "pass",
+        "source": "AssessmentBinding.referenceValidity",
+        "reason": "references are mechanically valid"
+      },
+      {
+        "id": "reference-sufficiency",
+        "scope": "aggregate",
+        "applicable": true,
+        "status": "fail",
+        "source": "AssessmentBinding.referenceSufficiency",
+        "reason": "insufficient reference support"
+      },
+      {
+        "id": "claim-admission",
+        "scope": "aggregate",
+        "applicable": true,
+        "status": "fail",
+        "source": "claimAdmissions",
+        "reason": "at least one claim failed a mandatory gate: AC-3 (claim-association), AC-3 (claim-association)"
+      }
+    ]
+  }
+}

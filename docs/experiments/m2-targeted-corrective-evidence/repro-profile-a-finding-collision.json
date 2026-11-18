@@ -1,0 +1,88 @@
+{
+  "schema": "m2.repro.profile-a-finding-collision/v1",
+  "note": "Two raw findings share the external id f-1. The first is AC-1/unsupported/contradicts; the second is AC-3/supported/matches. The join is by occurrence identity, so admission must not expose the second scored record for both.",
+  "contractValid": true,
+  "rawFindings": [
+    {
+      "findingId": "f-1",
+      "nativeComment": "AC-1: the profile route is missing.",
+      "normalizedFinding": "AC-1: the profile route is missing.",
+      "skipped": false,
+      "skipReason": null,
+      "qualityFlags": [],
+      "criterionMapping": "AC-1",
+      "references": [
+        "artifact://app.ts"
+      ]
+    },
+    {
+      "findingId": "f-1",
+      "nativeComment": "AC-3: the profile route is missing.",
+      "normalizedFinding": "AC-3: the profile route is missing.",
+      "skipped": false,
+      "skipReason": null,
+      "qualityFlags": [],
+      "criterionMapping": "AC-3",
+      "references": [
+        "artifact://app.ts"
+      ]
+    }
+  ],
+  "scoredOccurrences": [
+    {
+      "findingId": "f-1",
+      "occurrenceId": "fo-7e2f1a3eea09a98a",
+      "occurrenceIndex": 0,
+      "findingIdAmbiguous": true,
+      "criterionMapping": "AC-1",
+      "semanticSupport": "unsupported",
+      "supportAmbiguous": false,
+      "truthComparison": "contradicts",
+      "duplicateMapping": false
+    },
+    {
+      "findingId": "f-1",
+      "occurrenceId": "fo-28f77978202cfdf1",
+      "occurrenceIndex": 1,
+      "findingIdAmbiguous": true,
+      "criterionMapping": "AC-3",
+      "semanticSupport": "supported",
+      "supportAmbiguous": false,
+      "truthComparison": "matches",
+      "duplicateMapping": false
+    }
+  ],
+  "admission": {
+    "admitted": true,
+    "admittedFindings": 1,
+    "supportedDetections": [
+      "f-1"
+    ],
+    "supportedDetectionOccurrences": [
+      "fo-28f77978202cfdf1"
+    ],
+    "occurrencesOneToOne": true,
+    "findings": [
+      {
+        "findingId": "f-1",
+        "occurrenceId": "fo-7e2f1a3eea09a98a",
+        "criterionId": "AC-1",
+        "semanticSupported": false,
+        "admitted": false,
+        "supportedDetection": false,
+        "primaryFailureGate": "reference-sufficiency",
+        "reason": "reference does not semantically support the finding"
+      },
+      {
+        "findingId": "f-1",
+        "occurrenceId": "fo-28f77978202cfdf1",
+        "criterionId": "AC-3",
+        "semanticSupported": true,
+        "admitted": true,
+        "supportedDetection": true,
+        "primaryFailureGate": null,
+        "reason": "admitted"
+      }
+    ]
+  }
+}

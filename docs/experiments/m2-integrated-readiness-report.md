@@ -99,7 +99,7 @@ real scorer output and the verified registry. The persisted `AdmissionDecision` 
 
 | # | Suite | Command | Platform | Result |
 | --- | --- | --- | --- | --- |
-| 1 | Main regression suite | `node --experimental-strip-types --test --test-concurrency=1 tests/*.ts` | win32/x64, Node 24.13.1 | **299 / 299 pass**, 0 fail, 0 skip |
+| 1 | Main regression suite | `node --experimental-strip-types --test --test-concurrency=1 tests/*.ts` | win32/x64, Node 24.13.1 | **358 / 358 pass**, 0 fail, 0 skip |
 | 2 | rr.7 WP7 suite | `OCR_RR7_DIR=/rr7 node --experimental-transform-types --test tests/rr7/wp7-rr7.test.ts` | Ubuntu 24.04 container, Node 24.13.1 | **16 / 16 pass** |
 | 3 | WP8-A integrated Profile A | `OCR_RR7_DIR=/rr7 … tests/rr7/wp8-profile-a.test.ts` | Ubuntu 24.04 container, Node 24.13.1 | **6 / 6 pass** (C1–C4, 2 identity negatives, native unchanged-dependency read, out-of-scope refusal) |
 | 4 | SDK qualification | `SDK_PROJECT_DIR=<isolated> node scripts/qualify-sdk.mjs` | win32/x64, Node 24.21.0 | **20 / 20 pass** |
@@ -107,9 +107,35 @@ real scorer output and the verified registry. The persisted `AdmissionDecision` 
 
 Historical records preserved: main suite was 242/242, then 259/259; rr.7 suites were 18/18 (16 WP7 +
 2 WP8-A), then 20/20 (16 + 4). The main suite is now 284/284: +17 for the authoritative snapshot,
-registry and admission controls, and +25 from `tests/wp8-corrective.ts` (the M2 corrective pass), and
-the WP8-A suite is 6/6 after two native-scope tests were added. The suites above are counted
+registry and admission controls, and +25 from `tests/wp8-corrective.ts` (the M2 corrective pass), and the WP8-A suite is 6/6 after two native-scope tests were added. The suites above are counted
 independently and are never summed.
+
+### Targeted corrective pass (2026-11-18)
+
+Four counterexamples from the maintainer review at `268d4ba` are fixed. The main suite grew from 299
+to 358 (+21 exact reproductions in `tests/m2-corrective-repro.ts`, +27 gate-matrix cases in
+`tests/m2-gate-matrix.ts`, +11 transcript negative controls in `tests/native-tool-transcript.ts`);
+the rr.7 suites remain 22/22 (16 WP7 + 6 WP8-A). Details:
+
+| Defect | Root cause | Correction | Regression |
+| --- | --- | --- | --- |
+| Profile A finding identity transfer | Admission joined raw findings to scored records through a `findingId`-keyed map (last write wins); the compatibility `referenceRubrics` path also ignored a foreign `findingId` | Findings carry an internal occurrence identity derived from run/attempt/candidate/snapshot/input identity plus native position; the join is one-to-one; decisions bound only to a colliding display id are refused as ambiguous; `referenceRubrics` applies the same identity restriction | `repro A1`–`A7b` |
+| Profile B duplicate lost before admission | The decoder kept a duplicate only in `rawRecords`/diagnostics and dropped it from `assessments`, so coverage recomputed without it and the first claim was admitted | Every occurrence stays in `assessments` with an explicit conflict group and a classified kind (identical / conflicting / unclassified); the identity flows through contract coverage into per-claim and aggregate admission; no occurrence is admitted | `repro B1`–`B6` |
+| Mandatory gates diverged | The aggregate used the contract's own revision label; Profile A omitted schema validity; contradictory evidence had no individual conflict state | One gate policy (`src/admission-gates.ts`) evaluates the same gate ids for per-finding, per-claim and aggregate decisions, with structured pass/fail, source and reason; aggregate admission is additionally gated on every claim being admitted | `repro C1`–`C5`, `gate matrix A/B` (14 gates, positive control, isolated failure, two simultaneous failures) |
+| Transcript overstated observation | `contentReturned`, delivery and the content digest were derived from `scope.snapshot.headFiles[requested]`, so a call without a result still reported delivery | Content, bytes and digests come only from a matched observed tool output; delivery requires call → matching result by call identity → a captured request carrying both; expected snapshot content is reported separately; missing output is `unverified` | `tests/native-tool-transcript.ts` (10 negatives + positive) |
+
+The additional gate clarifications are covered: a stale revision no longer yields an admitted finding or a
+supported detection, and supporting-plus-contradicting evidence now rejects the individual claim with an
+explicit conflict, matching the aggregate.
+
+### PR #349 development case (planning deliverable)
+
+The pre-fix requirement source (`review-router-ai@6797745`), the immutable pre-fix candidate
+(`review-router@056952b5`, adapter blob `5c0ed26…`) and the fix (`f87abf4`) are carded in amendment
+v02. A model-free fake-provider probe against the pinned rr.7 binary shows the pre-fix `content` rule
+key delivers neither the rule text nor the appended memory to the captured provider request, while the
+post-fix `rule` key delivers both. This is development evidence only; no live comparison is
+recommended.
 
 ### Corrective pass (2026-11-17)
 
@@ -151,7 +177,8 @@ Manifests: `docs/experiments/m2-sdk-qualification.manifest.json`,
 | WP8-B Profile B (C1–C4, exact packed SDK, complete provider-bound input) | **COMPLETE** (corrected) |
 | M2 corrective pass (6 defects + 2 clarifications) | **COMPLETE** — see `m2-corrective-pass-report.md` |
 | M2 final audit (per-claim admission, Profile A finding isolation) | **COMPLETE** — see §9 |
-| Experiment amendment v02 (model-free feasibility card) | **PROPOSED** — planning only, supersedes v01 for next-phase feasibility; D1/D2 remain pending |
+| M2 targeted corrective pass (4 maintainer counterexamples) | **COMPLETE** — see §6 and `tests/m2-corrective-repro.ts` |
+| Experiment amendment v02 (one development case card, PR #349) | **PROPOSED** — planning only; case classified `DEVELOPMENT EXAMPLE — NOT HELD-OUT MODEL-QUALITY EVIDENCE`; D1/D2 remain pending |
 | Live model evaluation | **NOT STARTED** (unauthorized) |
 | D1 live inference authorization | **PENDING** |
 | D2 live evaluation budget | **PENDING** |
