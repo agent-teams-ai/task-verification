@@ -19,7 +19,7 @@ import assert from "node:assert/strict";
 import * as crypto from "node:crypto";
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { test } from "node:test";
+import { after, test } from "node:test";
 
 import {
   buildAuthoritativeSnapshot,
@@ -123,6 +123,133 @@ function writeEvidenceManifest(): void {
     "utf8",
   );
 }
+
+// --- Native tool transcript ------------------------------------------------
+// The binary performs its own `file_read` calls; both the call and its result are
+// carried in the provider request bodies. The transcript below is extracted from
+// those captured requests, so it records what the pinned rr.7 binary actually
+// did, not a reconstruction.
+
+const NATIVE_TRANSCRIPT: Record<string, unknown>[] = [];
+const TRANSCRIPT_SCENARIOS: string[] = [];
+
+interface TranscriptScope {
+  candidateId: string;
+  snapshot: AuthoritativeSnapshot;
+  scenario: string;
+  changedPaths: readonly string[];
+  unchangedPaths: readonly string[];
+  /** Paths that must be classified out-of-scope (outside the repository). */
+  outsidePaths: readonly string[];
+}
+
+function classifyPath(requested: string, scope: TranscriptScope): "changed" | "unchanged" | "out-of-scope" {
+  const normalized = requested.split("\\").join("/");
+  if (normalized.startsWith("/") || normalized.split("/").includes("..")) return "out-of-scope";
+  if (!scope.snapshot.files.includes(normalized)) return "out-of-scope";
+  return scope.changedPaths.includes(normalized) ? "changed" : "unchanged";
+}
+
+/** Extract the tool calls and their real results from the captured requests. */
+function nativeToolTranscript(
+  ev: Awaited<ReturnType<typeof runManagedOcr>>,
+  scope: TranscriptScope,
+): Record<string, unknown>[] {
+  const runId = `ocr-${H(ev.requests[0]?.bodyText ?? "").slice(0, 12)}`;
+  const lines: Record<string, unknown>[] = [];
+  const seen = new Set<string>();
+
+  for (const request of ev.requests) {
+    const items: any[] = Array.isArray(request.json?.input) ? request.json.input : [];
+    const outputs = new Map<string, any>();
+    for (const item of items) {
+      if (item?.type === "function_call_output" && typeof item.call_id === "string") {
+        outputs.set(item.call_id, item);
+      }
+    }
+    for (const item of items) {
+      if (item?.type !== "function_call" || typeof item.call_id !== "string") continue;
+      if (seen.has(item.call_id)) continue;
+      seen.add(item.call_id);
+
+      let args: Record<string, unknown> = {};
+      try {
+        args = JSON.parse(String(item.arguments ?? "{}"));
+      } catch {
+        args = {};
+      }
+      const requested = String(args.file_path ?? "");
+      const out = outputs.get(item.call_id);
+      const output = typeof out?.output === "string" ? out.output : "";
+      const denied = /^Error executing tool/.test(output);
+      const classification = classifyPath(requested, scope);
+      const headContent = denied ? null : (scope.snapshot.headFiles[requested] ?? null);
+
+      lines.push({
+        schema: "m2.native-tool-transcript/v1",
+        runId,
+        candidateId: scope.candidateId,
+        scenario: scope.scenario,
+        snapshot: {
+          baseCommit: scope.snapshot.base.commit,
+          headCommit: scope.snapshot.head.commit,
+          headApplicationDigest: scope.snapshot.head.applicationDigest,
+        },
+        requestIndex: request.index,
+        toolName: item.name ?? null,
+        toolCallId: item.call_id,
+        requestedPath: requested,
+        classification,
+        status: denied ? "denied" : "success",
+        executedByBinary: output.length > 0,
+        // A denied call returns no file content and therefore delivers none.
+        contentReturned: headContent !== null,
+        deliveredToProvider: headContent !== null,
+        contentBytes: headContent === null ? 0 : Buffer.byteLength(headContent, "utf8"),
+        contentSha256: headContent === null ? null : H(headContent),
+        deliveredOutputBytes: Buffer.byteLength(output, "utf8"),
+        deliveredOutputSha256: output.length === 0 ? null : H(output),
+        diagnostic: denied ? output.slice(0, 400) : null,
+        denialReason: denied ? "native tool refused to read outside the repository" : null,
+      });
+    }
+  }
+  return lines;
+}
+
+/**
+ * Write the transcript once every test in this file has run. The scope tests add
+ * their lines as they execute; this hook retains the file and manifest entry.
+ */
+function writeNativeToolTranscript(): void {
+  if (NATIVE_TRANSCRIPT.length === 0) return;
+  fs.mkdirSync(EVIDENCE_DIR, { recursive: true });
+  const file = path.join(EVIDENCE_DIR, "native-tool-transcript.jsonl");
+  const body = NATIVE_TRANSCRIPT.map((line) => JSON.stringify(line)).join("\n") + "\n";
+  fs.writeFileSync(file, body, "utf8");
+  const bytes = fs.readFileSync(file);
+  EVIDENCE_MANIFEST.push({
+    profile: "profile-a",
+    candidate: "S1-C3",
+    producer: "tests/rr7/wp8-profile-a.test.ts",
+    runIdentity: String(NATIVE_TRANSCRIPT[0].runId),
+    snapshotDigest: String((NATIVE_TRANSCRIPT[0].snapshot as any).headApplicationDigest),
+    baseTree: String((NATIVE_TRANSCRIPT[0].snapshot as any).baseCommit),
+    headTree: String((NATIVE_TRANSCRIPT[0].snapshot as any).headCommit),
+    criteriaRevision: CAPTURED_CRITERIA.authoredRevision,
+    criteriaContentDigest: CAPTURED_CRITERIA.contentDigest,
+    scope: "native-tool-transcript.jsonl",
+    scenarios: TRANSCRIPT_SCENARIOS,
+    lines: NATIVE_TRANSCRIPT.length,
+    completeness: "complete",
+    path: path.relative(ROOT, file).split(path.sep).join("/"),
+    bytes: bytes.length,
+    sha256: crypto.createHash("sha256").update(bytes).digest("hex"),
+  });
+  writeEvidenceManifest();
+}
+
+after(writeNativeToolTranscript);
 
 const SUPPORTING: RubricDecision = {
   referenceExists: true,
@@ -826,6 +953,27 @@ test("WP8-A: an unchanged dependency is read natively but is not a candidate cha
   assert.deepEqual(normalized.findings, [], "a finding on an unchanged dependency must not survive scoped normalization");
   assert.ok(normalized.diagnostics.skipped.length > 0 || normalized.diagnostics.reasons.length > 0);
   void parsed;
+
+  // Retain the actual native tool transcript for this scenario.
+  const transcript = nativeToolTranscript(ev, {
+    candidateId: "S1-C3",
+    snapshot,
+    scenario: "unchanged-dependency-read",
+    changedPaths: changed,
+    unchangedPaths: unchanged,
+    outsidePaths: [],
+  });
+  const read = transcript.find((line) => line.requestedPath === "audit.ts");
+  assert.ok(read, "the native read of the unchanged dependency must appear in the transcript");
+  assert.equal(read.status, "success");
+  assert.equal(read.classification, "unchanged");
+  assert.equal(read.contentReturned, true);
+  assert.equal(read.contentSha256, H(snapshot.headFiles["audit.ts"]));
+  assert.ok((read.contentBytes as number) > 0);
+  NATIVE_TRANSCRIPT.push(...transcript);
+  if (!TRANSCRIPT_SCENARIOS.includes("unchanged-dependency-read")) {
+    TRANSCRIPT_SCENARIOS.push("unchanged-dependency-read");
+  }
 });
 
 /**
@@ -887,5 +1035,29 @@ test("WP8-A: out-of-scope reads through the native tools are refused", async (t)
   // rather than reported as a successful out-of-scope review.
   if (ev.exit_code !== 0) {
     assert.ok(ev.stderr.length > 0 || ev.native_error !== null, "a failed run must retain diagnostics");
+  }
+
+  // Retain the actual native tool transcript for the denial scenario.
+  const transcript = nativeToolTranscript(ev, {
+    candidateId: "S1-C3",
+    snapshot,
+    scenario: "out-of-scope-read",
+    changedPaths: changedPathsFromDiff(snapshot.diff),
+    unchangedPaths: snapshot.files,
+    outsidePaths: ["../outside-secret.ts", "/etc/passwd"],
+  });
+  const denied = transcript.filter((line) => line.classification === "out-of-scope");
+  assert.equal(denied.length, 2, `expected two out-of-scope attempts, got ${JSON.stringify(transcript)}`);
+  for (const line of denied) {
+    assert.equal(line.status, "denied", `${String(line.requestedPath)} must be denied`);
+    assert.equal(line.contentReturned, false);
+    assert.equal(line.deliveredToProvider, false);
+    assert.equal(line.contentBytes, 0);
+    assert.equal(line.contentSha256, null);
+    assert.ok(String(line.diagnostic).length > 0, "the denial reason must be retained");
+  }
+  NATIVE_TRANSCRIPT.push(...transcript);
+  if (!TRANSCRIPT_SCENARIOS.includes("out-of-scope-read")) {
+    TRANSCRIPT_SCENARIOS.push("out-of-scope-read");
   }
 });
