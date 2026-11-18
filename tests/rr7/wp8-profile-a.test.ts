@@ -200,7 +200,7 @@ function writeNativeToolTranscript(): void {
     criteriaContentDigest: CAPTURED_CRITERIA.contentDigest,
     scope: "native-tool-transcript.jsonl",
     scenarios: TRANSCRIPT_SCENARIOS,
-    lines: NATIVE_TRANSCRIPT.length,
+    // `lines` and the delivery counters come from the one summary calculation.
     ...summarizeTranscript(NATIVE_TRANSCRIPT),
     completeness: "complete",
     path: path.relative(ROOT, file).split(path.sep).join("/"),
