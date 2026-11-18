@@ -224,13 +224,17 @@ function nativeToolTranscript(
 function writeNativeToolTranscript(): void {
   if (NATIVE_TRANSCRIPT.length === 0) return;
   fs.mkdirSync(EVIDENCE_DIR, { recursive: true });
-  const file = path.join(EVIDENCE_DIR, "native-tool-transcript.jsonl");
+  // Retained next to the candidate's other evidence, matching the manifest entry.
+  const transcriptCandidate = String(NATIVE_TRANSCRIPT[0].candidateId);
+  const candidateDir = path.join(EVIDENCE_DIR, transcriptCandidate);
+  fs.mkdirSync(candidateDir, { recursive: true });
+  const file = path.join(candidateDir, "native-tool-transcript.jsonl");
   const body = NATIVE_TRANSCRIPT.map((line) => JSON.stringify(line)).join("\n") + "\n";
   fs.writeFileSync(file, body, "utf8");
   const bytes = fs.readFileSync(file);
   EVIDENCE_MANIFEST.push({
     profile: "profile-a",
-    candidate: "S1-C3",
+    candidate: transcriptCandidate,
     producer: "tests/rr7/wp8-profile-a.test.ts",
     runIdentity: String(NATIVE_TRANSCRIPT[0].runId),
     snapshotDigest: String((NATIVE_TRANSCRIPT[0].snapshot as any).headApplicationDigest),
