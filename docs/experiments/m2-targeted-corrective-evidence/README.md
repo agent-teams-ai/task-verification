@@ -42,10 +42,15 @@ files close that gap:
 
 The committed transcript, chain and payload files are the **exact bytes** produced by hosted CI run
 `44816538987` (push event, head `fb80001cb1422feca839fe4e7939fa9b96ae9269`, `ubuntu-latest`, WP8-A 6/6),
-downloaded from the `wp8a-evidence` artifact and copied here unchanged. All five files therefore belong
-to one run: runIds and per-request digests are internally consistent, and the transcript's digests match
+downloaded from the `wp8a-evidence` artifact and copied here unchanged. All five files therefore belong to one run: runIds and per-request digests are internally consistent, and the transcript's digests match
 the payload digests. Re-running the suite locally or in CI produces new runIds and new digests; the
 authoritative copy for any given head is that head's CI artifact.
+
+Cross-run comparison: the per-run `runId`, the native tool call ids and one temporary directory path
+embedded in the `../outside-secret.ts` denial text differ between runs, so file digests never repeat.
+Everything else is stable — the `audit.ts` payload content is byte-identical across runs, and the
+`/etc/passwd` denial text is identical too. A digest mismatch between the committed copy and a later CI
+artifact is therefore expected and is not evidence of different behaviour.
 
 ## Regeneration
 

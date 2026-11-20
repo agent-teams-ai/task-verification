@@ -3,8 +3,8 @@
   "files": [
     {
       "path": "README.md",
-      "bytes": 6522,
-      "sha256": "0a78b3274a52665f6a29cbc0b2f9aff9bbd4e7e53d2ff4fcf53237a6c8114049"
+      "bytes": 7005,
+      "sha256": "82f89c3181986764d906d37032abfca1eb9c5fa46bd934bcb12aa012a5320a12"
     },
     {
       "path": "native-tool-chain-out-of-scope-read.json",
