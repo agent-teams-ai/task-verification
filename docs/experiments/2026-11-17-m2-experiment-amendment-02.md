@@ -153,6 +153,12 @@ is a **summary of that execution**, not raw request evidence. It is labelled
 rule-key shape, but it does not contain the captured request bodies. No raw request was retained for
 this probe, and none is claimed.
 
+**Probe harness not retained.** The local probe ran from a temporary, uncommitted harness, so no script
+in this repository reproduces it end to end. What is retained is the summary above plus the immutable
+source identities in `pr349-development-case-sources.json`. The reproducible implementation evidence
+for this delivery question is the upstream regression in §4.4, not this probe; the probe is support for
+the root-cause explanation and should not be cited as the verification.
+
 What it does not establish: rr.4 behaviour (the probe uses the pinned rr.7 binary), any model's
 comprehension of the delivered memory, or general product value. The historical review remains a
 development example.

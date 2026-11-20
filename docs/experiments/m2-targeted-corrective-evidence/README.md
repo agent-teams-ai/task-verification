@@ -17,7 +17,7 @@ behind it is not.
 | `native-tool-chain-unchanged-dependency-read.json` | The captured provider request chain behind the verified `audit.ts` read: per-request body digests and the call/result item identities. | the WP8-A suite |
 | `native-tool-chain-out-of-scope-read.json` | The same chain for the denied out-of-scope reads. | the WP8-A suite |
 | `pr349-development-case-sources.json` | PR #349 requirement-source and immutable pre-fix candidate identities (commits, trees, blobs, sha256, changed paths). | the generator script |
-| `pr349-memory-delivery-probe.json` | The deterministic memory-delivery probe summary: pre-fix `content` rule key vs post-fix `rule` key, with the sentinel observed in 0 of 2 and 2 of 2 captured requests respectively. **Labelled `reported-summary-not-raw-request-evidence`** — a summary of a prior execution, not a captured raw request. | the generator script |
+| `pr349-memory-delivery-probe.json` | The deterministic memory-delivery probe summary: pre-fix `content` rule key vs post-fix `rule` key, with the sentinel observed in 0 of 2 and 2 of 2 captured requests respectively. **Labelled `reported-summary-not-raw-request-evidence`** — a summary of a prior execution, not a captured raw request. The probe harness itself was never committed, so no repository script reproduces this run end to end; the implementation evidence is the upstream `f87abf4` regression. | the generator script |
 | `MANIFEST.json` | Per-file byte count and SHA-256 of every file above, verified against the bytes on disk when generated. | the generator script |
 
 ## Native tool payload retention
