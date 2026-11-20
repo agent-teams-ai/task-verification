@@ -244,6 +244,106 @@ function profileACollision() {
   };
 }
 
+// --- Profile A explicit contradiction reproduction -------------------------
+
+/**
+ * The maintainer's paired Profile A case. Identical inputs in both halves; only
+ * the second AC-3 reference's judgment changes:
+ *
+ *   A. reference A supports, reference B is neutral       -> admissible
+ *   B. reference A supports, reference B contradictsClaim -> rejected
+ */
+function profileAContradiction() {
+  const findings = [
+    finding({
+      findingId: "f-control",
+      criterionMapping: "AC-1",
+      nativeComment: "AC-1: the profile route is missing.",
+      normalizedFinding: "AC-1: the profile route is missing.",
+      references: [APP],
+    }),
+    finding({
+      findingId: "f-pair",
+      criterionMapping: "AC-3",
+      references: [APP, SERIALIZER],
+    }),
+  ];
+  const baseRubrics = {
+    [claimSupportKey("AC-1", APP)]: { ...SUPPORTING, criterionId: "AC-1" },
+    [claimSupportKey("AC-3", APP)]: { ...SUPPORTING, criterionId: "AC-3" },
+  };
+
+  const run = (rubrics) => {
+    const rc = contract({ findings });
+    const scorer = scoreResult({
+      resultContract: rc,
+      truthBinding: truthBinding(rc),
+      claimRubrics: rubrics,
+      artifactRegistry: registry(),
+    });
+    const decision = admitProfileAFindings({
+      resultContract: rc,
+      scorer,
+      registry: registry(),
+      allowedPaths: files().map((f) => f.path),
+      expectedCandidateBinding: CANDIDATE,
+      expectedSnapshotDigest: SNAPSHOT,
+      expectedCriteriaRevision: rc.criteria.authoredCriteriaRevision,
+      expectedCriteriaContentDigest: rc.criteria.criteriaTextDigest,
+      expectedCriterionIds: [...CRITERIA],
+    });
+    return {
+      scoredFindings: scorer.profileA.findings.map((f) => ({
+        findingId: f.findingId,
+        occurrenceId: f.occurrenceId,
+        criterionMapping: f.criterionMapping,
+        references: findings[f.occurrenceIndex].references,
+        semanticSupport: f.semanticSupport,
+        evidenceConflict: f.evidenceConflict,
+        contradictoryReferences: f.contradictoryReferences,
+        supportAmbiguous: f.supportAmbiguous,
+        truthComparison: f.truthComparison,
+        diagnostics: f.diagnostics,
+      })),
+      summary: scorer.profileA.summary,
+      admission: {
+        reviewAdmitted: decision.admitted,
+        deliveredFindings: decision.deliveredFindings,
+        admittedFindings: decision.admittedFindings,
+        rejectedFindings: decision.rejectedFindings,
+        supportedDetections: decision.supportedDetections,
+        supportedDetectionOccurrences: decision.supportedDetectionOccurrences,
+        findings: decision.findings.map((f) => ({
+          findingId: f.findingId,
+          occurrenceId: f.occurrenceId,
+          criterionId: f.criterionId,
+          references: f.references,
+          semanticSupported: f.semanticSupported,
+          evidenceConflict: f.evidenceConflict,
+          contradictoryReferences: f.contradictoryReferences,
+          admitted: f.admitted,
+          supportedDetection: f.supportedDetection,
+          primaryFailureGate: f.primaryFailureGate,
+          reason: f.reason,
+          gates: f.gates.filter((g) => g.scope === "claim" && g.status !== "not-applicable"),
+        })),
+      },
+    };
+  };
+
+  return {
+    schema: "m2.repro.profile-a-explicit-contradiction/v1",
+    note:
+      "Paired case with identical inputs. Case A: reference A supports AC-3 and reference B is neutral, so the finding stays admissible. Case B: the same reference B carries contradictsClaim=true, so the finding is rejected with an evidence-conflict gate and is not a supported detection. Original findings, references and diagnostics are preserved in both cases, and an unrelated AC-1 finding is unaffected.",
+    inputs: { findings, criteria: [...CRITERIA], candidate: CANDIDATE, snapshot: SNAPSHOT },
+    caseA_supportingPlusNeutral: run(baseRubrics),
+    caseB_supportingPlusContradiction: run({
+      ...baseRubrics,
+      [claimSupportKey("AC-3", SERIALIZER)]: { ...SUPPORTING, criterionId: "AC-3", contradictsClaim: true },
+    }),
+  };
+}
+
 // --- Profile B conflicting duplicate reproduction --------------------------
 
 function profileBDuplicate() {
@@ -329,7 +429,7 @@ function profileBDuplicate() {
 
 const PR349 = {
   schema: "m2.pr349-development-case-sources/v1",
-  classification: "DEVELOPMENT EXAMPLE — NOT HELD-OUT MODEL-QUALITY EVIDENCE",
+  classification: "DEVELOPMENT EXAMPLE — NOT INDEPENDENT MODEL-QUALITY EVIDENCE",
   requirementSource: {
     repository: "777genius/review-router-ai",
     commit: "6797745dd568149e6314cd44b24cb901de1819e2",
@@ -381,6 +481,7 @@ function writeJson(name, value) {
 fs.mkdirSync(OUT, { recursive: true });
 
 writeJson("repro-profile-a-finding-collision.json", profileACollision());
+writeJson("repro-profile-a-explicit-contradiction.json", profileAContradiction());
 writeJson("repro-profile-b-conflicting-duplicate.json", profileBDuplicate());
 writeJson("pr349-development-case-sources.json", PR349);
 
@@ -397,6 +498,10 @@ if (fs.existsSync(transcript)) {
 for (const scenario of ["unchanged-dependency-read", "out-of-scope-read"]) {
   const chain = path.join(wp8aDir, "S1-C3", `native-tool-chain-${scenario}.json`);
   if (fs.existsSync(chain)) fs.copyFileSync(chain, path.join(OUT, `native-tool-chain-${scenario}.json`));
+  // The actual call arguments and tool-output payloads, when the run that
+  // produced the transcript also retained them.
+  const payloads = path.join(wp8aDir, "S1-C3", `native-tool-payloads-${scenario}.json`);
+  if (fs.existsSync(payloads)) fs.copyFileSync(payloads, path.join(OUT, `native-tool-payloads-${scenario}.json`));
 }
 
 // Per-file manifest over everything in the bundle except the manifest itself.
@@ -413,4 +518,18 @@ fs.writeFileSync(
   JSON.stringify({ schema: "m2.targeted-corrective-evidence/v1", files: entries }, null, 2) + "\n",
   "utf8",
 );
-console.log(`retained ${entries.length} evidence files in ${path.relative(ROOT, OUT)}`);
+
+// Verify EVERY entry against the bytes on disk, not only the one just written.
+// A stale digest left by an earlier run (the README drift) fails here.
+const manifest = JSON.parse(fs.readFileSync(path.join(OUT, "MANIFEST.json"), "utf8"));
+const mismatches = [];
+for (const entry of manifest.files) {
+  const bytes = fs.readFileSync(path.join(OUT, entry.path));
+  if (bytes.length !== entry.bytes || H(bytes) !== entry.sha256) {
+    mismatches.push(`${entry.path}: manifest ${entry.bytes}B/${entry.sha256.slice(0, 12)} != disk ${bytes.length}B/${H(bytes).slice(0, 12)}`);
+  }
+}
+if (mismatches.length > 0) {
+  throw new Error(`evidence manifest mismatch:\n${mismatches.join("\n")}`);
+}
+console.log(`retained ${entries.length} evidence files in ${path.relative(ROOT, OUT)}; verified ${entries.length}/${entries.length}`);

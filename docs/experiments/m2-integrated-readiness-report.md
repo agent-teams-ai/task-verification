@@ -1,8 +1,21 @@
 # M2 Integrated Readiness Report (WP0–WP8)
 
-Scope: **model-free**. No live model, inference API, external OCR provider or Gateway call was made.
-No credential was used, nothing was spent, published or deployed. Live model evaluation remains
-unauthorized (D1/D2).
+## 0. Execution boundary (read this before any status claim)
+
+**Real rr.7 OCR binary with a fake model provider.** That is the accurate one-line description of the
+Profile A qualification, and the individual statements below are deliberately narrower than a blanket
+"no live OCR call was made".
+
+| # | What executed | Against what | What it establishes |
+| --- | --- | --- | --- |
+| 1 | The real pinned `ocr-v1.13.1-rr.7` binary, four times (C1–C4) and twice more for the native-scope negatives | A loopback fake model provider serving fixed injected protocol replies, `--network none` | The adapter, parser, normalizer, artifact registry, scorer and admission path run on the real binary's real output |
+| 2 | The real packed `@agent-teams/account-gateway@0.1.0` through `createLlmClient()` | A loopback fake Responses provider | Request assembly, captured-request integrity, claim accounting and consumer admission |
+| 3 | — | — | **No live LLM quality evaluation.** Fixed replies cannot measure reasoning, latency or cost |
+| 4 | — | — | **No complete production Gateway/provider route evaluation.** Recovery, rate limits, billing and capacity are untested |
+| 5 | — | — | **No production deployment, publication or spending.** No credential was loaded |
+
+So: the OCR binary is real and did run; the model behind its provider interface was not. Live model
+evaluation remains unauthorized (D1/D2).
 
 ## 1. Implementation identities
 
@@ -49,7 +62,8 @@ Profile A ResultContract (`assessments: []`, `satisfaction: not-applicable`) →
 (not a packet id) → byte-verified ArtifactRegistry → Profile A scoring → ledger lifecycle → Profile A
 admission → persisted readiness artifact → readback with digest and identity verification.
 
-**Fixed injected protocol responses.** The provider replies are fixed injected content used to
+**Real binary, fake model.** The pinned rr.7 binary actually executed for every candidate; only the
+model behind its provider interface was a loopback fake serving fixed injected content. Those replies
 qualify the adapter, parser, normalizer, registry and admission path. They do not measure reviewer
 reasoning or model quality. Each persisted artifact records
 `providerMode: "fixed-injected-protocol-response"` and `modelQualityMeasured: false`.
@@ -95,11 +109,45 @@ For Profile A no criterion verdict is fabricated: `admittedCriterionIds` is alwa
 is represented as (a) review-execution admission and (b) per-finding admission, both derived from the
 real scorer output and the verified registry. The persisted `AdmissionDecision` reads back unchanged.
 
+Explicit contradiction is handled as its own finding gate. A supporting reference plus an explicitly
+contradicting one (`contradictsClaim: true`) is a conflict, not support: the finding records
+`evidenceConflict`, names the contradicting references, fails the `evidence-conflict` gate, is absent
+from `supportedDetections`, and keeps its original finding, every reference and every diagnostic. A
+supporting reference plus a neutral one remains admissible. A reference that merely fails to support,
+or does not resolve, never triggers this rule.
+
+### 5.1 Evaluator-only semantic-support judgments
+
+The scorer receives fixed semantic-support judgments (`claimRubrics`: `supportsBehavior`,
+`coversSubclauses`, `relevantCurrentApplicable`, `contradictsClaim`) supplied by the qualification
+harness. These are **evaluator-only semantic-support judgments**. They are grading inputs to
+deterministic tests, not something the product produces at review time.
+
+The following must stay separate, and are never added together:
+
+| Source | What it is | Counts as product protection? |
+| --- | --- | --- |
+| Offline evaluator grading (Truth-v1, fixed rubrics) | Our answers, joined after the fact | **No** |
+| Fixed injected semantic-support judgments | Declared inputs to scorer tests | **No** |
+| Deterministic checks available to the consumer | Artifact resolution, digest and binding verification, applicability, coverage, duplicate/conflict classification, request-boundary assertions | **Yes** — they exist at review time |
+| Future human semantic review | A named person reading the evidence at review time | Yes, if and when it exists |
+| Proposed runtime model judgment | Not built, not measured | **No** |
+
+Consequences, which the report specimen and the pilot proposal both respect:
+
+- The current product **cannot** decide automatically whether arbitrary evidence supports a claim.
+  Only the deterministic checks above are product safeguards.
+- Advisory wording is **"available checks have not established support"**. An artifact is not said to
+  fail to support a claim merely because offline Truth later rejects the claim; that would present an
+  evaluator answer as a review-time observation.
+- Original claims and their unsupported/unknown states stay visible. A missing support judgment is
+  reported as unknown/unsupported, never silently as a negative finding.
+
 ## 6. Test totals (separate suites, not summed)
 
 | # | Suite | Command | Platform | Result |
 | --- | --- | --- | --- | --- |
-| 1 | Main regression suite | `node --experimental-strip-types --test --test-concurrency=1 tests/*.ts` | win32/x64, Node 24.13.1 | **359 / 359 pass**, 0 fail, 0 skip |
+| 1 | Main regression suite | `node --experimental-strip-types --test --test-concurrency=1 tests/*.ts` | win32/x64, Node 24.13.1 | **363 / 363 pass**, 0 fail, 0 skip |
 | 2 | rr.7 WP7 suite | `OCR_RR7_DIR=/rr7 node --experimental-transform-types --test tests/rr7/wp7-rr7.test.ts` | Ubuntu 24.04 container, Node 24.13.1 | **16 / 16 pass** |
 | 3 | WP8-A integrated Profile A | `OCR_RR7_DIR=/rr7 … tests/rr7/wp8-profile-a.test.ts` | Ubuntu 24.04 container, Node 24.13.1 | **6 / 6 pass** (C1–C4, 2 identity negatives, native unchanged-dependency read, out-of-scope refusal) |
 | 4 | SDK qualification | `SDK_PROJECT_DIR=<isolated> node scripts/qualify-sdk.mjs` | win32/x64, Node 24.21.0 | **20 / 20 pass** |
@@ -113,8 +161,8 @@ independently and are never summed.
 ### Targeted corrective pass (2026-11-18)
 
 Four counterexamples from the maintainer review at `268d4ba` are fixed. The main suite grew from 299
-to 359 (+22 exact reproductions in `tests/m2-corrective-repro.ts`, +27 gate-matrix cases in
-`tests/m2-gate-matrix.ts`, +11 transcript negative controls in `tests/native-tool-transcript.ts`);
+to 363 (+23 exact reproductions in `tests/m2-corrective-repro.ts`, +27 gate-matrix cases in
+`tests/m2-gate-matrix.ts`, +14 native-transcript assertions in `tests/native-tool-transcript.ts`);
 the rr.7 suites remain 22/22 (16 WP7 + 6 WP8-A). Details:
 
 | Defect | Root cause | Correction | Regression |
@@ -126,7 +174,11 @@ the rr.7 suites remain 22/22 (16 WP7 + 6 WP8-A). Details:
 
 The additional gate clarifications are covered: a stale revision no longer yields an admitted finding or a
 supported detection, and supporting-plus-contradicting evidence now rejects the individual claim with an
-explicit conflict, matching the aggregate.
+explicit conflict, matching the aggregate. The same rule is enforced for a Profile A finding
+(`repro C6`): a supporting reference plus an explicitly contradicting one fails `evidence-conflict`,
+records `semanticSupport: unsupported` with the contradicting reference named, and yields no supported
+detection, while the identical input with a neutral second reference stays admissible and leaves an
+unrelated finding's decision untouched.
 
 **Exact Profile B reproduction (maintainer input).** `repro B1x` uses the six records the maintainer
 actually supplied: five ordinary expected assessments, one for each of AC-1…AC-5, then a sixth AC-3
@@ -204,7 +256,9 @@ Manifests: `docs/experiments/m2-sdk-qualification.manifest.json`,
 | M2 corrective pass (6 defects + 2 clarifications) | **COMPLETE** — see `m2-corrective-pass-report.md` |
 | M2 final audit (per-claim admission, Profile A finding isolation) | **COMPLETE** — see §9 |
 | M2 targeted corrective pass (4 maintainer counterexamples) | **COMPLETE** — see §6 and `tests/m2-corrective-repro.ts` |
-| Experiment amendment v02 (one development case card, PR #349) | **PROPOSED** — planning only; case classified `DEVELOPMENT EXAMPLE — NOT HELD-OUT MODEL-QUALITY EVIDENCE`; D1/D2 remain pending |
+| Profile A explicit contradiction (supporting + contradicting reference) | **COMPLETE** — `evidence-conflict` finding gate, `repro C6` |
+| Native tool output payload retention | **ADDED** — exact call arguments and tool-output text retained per call identity, separate from expected-snapshot digests |
+| Experiment amendment v02 (one development case card, PR #349) | **PROPOSED** — planning only; case classified `DEVELOPMENT EXAMPLE — NOT INDEPENDENT MODEL-QUALITY EVIDENCE`; D1/D2 remain pending |
 | Live model evaluation | **NOT STARTED** (unauthorized) |
 | D1 live inference authorization | **PENDING** |
 | D2 live evaluation budget | **PENDING** |
@@ -272,15 +326,21 @@ admission is false. Truth outcomes were not changed.
 
 ## 10. Known limitations
 
-- Fake providers and fixed injected replies only; no model-quality claim is made.
+- The OCR binary is real; the model provider is a loopback fake. No model-quality claim is made, and
+  a fake-provider run is never evidence about a real model's behaviour.
 - Production Gateway recovery, provider rate limits, billing behaviour and capacity are not tested.
 - The rr.7 binary is Linux/amd64 only; its suites run on Ubuntu 24.04. Windows exercises the shared
   substrate, registry and admission logic, not the OCR binary.
 - The `--network none` container plus an allowlisted child environment is the recorded network
   boundary; the binary's own egress is traced, but this is not an OS-level sandbox claim.
 
-## 11. Zero live calls
+## 11. Execution boundary, stated precisely
 
-- No live model/API/OCR/Gateway call.
-- No credential loaded; the qualification refuses to run if a provider credential is present.
-- No package publication, no deployment, no spending.
+No **live** call was made to any model, inference API, hosted OCR service or production Gateway, and
+no credential was loaded (the qualification refuses to run when a provider credential is present). No
+package publication, deployment or spending occurred.
+
+That is not the same as "nothing ran". What did run, locally: the real pinned rr.7 OCR binary, the real
+packed SDK, and a loopback fake model provider serving fixed injected replies. So the honest summary
+is **real rr.7 OCR binary with a fake model provider**, plus **real packed SDK with a fake local
+provider** — not a production-service or external-LLM evaluation of any kind.

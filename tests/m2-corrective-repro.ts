@@ -917,3 +917,119 @@ test("repro C5: an admitted aggregate always implies every claim passed its own 
     "the aggregate fails the coverage gate, and says so",
   );
 });
+
+test("repro C6 (maintainer): supporting plus neutral stays admissible; supporting plus an explicit contradiction does not", () => {
+  // Both halves use the same finding ids, candidate, snapshot and references.
+  // Only the SECOND AC-3 reference's judgment changes between them, and one
+  // unrelated AC-1 finding is present throughout as a control.
+  const findings: FindingRecord[] = [
+    finding({
+      findingId: "f-control",
+      criterionMapping: "AC-1",
+      nativeComment: "AC-1: the profile route is missing.",
+      normalizedFinding: "AC-1: the profile route is missing.",
+      references: [APP],
+    }),
+    finding({
+      findingId: "f-pair",
+      criterionMapping: "AC-3",
+      references: [APP, SERIALIZER],
+    }),
+  ];
+  const baseRubrics: Record<string, RubricDecision> = {
+    [claimSupportKey("AC-1", APP)]: { ...SUPPORTING, criterionId: "AC-1" },
+    [claimSupportKey("AC-3", APP)]: { ...SUPPORTING, criterionId: "AC-3" },
+  };
+
+  // --- Case A: reference A supports, reference B is neutral ---------------
+  const neutral = scoreA({ findings, rubrics: baseRubrics });
+  const neutralFinding = neutral.scorer.profileA.findings[1];
+  assert.equal(neutralFinding.criterionMapping, "AC-3");
+  assert.equal(neutralFinding.semanticSupport, "supported", "a neutral second reference does not disturb support");
+  assert.equal(neutralFinding.evidenceConflict, false);
+  assert.deepEqual(neutralFinding.contradictoryReferences, []);
+  assert.equal(neutralFinding.supportAmbiguous, false);
+
+  const neutralDecision = neutral.decision.findings[1];
+  assert.equal(neutralDecision.admitted, true, "supporting plus neutral remains admissible");
+  assert.equal(neutralDecision.primaryFailureGate, null);
+  assert.equal(neutralDecision.semanticSupported, true);
+  assert.equal(neutralDecision.supportedDetection, true);
+  assert.deepEqual(neutralDecision.references, [APP, SERIALIZER], "both references are preserved");
+  assert.equal(
+    neutralDecision.gates.find((g) => g.id === "evidence-conflict")?.status,
+    "pass",
+    "the conflict gate passes when no reference contradicts the claim",
+  );
+  assert.deepEqual(neutral.decision.supportedDetections, ["f-pair"]);
+  assert.equal(neutral.decision.admittedFindings, 2);
+
+  // --- Case B: reference A supports, reference B explicitly contradicts ---
+  const conflicting = scoreA({
+    findings,
+    rubrics: {
+      ...baseRubrics,
+      [claimSupportKey("AC-3", SERIALIZER)]: {
+        ...SUPPORTING,
+        criterionId: "AC-3",
+        contradictsClaim: true,
+      },
+    },
+  });
+  const conflictFinding = conflicting.scorer.profileA.findings[1];
+  assert.equal(conflictFinding.criterionMapping, "AC-3");
+  assert.equal(conflictFinding.semanticSupport, "unsupported", "a positive reference never overrides a contradiction");
+  assert.notEqual(conflictFinding.semanticSupport, "neutral", "an explicit contradiction is not neutralised");
+  assert.equal(conflictFinding.supportAmbiguous, false);
+  assert.equal(conflictFinding.evidenceConflict, true);
+  assert.deepEqual(conflictFinding.contradictoryReferences, [SERIALIZER], "the contradicting reference is named");
+  assert.ok(
+    conflictFinding.diagnostics.some((d) => d.includes("explicit contradiction")),
+    "the conflict is diagnosed on the original finding",
+  );
+  // The original finding and every reference survive the rejection.
+  assert.equal(conflictFinding.findingId, "f-pair");
+  assert.equal(conflictFinding.nativeComment, "AC-3: the profile route is missing.");
+  assert.deepEqual(conflictFinding.normalizedFinding, "AC-3: the profile route is missing.");
+
+  const conflictDecision = conflicting.decision.findings[1];
+  assert.equal(conflictDecision.findingId, "f-pair");
+  assert.deepEqual(conflictDecision.references, [APP, SERIALIZER], "the contradictory reference is not discarded");
+  assert.equal(conflictDecision.evidenceConflict, true);
+  assert.deepEqual(conflictDecision.contradictoryReferences, [SERIALIZER]);
+  assert.equal(conflictDecision.semanticSupported, false);
+  assert.equal(conflictDecision.admitted, false, "the contradictory finding is not admitted as supported");
+  assert.equal(conflictDecision.supportedDetection, false, "it is not a supported detection");
+  assert.equal(conflictDecision.primaryFailureGate, "evidence-conflict");
+  const conflictGate = conflictDecision.gates.find((g) => g.id === "evidence-conflict");
+  assert.equal(conflictGate?.status, "fail");
+  assert.ok(String(conflictGate?.reason).includes(SERIALIZER), "the gate names the contradicting reference");
+  assert.match(conflictDecision.reason, /contradictory evidence/);
+  assert.deepEqual(
+    conflicting.decision.supportedDetections,
+    [],
+    "the contradictory finding is excluded from supported detections",
+  );
+  assert.equal(conflicting.decision.supportedDetectionOccurrences.length, 0);
+  // Finding-level accounting keeps both findings: one rejected, one admitted.
+  assert.equal(conflicting.decision.findings.length, 2);
+  assert.equal(conflicting.decision.deliveredFindings, 2);
+  assert.equal(conflicting.decision.admittedFindings, 1);
+  assert.equal(conflicting.decision.rejectedFindings, 1);
+
+  // --- The unrelated finding is unaffected in both cases ------------------
+  for (const [label, run] of [
+    ["neutral", neutral],
+    ["conflicting", conflicting],
+  ] as const) {
+    const control = run.decision.findings[0];
+    assert.equal(control.findingId, "f-control", label);
+    assert.equal(control.criterionId, "AC-1", label);
+    assert.equal(control.evidenceConflict, false, label);
+    assert.equal(control.admitted, true, `${label}: an unrelated finding keeps its decision`);
+  }
+  assert.equal(neutral.decision.findings[0].reason, conflicting.decision.findings[0].reason);
+  // Review-execution admission is a separate decision from finding admission:
+  // one rejected finding does not invalidate the review, per existing policy.
+  assert.equal(conflicting.decision.admitted, neutral.decision.admitted);
+});

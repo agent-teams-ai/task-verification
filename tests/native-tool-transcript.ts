@@ -25,6 +25,7 @@ import * as crypto from "node:crypto";
 import { test } from "node:test";
 
 import {
+  nativeToolPayloads,
   nativeToolTranscript,
   parseFileReadOutput,
   type CapturedProviderRequest,
@@ -261,4 +262,66 @@ test("native transcript: structured file-read parsing rejects non-file payloads"
   assert.equal(parsed.truncated, false);
   assert.deepEqual(parsed.lineRange, [1, 1]);
   assert.equal(parsed.content, APP_CONTENT);
+});
+
+// ===========================================================================
+// Retained payloads: the actual output bytes, not only their digest
+// ===========================================================================
+
+test("native payloads: the observed tool output is retained byte for byte", () => {
+  const payloads = nativeToolPayloads(validRequests("call_1", "app.ts", APP_CONTENT), scope());
+  assert.equal(payloads.schema, "m2.native-tool-payloads/v1");
+  assert.equal(payloads.source, "captured-fake-provider-request-items");
+  assert.equal(payloads.payloadCount, 1);
+  assert.equal(payloads.resolvedPayloads, 1);
+  const payload = payloads.payloads[0];
+  assert.equal(payload.toolCallId, "call_1");
+  assert.ok(payload.result);
+  // The exact captured output, not a reconstruction from the expected file.
+  assert.equal(payload.result.outputText, fileReadOutput("app.ts", APP_CONTENT));
+  assert.equal(payload.result.outputSha256, H(payload.result.outputText));
+  assert.equal(payload.result.status, "success");
+  // The parsed file-read payload is the delivered content.
+  assert.ok(payload.parsedFileRead);
+  assert.equal(payload.parsedFileRead.contentText, APP_CONTENT);
+  assert.equal(payload.parsedFileRead.contentSha256, H(APP_CONTENT));
+  // Call and result identity resolve to the request that carries both.
+  assert.equal(payload.call.argumentsText, JSON.stringify({ file_path: "app.ts" }));
+  assert.ok(payload.carryingRequest);
+  assert.equal(payload.carryingRequest.index, 1);
+  assert.equal(payload.unresolvedReason, null);
+});
+
+test("native payloads: the expected snapshot digest is reported separately from the observed output", () => {
+  // Same expected snapshot, different observed bytes: the two must not be
+  // collapsed into one digest, and the retained text stays the observed text.
+  const observed = APP_CONTENT.replace("id: 1", "id: 99");
+  const payloads = nativeToolPayloads(validRequests("call_1", "app.ts", observed), scope());
+  const payload = payloads.payloads[0];
+  assert.equal(payload.parsedFileRead?.contentSha256, H(observed));
+  assert.equal(payload.expectedSnapshotContentSha256, H(APP_CONTENT));
+  assert.notEqual(payload.parsedFileRead?.contentSha256, payload.expectedSnapshotContentSha256);
+  assert.equal(payload.result?.outputText, fileReadOutput("app.ts", observed));
+  assert.equal(payloads.expectedSnapshotContentIsSeparate, true);
+});
+
+test("native payloads: a call with no observed result is unresolved, never filled from the snapshot", () => {
+  // A call whose result is missing, and a result with a different call identity.
+  const requests = [
+    request(1, [
+      { role: "user", content: "review" },
+      call("call_1", "app.ts"),
+      call("call_2", "audit.ts"),
+      output("call_other", fileReadOutput("audit.ts", OTHER_CONTENT)),
+    ]),
+  ];
+  const payloads = nativeToolPayloads(requests, scope());
+  assert.equal(payloads.payloadCount, 2);
+  assert.equal(payloads.resolvedPayloads, 0);
+  for (const payload of payloads.payloads) {
+    assert.equal(payload.result, null, `${payload.requestedPath} must not borrow another call's output`);
+    assert.equal(payload.parsedFileRead, null);
+    assert.equal(payload.carryingRequest, null);
+    assert.match(String(payload.unresolvedReason), /no function_call_output with this call identity/);
+  }
 });

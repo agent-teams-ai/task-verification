@@ -711,6 +711,14 @@ export interface ProfileAFindingOutput {
    * support cannot be attributed to this finding individually.
    */
   supportAmbiguous: boolean;
+  /**
+   * A cited reference explicitly contradicts this claim while another cited
+   * reference supports it. The finding is not supported and is never admitted;
+   * the references, their judgments and the diagnostics stay intact.
+   */
+  evidenceConflict: boolean;
+  /** References whose explicit judgment is `contradictsClaim` for this claim. */
+  contradictoryReferences: string[];
   truthComparison: "matches" | "contradicts" | "neutral" | "n/a";
   qualityFlags: string[];
   diagnostics: string[];
@@ -735,6 +743,8 @@ export interface ProfileAOutput {
     duplicateMappings: number;
     /** Findings whose shared (criterion, reference) pair has no finding-scoped support decision. */
     ambiguousSupport: number;
+    /** Findings carrying both a supporting and an explicitly contradicting reference. */
+    evidenceConflicts: number;
     overallStatus: "complete" | "partial" | "inconclusive";
   };
 }
@@ -887,6 +897,8 @@ function resolveReference(
 
 interface ResolvedFindingReference extends ResolvedReference {
   supportsBehavior: boolean;
+  /** An explicit judgment attached to this citation contradicts the claim. */
+  contradictsClaim: boolean;
   /** Why this claim is or is not supported by this reference. */
   supportReason: string;
   /** The support judgment is ambiguous because the pair is shared by findings. */
@@ -909,9 +921,15 @@ function resolveFindingReferences(
     const lookup = lookupClaimSupport(support, criterionId, ref, finding, shared);
     const supportsBehavior =
       resolved.mechanicallyValid && lookup.decision !== null && isReferenceSupporting(lookup.decision);
+    // Contradiction is a separate, explicit judgment: a decision that merely
+    // fails to support is not a contradiction, and an unresolvable reference is
+    // never treated as one.
+    const contradictsClaim =
+      resolved.mechanicallyValid && lookup.decision !== null && lookup.decision.contradictsClaim;
     out.push({
       ...resolved,
       supportsBehavior,
+      contradictsClaim,
       supportReason: lookup.reason,
       supportAmbiguous: lookup.ambiguous === true,
     });
@@ -1290,6 +1308,8 @@ function computeProfileAOutput(
         referenceValidity: "unknown",
         semanticSupport: "neutral",
         supportAmbiguous: false,
+        evidenceConflict: false,
+        contradictoryReferences: [],
         truthComparison: "n/a",
         qualityFlags: f.qualityFlags,
         diagnostics: [f.skipReason ? `skipped: ${f.skipReason}` : "skipped"],
@@ -1319,6 +1339,8 @@ function computeProfileAOutput(
         referenceValidity: "unknown",
         semanticSupport: "neutral",
         supportAmbiguous: false,
+        evidenceConflict: false,
+        contradictoryReferences: [],
         truthComparison: "n/a",
         qualityFlags: f.qualityFlags,
         diagnostics: ["normalization dropped the raw native finding"],
@@ -1386,8 +1408,24 @@ function computeProfileAOutput(
     else referenceValidity = "invalid";
 
     const anySupporting = resolvedRefs.some((r) => r.mechanicallyValid && r.supportsBehavior);
+    const contradictoryReferences = resolvedRefs
+      .filter((r) => r.mechanicallyValid && r.contradictsClaim)
+      .map((r) => r.reference);
+    // The same explicit-contradiction rule Profile B applies to a claim: a
+    // supporting reference plus an explicitly contradicting one is a conflict,
+    // not support. A positive reference never overrides the contradiction, and
+    // a listed reference is never dropped. Only an explicit `contradictsClaim`
+    // judgment triggers this; neutral or missing support never does.
+    const evidenceConflict = contradictoryReferences.length > 0 && anySupporting;
+    if (evidenceConflict) {
+      findingDiagnostics.push(
+        `explicit contradiction conflicts with the supporting reference(s): ${contradictoryReferences.join(", ")}`,
+      );
+    }
+
     let semanticSupport: "supported" | "unsupported" | "neutral";
     if (mappingStatus !== "mapped" || resolvedRefs.length === 0) semanticSupport = "neutral";
+    else if (evidenceConflict) semanticSupport = "unsupported";
     else if (anySupporting) semanticSupport = "supported";
     else semanticSupport = "unsupported";
 
@@ -1433,6 +1471,8 @@ function computeProfileAOutput(
       referenceValidity,
       semanticSupport,
       supportAmbiguous,
+      evidenceConflict,
+      contradictoryReferences,
       truthComparison,
       qualityFlags: f.qualityFlags,
       diagnostics: findingDiagnostics,
@@ -1489,6 +1529,7 @@ function computeProfileAOutput(
       supportedDetections,
       duplicateMappings,
       ambiguousSupport: findings.filter((f) => f.supportAmbiguous).length,
+      evidenceConflicts: findings.filter((f) => f.evidenceConflict).length,
       overallStatus,
     },
   };

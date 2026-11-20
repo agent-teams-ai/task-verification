@@ -85,6 +85,13 @@ export interface ProfileAFindingAdmission {
    * to this finding individually.
    */
   supportAmbiguous: boolean;
+  /**
+   * A cited reference explicitly contradicts this claim while another supports
+   * it. The finding is not admitted and is never a supported detection.
+   */
+  evidenceConflict: boolean;
+  /** References whose explicit judgment contradicts this claim. */
+  contradictoryReferences: string[];
   /** Mapped to a criterion in the frozen expected inventory. */
   criteriaApplicable: boolean;
   references: string[];
@@ -274,6 +281,8 @@ export function admitProfileAFindings(input: ProfileAAdmissionInput): ProfileAAd
       mappingStatus === "mapped" && criterionId !== null && input.expectedCriterionIds.includes(criterionId);
     const semanticSupported = output?.semanticSupport === "supported";
     const supportAmbiguous = output?.supportAmbiguous === true;
+    const evidenceConflict = output?.evidenceConflict === true;
+    const contradictoryReferences = [...(output?.contradictoryReferences ?? [])];
     const duplicateMapping = output?.duplicateMapping === true;
     const findingIdAmbiguous = output?.findingIdAmbiguous === true;
 
@@ -377,6 +386,22 @@ export function admitProfileAFindings(input: ProfileAAdmissionInput): ProfileAAd
               reasons.filter((r) => r.startsWith("reference")).join("; ") || "invalid reference",
             );
 
+    // The explicit-contradiction rule is a finding gate of its own, so a
+    // supporting citation can never carry a finding past a contradicting one.
+    const evidenceConflictGate = evidenceConflict
+      ? failGate(
+          "evidence-conflict",
+          "claim",
+          "scorer.profileA.findings[].contradictoryReferences",
+          `contradictory evidence conflicts with supporting evidence: ${contradictoryReferences.join(", ")}`,
+        )
+      : passGate(
+          "evidence-conflict",
+          "claim",
+          "scorer.profileA.findings[].contradictoryReferences",
+          "no cited reference contradicts this claim",
+        );
+
     const sufficiencyGate = supportAmbiguous
       ? failGate(
           "reference-sufficiency",
@@ -404,6 +429,7 @@ export function admitProfileAFindings(input: ProfileAAdmissionInput): ProfileAAd
       candidateBindingGate,
       snapshotBindingGate,
       referenceValidityGate,
+      evidenceConflictGate,
       sufficiencyGate,
     ];
     const outcome = decide([...runGates, ...findingGates]);
@@ -427,6 +453,8 @@ export function admitProfileAFindings(input: ProfileAAdmissionInput): ProfileAAd
       criterionId,
       duplicateMapping,
       supportAmbiguous,
+      evidenceConflict,
+      contradictoryReferences,
       criteriaApplicable,
       references,
       referenceValid: referenceValid && candidateBound && snapshotBound && references.length > 0,

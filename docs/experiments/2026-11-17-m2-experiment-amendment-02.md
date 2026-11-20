@@ -9,7 +9,13 @@
 | Status | **PROPOSED — planning deliverable** |
 | Authority | Not an M2 acceptance item. D1 and D2 remain separate pending authorizations. |
 | Feasibility result | **NO LIVE COMPARISON RECOMMENDED YET** |
-| Case classification | `DEVELOPMENT EXAMPLE — NOT HELD-OUT MODEL-QUALITY EVIDENCE` |
+| Case classification | `DEVELOPMENT EXAMPLE — NOT INDEPENDENT MODEL-QUALITY EVIDENCE` |
+
+**Execution boundary for this amendment.** Same as the M2 readiness report: the deterministic probe in
+§4.2 ran the **real pinned rr.7 OCR binary against a fake model provider** (loopback, `--network none`,
+no credential). The binary is real; the model is not. Nothing here evaluates a live LLM, the hosted
+production OCR service, a complete production Gateway route, or provider latency/cost/quality. No
+deployment or spending occurred.
 
 Amendment v01 is preserved unchanged at `2026-11-17-m2-experiment-amendment-01.md`. It is not
 deleted, edited or reinterpreted. What v02 supersedes is only its *proposal*: v01 proposed a
@@ -78,7 +84,7 @@ not entry conditions — requiring them in advance would make the evaluation imp
 
 ## 3. Development case card — PR #349 memory delivery
 
-Classification: `DEVELOPMENT EXAMPLE — NOT HELD-OUT MODEL-QUALITY EVIDENCE`.
+Classification: `DEVELOPMENT EXAMPLE — NOT INDEPENDENT MODEL-QUALITY EVIDENCE`.
 
 | Field | Value |
 | --- | --- |
@@ -96,7 +102,8 @@ Classification: `DEVELOPMENT EXAMPLE — NOT HELD-OUT MODEL-QUALITY EVIDENCE`.
 | Native OCR findings / normalized / skipped | **NOT ESTABLISHED.** The historical review ran rr.4 and its native output, normalized output and skipped reasons were not retained. No value is inferred for them. |
 | Stored rule/memory content | **Partially established.** The exact rule-document shape and the append location are established from the immutable adapter. The actual memory bytes rendered for that review are not retained, so no claim is made about their content. |
 | Expected content at the provider boundary | The managed rule text followed by `\n\n` and the rendered memory, carried in a native `rule` entry that the OCR parser reads. |
-| Actual observed pre-fix request contents | **NOT retained historically.** Reproduced deterministically for this card: see §4. |
+| Actual observed pre-fix request contents | **NOT retained historically.** Reproduced deterministically for this card: see §4. The retained probe JSON is a **reported summary**, labelled `reported-summary-not-raw-request-evidence`; the raw captured request bodies were not kept. |
+| Established implementation evidence | **Exists upstream, reused not re-implemented.** `777genius/review-router@f87abf4817bcee10a6be830c834cb599a971372f`, `__tests__/integration/ocr-managed/ocr-managed-real-cli.test.ts`, test `supplies approved memory to the actual managed OCR model request end to end` — see §4.4. |
 | What is known | The pre-fix adapter appends memory to the `content` key of the managed rule entry; the pinned rr.7 parser does not read `content`, so neither the rule text nor the appended memory reaches the captured provider request (observed, §4). The fix moves the text to `rule`. |
 | What is not known | Whether rr.4 behaved identically (only the fix commit's own comment and tests assert it); the rendered memory bytes; the historical native findings; the review reader's actual decision. |
 | Expert preparation required | Not measured. Establishing the intent source, candidate and code path took one retrieval pass; no hours are recorded, so none are claimed. |
@@ -121,10 +128,11 @@ The expected content is therefore lost at **rule-document interpretation inside 
 not at context selection, not at request assembly, not at SDK serialisation, and not for lack of a
 retained observation. The adapter's own fix comment states the same cause.
 
-### 4.2 Deterministic delivery check (executed, model-free)
+### 4.2 Deterministic delivery check (executed: real binary, fake provider)
 
 A local fake-provider check is sufficient for this task family. It was run against the pinned rr.7
-binary, offline (`--network none`), with no credentials and no live model:
+binary — **real rr.7 OCR binary with a fake model provider** — offline (`--network none`), with no
+credentials and no live model:
 
 | Shape | Rule key carrying rule + memory | Memory sentinel in captured request | Managed rule text in captured request |
 | --- | --- | --- | --- |
@@ -139,9 +147,33 @@ What this establishes: for the exact pre-fix rule document shape, the approved m
 reach the provider request, while the post-fix shape delivers them. A request-boundary regression can
 therefore decide this family without a live comparison, which is why none is recommended.
 
+The retained file `docs/experiments/m2-targeted-corrective-evidence/pr349-memory-delivery-probe.json`
+is a **summary of that execution**, not raw request evidence. It is labelled
+`reported-summary-not-raw-request-evidence`: it records the sentinel presence per request index and the
+rule-key shape, but it does not contain the captured request bodies. No raw request was retained for
+this probe, and none is claimed.
+
 What it does not establish: rr.4 behaviour (the probe uses the pinned rr.7 binary), any model's
 comprehension of the delivered memory, or general product value. The historical review remains a
 development example.
+
+### 4.4 Established implementation evidence (existing upstream regression)
+
+The request-boundary regression for this delivery family already exists in the fix commit and is
+**reused, not re-implemented**:
+
+| Field | Value |
+| --- | --- |
+| Repository | `777genius/review-router` |
+| Commit | `f87abf4817bcee10a6be830c834cb599a971372f` |
+| File | `__tests__/integration/ocr-managed/ocr-managed-real-cli.test.ts` |
+| Test | `supplies approved memory to the actual managed OCR model request end to end` |
+| Link | https://github.com/777genius/review-router/blob/f87abf4817bcee10a6be830c834cb599a971372f/__tests__/integration/ocr-managed/ocr-managed-real-cli.test.ts |
+
+This is the implementation evidence for the delivery question. It is an integration regression against
+the managed OCR request boundary, and it is the reason no second implementation of the same regression
+is proposed here. The local deterministic probe in §4.2 remains an independent, model-free
+reproduction of the cause; it is not needed as a substitute for that regression.
 
 ### 4.3 Check design (for reuse)
 
@@ -214,7 +246,7 @@ promoted or dropped.
 
 | Question | Rule |
 | --- | --- |
-| Smallest remaining adaptation gap | The smallest change that would make the next real case reviewable. For PR #349 the delivery gap itself is closed by the fix; what remains is the **verification** gap: a request-boundary regression that fails on the legacy rule key. That is one test, not a roadmap. |
+| Smallest remaining adaptation gap | The smallest change that would make the next real case reviewable. For PR #349 the delivery gap is closed by the fix **and** the verification gap is already closed by the existing regression in §4.4. Nothing further is required for this case; do not propose a second implementation of that test. |
 | Observations needed before proceeding | For each field in the card: where it came from, or an explicit NOT ESTABLISHED. |
 | Stop conditions | Stop if P1 cannot be cited; if the available rule set already decides the case; if the only evidence of incorrectness is evaluator Truth; or if preparation cost exceeds the value of the decision it informs. |
 | Prefer a deterministic check or existing OCR route when | The observation is mechanical, already available at review time, and expressible as a configured rule or request assertion. A criteria assessment is not justified merely because it is possible. |
@@ -234,6 +266,12 @@ reasons:
 3. What no live comparison can supply here is the consumer-side measurement: a named reader, a
    decision that changes, and triage cost. Those are absent, and they are the actual precondition for
    an independent evaluation (§2.2).
+
+**Scope of this conclusion.** `NO LIVE COMPARISON NEEDED FOR THIS DELIVERY QUESTION` is limited to
+whether the approved memory/rule content reaches the actual request boundary. The existing
+deterministic request test does **not** establish model comprehension, model reasoning quality,
+general reviewer quality, general product value, or rr.7 compatibility beyond the environment the test
+actually runs in. It does not resolve the broader Task Verification research question.
 
 ## 10. Practical ways forward
 

@@ -64,6 +64,7 @@ import {
 import { runManagedOcr, tmpRoot } from "../../scripts/ocr-rr7/native-runner.ts";
 import {
   nativeToolChain,
+  nativeToolPayloads,
   nativeToolTranscript as buildNativeToolTranscript,
   summarizeTranscript,
 } from "../../src/native-tool-transcript.ts";
@@ -935,6 +936,40 @@ test("WP8-A: an unchanged dependency is read natively but is not a candidate cha
       },
     }),
   );
+  // Retain the ACTUAL payloads: the exact call arguments and tool-output text
+  // the native binary exchanged, so the claimed delivery can be inspected
+  // rather than inferred from a digest. Nothing is derived from the expected
+  // snapshot; its digest is reported in a separate field.
+  const payloads = nativeToolPayloads(ev.requests, {
+    candidateId: "S1-C3",
+    scenario: "unchanged-dependency-read",
+    repositoryFiles: snapshot.files,
+    changedPaths: changed,
+    expectedFiles: snapshot.headFiles,
+    snapshot: {
+      baseCommit: snapshot.base.commit,
+      headCommit: snapshot.head.commit,
+      headApplicationDigest: snapshot.head.applicationDigest,
+    },
+  });
+  const readPayload = payloads.payloads.find((p) => p.requestedPath === "audit.ts");
+  assert.ok(readPayload, "the native read of the unchanged dependency must retain its payload");
+  assert.ok(readPayload.result, "the payload must carry the observed tool output");
+  assert.equal(readPayload.result.status, "success");
+  assert.equal(readPayload.result.outputSha256, H(readPayload.result.outputText));
+  assert.ok(readPayload.result.outputText.includes("private readonly records: AuditRecord[] = [];"));
+  assert.equal(readPayload.parsedFileRead?.contentSha256, H(snapshot.headFiles["audit.ts"]));
+  // Expected snapshot content stays a separate expectation, never the observation.
+  assert.equal(readPayload.expectedSnapshotContentSha256, H(snapshot.headFiles["audit.ts"]));
+  assert.equal(readPayload.unresolvedReason, null);
+  assert.ok(readPayload.carryingRequest, "the payload must name the captured request that carried it");
+  retainEvidence(
+    "S1-C3",
+    `ocr-${H(ev.requests[0]?.bodyText ?? "").slice(0, 12)}`,
+    snapshot,
+    "native-tool-payloads-unchanged-dependency-read.json",
+    payloads,
+  );
   const transcript = nativeToolTranscript(ev, {
     candidateId: "S1-C3",
     snapshot,
@@ -1045,6 +1080,38 @@ test("WP8-A: out-of-scope reads through the native tools are refused", async (t)
         headApplicationDigest: snapshot.head.applicationDigest,
       },
     }),
+  );
+  // Retain the actual denial payloads too: the exact bytes the native tool
+  // returned for each refused read, so the absence of out-of-scope content is
+  // inspectable rather than only hashed.
+  const payloads = nativeToolPayloads(ev.requests, {
+    candidateId: "S1-C3",
+    scenario: "out-of-scope-read",
+    repositoryFiles: snapshot.files,
+    changedPaths: changedPathsFromDiff(snapshot.diff),
+    expectedFiles: snapshot.headFiles,
+    snapshot: {
+      baseCommit: snapshot.base.commit,
+      headCommit: snapshot.head.commit,
+      headApplicationDigest: snapshot.head.applicationDigest,
+    },
+  });
+  const deniedPayloads = payloads.payloads.filter((p) => p.classification === "out-of-scope");
+  assert.equal(deniedPayloads.length, 2, "both refused reads must retain their payloads");
+  for (const payload of deniedPayloads) {
+    assert.ok(payload.result, "a refused read still retains the observed tool output");
+    assert.equal(payload.result.status, "denied");
+    assert.equal(payload.result.outputSha256, H(payload.result.outputText));
+    assert.equal(payload.parsedFileRead, null, "a denial carries no file-read payload");
+    assert.equal(payload.result.outputText.includes(sentinel), false);
+    assert.equal(payload.result.outputText.includes("root:x:0"), false);
+  }
+  retainEvidence(
+    "S1-C3",
+    `ocr-${H(ev.requests[0]?.bodyText ?? "").slice(0, 12)}`,
+    snapshot,
+    "native-tool-payloads-out-of-scope-read.json",
+    payloads,
   );
   const transcript = nativeToolTranscript(ev, {
     candidateId: "S1-C3",

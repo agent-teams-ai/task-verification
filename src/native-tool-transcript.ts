@@ -414,6 +414,192 @@ export function nativeToolChain(
   };
 }
 
+export const NATIVE_TOOL_PAYLOADS_SCHEMA = "m2.native-tool-payloads/v1";
+
+/** The exact bytes one native tool call and its result carried. */
+export interface NativeToolPayload {
+  toolCallId: string;
+  toolName: string | null;
+  requestedPath: string;
+  classification: "changed" | "unchanged" | "out-of-scope";
+  call: {
+    requestIndex: number;
+    /** The `arguments` string exactly as the native tool emitted it. */
+    argumentsText: string;
+    argumentsSha256: string;
+  };
+  /** The observed result, or null when no result with this call identity exists. */
+  result: {
+    requestIndex: number;
+    status: "success" | "denied";
+    /** The `function_call_output` payload exactly as captured. */
+    outputText: string;
+    outputBytes: number;
+    outputSha256: string;
+  } | null;
+  /** The captured request that carries both the call and this exact result. */
+  carryingRequest: { index: number; bodyBytes: number; bodySha256: string } | null;
+  /** The file-read payload parsed out of `outputText`, if it is one. */
+  parsedFileRead: {
+    path: string | null;
+    contentText: string;
+    contentBytes: number;
+    contentSha256: string;
+  } | null;
+  /** Separately reported expected snapshot digest — an expectation, not an observation. */
+  expectedSnapshotContentSha256: string | null;
+  unresolvedReason: string | null;
+}
+
+export interface NativeToolPayloads {
+  schema: string;
+  runId: string;
+  candidateId: string;
+  scenario: string;
+  snapshot: TranscriptSnapshotIdentity;
+  /** Every payload below was copied from these captured request items. */
+  source: "captured-fake-provider-request-items";
+  expectedSnapshotContentIsSeparate: true;
+  payloadCount: number;
+  resolvedPayloads: number;
+  payloads: NativeToolPayload[];
+}
+
+/**
+ * Retain the ACTUAL native tool output payloads, byte for byte.
+ *
+ * The transcript and chain record identities and digests, which is enough to
+ * prove correlation but not enough to inspect what was delivered. This
+ * extractor keeps the exact `arguments` and `function_call_output` strings from
+ * the captured fake-provider requests, so the claimed delivery can be read
+ * rather than inferred from a hash.
+ *
+ * Nothing is reconstructed from the expected snapshot: the expected content
+ * digest is reported in a separate field, a call without an observed result is
+ * left `null` with a reason, and a payload whose result is not carried by a
+ * captured request records that instead of borrowing a request digest.
+ */
+export function nativeToolPayloads(
+  requests: readonly CapturedProviderRequest[],
+  scope: TranscriptScope,
+): NativeToolPayloads {
+  const runId = `ocr-${sha256(requests[0]?.bodyText ?? "").slice(0, 12)}`;
+  const calls: { requestIndex: number; callId: string; toolName: string | null; argumentsText: string; requestedPath: string }[] = [];
+  const resultByCallId = new Map<string, { requestIndex: number; output: string }>();
+
+  for (const request of requests) {
+    for (const item of callItems(request)) {
+      if (item?.type === "function_call" && typeof item.call_id === "string") {
+        if (calls.some((c) => c.callId === item.call_id)) continue;
+        const argumentsText = typeof item.arguments === "string" ? item.arguments : "";
+        let args: Record<string, unknown> = {};
+        try {
+          args = JSON.parse(argumentsText === "" ? "{}" : argumentsText) as Record<string, unknown>;
+        } catch {
+          args = {};
+        }
+        calls.push({
+          requestIndex: request.index,
+          callId: item.call_id,
+          toolName: typeof item.name === "string" ? item.name : null,
+          argumentsText,
+          requestedPath: typeof args.file_path === "string" ? args.file_path : "",
+        });
+      }
+      if (item?.type === "function_call_output" && typeof item.call_id === "string") {
+        if (resultByCallId.has(item.call_id)) continue;
+        resultByCallId.set(item.call_id, {
+          requestIndex: request.index,
+          output: typeof item.output === "string" ? item.output : "",
+        });
+      }
+    }
+  }
+
+  const payloads: NativeToolPayload[] = calls.map((call) => {
+    const result = resultByCallId.get(call.callId);
+    const carrying =
+      result === undefined
+        ? undefined
+        : requests.find(
+            (request) =>
+              request.index >= call.requestIndex &&
+              callItems(request).some(
+                (item) => item?.type === "function_call" && item.call_id === call.callId,
+              ) &&
+              callItems(request).some(
+                (item) =>
+                  item?.type === "function_call_output" &&
+                  item.call_id === call.callId &&
+                  item.output === result.output,
+              ),
+          );
+    const parsed = result === undefined ? null : parseFileReadOutput(result.output);
+    const expected = Object.prototype.hasOwnProperty.call(scope.expectedFiles, call.requestedPath)
+      ? scope.expectedFiles[call.requestedPath]
+      : null;
+
+    return {
+      toolCallId: call.callId,
+      toolName: call.toolName,
+      requestedPath: call.requestedPath,
+      classification: classifyPath(call.requestedPath, scope),
+      call: {
+        requestIndex: call.requestIndex,
+        argumentsText: call.argumentsText,
+        argumentsSha256: sha256(call.argumentsText),
+      },
+      result:
+        result === undefined
+          ? null
+          : {
+              requestIndex: result.requestIndex,
+              status: /^Error executing tool/.test(result.output) ? "denied" : "success",
+              outputText: result.output,
+              outputBytes: byteLength(result.output),
+              outputSha256: sha256(result.output),
+            },
+      carryingRequest:
+        carrying === undefined
+          ? null
+          : {
+              index: carrying.index,
+              bodyBytes: byteLength(carrying.bodyText),
+              bodySha256: sha256(carrying.bodyText),
+            },
+      parsedFileRead:
+        parsed === null
+          ? null
+          : {
+              path: parsed.path,
+              contentText: parsed.content,
+              contentBytes: byteLength(parsed.content),
+              contentSha256: sha256(parsed.content),
+            },
+      expectedSnapshotContentSha256: expected === null ? null : sha256(expected),
+      unresolvedReason:
+        result === undefined
+          ? "no function_call_output with this call identity was observed"
+          : carrying === undefined
+            ? "the observed output is not carried in a captured request with its call"
+            : null,
+    };
+  });
+
+  return {
+    schema: NATIVE_TOOL_PAYLOADS_SCHEMA,
+    runId,
+    candidateId: scope.candidateId,
+    scenario: scope.scenario,
+    snapshot: scope.snapshot,
+    source: "captured-fake-provider-request-items",
+    expectedSnapshotContentIsSeparate: true,
+    payloadCount: payloads.length,
+    resolvedPayloads: payloads.filter((p) => p.result !== null).length,
+    payloads,
+  };
+}
+
 /** Summary counters for the retained evidence manifest. */
 export function summarizeTranscript(lines: readonly Record<string, unknown>[]): {
   lines: number;
