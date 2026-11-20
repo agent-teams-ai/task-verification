@@ -30,18 +30,24 @@ valuable in general, whether a model reasons well, or whether either profile is 
 the exact missing inputs rather than inventing a task. Executing without them would produce an
 unfalsifiable report, which is the failure mode amendment v02 §6 exists to prevent.
 
-| # | Missing input (required before any live call) | Why it cannot be substituted |
-| --- | --- | --- |
-| M1 | Repository plus PR/task URL | The reader's decision is about a real change; a synthetic task has no reader. |
-| M2 | Immutable **pre-review** base SHA and head SHA | A post-fix head is a known answer. The snapshot must predate the review being evaluated. |
-| M3 | Original task/requirement source (issue, plan section or commit message) at a citable identity | Criteria must be derived from what was required, not from what was eventually built. |
-| M4 | Review-time configured OCR rules and their native findings for that snapshot | This is the comparator. Re-deriving it later with different rules measures a different configuration. |
-| M5 | Ordinary check results available at review time (baseline observations, deterministic gate outcomes) | Needed to decide whether the criteria pass added anything beyond checks that already existed. |
-| M6 | Named intended report reader and the decision they own | Value is defined by a decision changing. Without a reader there is no decision to inform. |
+No case has been selected. **No repository, PR, snapshot, OCR output or check result has been identified
+for this pilot**, and none is implied anywhere below. The six items are the inputs a selected case would
+have to provide, and each one has a named supplier.
 
-If the maintainer supplies M1–M6, this proposal can be executed without redesign: the limits, trace and
-measurements below are already fixed. If any of M1–M6 stays unavailable, the correct outcome is **no
-pilot**, not a substitute task.
+| # | Missing input (required before any live call) | Who must supply it | Why it cannot be substituted |
+| --- | --- | --- | --- |
+| M1 | Repository plus PR/task URL | Maintainer (repository owner with review authority) | The reader's decision is about a real change; a synthetic task has no reader. |
+| M2 | Immutable **pre-review** base SHA and head SHA | Maintainer supplies the SHAs; the pilot operator freezes and records them | A post-fix head is a known answer. The snapshot must predate the review being evaluated. |
+| M3 | Original task/requirement source (issue, plan section or commit message) at a citable identity | Maintainer, or the author of the linked issue/plan the change claims to satisfy | Criteria must be derived from what was required, not from what was eventually built. |
+| M4 | Review-time configured OCR rules and their native findings for that snapshot | Maintainer together with whoever owned the OCR configuration at review time | This is the comparator. Re-deriving it later with different rules measures a different configuration. |
+| M5 | Ordinary check results available at review time (baseline observations, deterministic gate outcomes) | Maintainer together with the CI/check owner for that snapshot | Needed to decide whether the criteria pass added anything beyond checks that already existed. |
+| M6 | Named intended report reader and the decision they own | Maintainer names the reader; the reader accepts and records the decision | Value is defined by a decision changing. Without a reader there is no decision to inform. |
+
+**Execution is blocked until all six are supplied and frozen.** M1 fixes the case, M2 fixes the snapshot,
+M3 fixes the criteria source, M4 and M5 fix the comparator, and M6 fixes who decides. If the maintainer
+supplies M1–M6, this proposal can be executed without redesign: the limits, trace and measurements below
+are already fixed. If any of M1–M6 stays unavailable, the correct outcome is **no pilot**, not a
+substitute task.
 
 ### 2.2 Candidates considered and rejected
 
@@ -75,38 +81,45 @@ non-required criterion, or anything only offline Truth knows is wrong.
 checks.** No second OCR model and no extra OCR-plus-criteria arm is added. The pilot arm is the criteria
 assessment alone.
 
-| Input | Available at review time? | Source at execution |
-| --- | --- | --- |
-| Original task and derived criteria | Yes | M3, frozen before the run |
-| Base and head code, immutable | Yes | M2 snapshot |
-| Changed files (complete text) | Yes | materialization from the diff |
-| Relevant unchanged files | On demand | native tool reads, same boundary as WP8-A |
-| Task/PR background | Yes | M1/M3 |
-| Configured OCR rules | Yes | M4 |
-| Ordinary check results | Yes | M5 |
-| Evidence actually available to the reviewer | Yes | artifacts resolvable in the snapshot |
-| Later fixes / evaluator Truth / known answers | **No** | withheld until after the human decision is recorded |
+The table below is **conditional on a selected case**. For every row, the "current" cell describes today's
+state, not an observation about a task: nothing here records an OCR finding, a check outcome or a case.
+
+| Input | Currently supplied for a selected case? | Expected to be available only after | Source / owner |
+| --- | --- | --- | --- |
+| Original task and derived criteria | **No — no case selected** | M1–M6 provided and frozen; criteria then derived and frozen before the run | M3 (requirement source) → criteria derived by the pilot operator |
+| Base and head code, immutable | **No — no case selected** | M2 provided and frozen | M2 (maintainer) → snapshot frozen by the pilot operator |
+| Changed files (complete text) | **No — no snapshot exists** | M2 frozen | Materialization from the recorded diff (pilot operator) |
+| Relevant unchanged files | **No — no snapshot exists** | M2 frozen, then read on demand | Native tool reads, same boundary as WP8-A (pilot operator) |
+| Task/PR background | **No — no case selected** | M1 and M3 supplied | M1/M3 (maintainer) |
+| Configured OCR rules | **No — no review-time output captured** | M4 supplied for that snapshot | M4 (maintainer + OCR configuration owner) |
+| Ordinary check results | **No — no review-time output captured** | M5 supplied for that snapshot | M5 (maintainer + CI/check owner) |
+| Evidence actually available to the reviewer | **No — no snapshot exists** | M2 + M4 + M5 frozen | Artifacts resolvable in the snapshot (maintainer and pilot operator) |
+| Later fixes / evaluator Truth / known answers | **Must stay unavailable** | Never before the decision; withheld until the decision is recorded | Withholding control (pilot operator) |
 
 ## 5. One route and model, with hard limits
 
-**Recommendation: OpenAI Responses API, `gpt-5-mini`, reasoning effort `medium`, through the existing
+**Recommendation: OpenAI Responses API, `gpt-6.2-sol`, `reasoning.effort=medium`, through the existing
 packed SDK path (`@agent-teams/account-gateway@0.1.0` → `createLlmClient()`), which Profile B already
 qualifies.**
 
-Why this is the smallest reasonable route: the request assembly, capture and ResultContract path are
-already implemented and tested against a loopback provider, so the pilot adds a live endpoint — not a
-new integration. `gpt-5-mini` is the cheapest model in the family that still supports an explicit
-reasoning-effort setting, which a criteria assessment needs; a nano-class model would test the harness
-floor rather than a plausible reviewer.
+Why this route and model: the request assembly, capture and ResultContract path are already implemented
+and tested against a loopback provider, so the pilot adds a live endpoint — not a new integration. On the
+model, the official selection guide's default for API workflows is GPT-6.2 Sol at medium reasoning effort,
+and its own example for that pairing is "fixing bugs and adding features in an existing codebase, or
+drafting documents for review" — which is this bounded code/review task. The earlier candidate
+`gpt-5-mini` is **deprecated** (shutdown 2026-12-11, replacement `gpt-6.1-terra`), so it is no longer a
+defensible choice for a pilot that may run after that date.
 
-Pricing used for the ceiling (OpenAI pricing page, Standard tier, checked 2026-11-20):
-`gpt-5-mini` — **$0.25 / 1M input tokens, $2.00 / 1M output tokens**, $0.025 / 1M cached input.
+Pricing used for the ceiling — official model page and pricing page, **Standard** processing tier, short
+context (≤272K input tokens), checked 2026-11-20 and confirmed equal on both pages:
+`gpt-6.2-sol` — **USD 2.00 / 1M input tokens, USD 10.00 / 1M output tokens**, USD 0.10 / 1M cached input.
 
 | Limit | Proposed value |
 | --- | --- |
 | Provider / route | OpenAI, Responses API (no batch, no fine-tune, no tools beyond the fixed read-only file reader) |
-| Exact model | `gpt-5-mini` |
-| Reasoning effort | `medium` |
+| Exact model | `gpt-6.2-sol` |
+| Reasoning effort | `medium` (`reasoning.effort`; the model rejects `none`) |
+| Account / model availability | **Not assumed.** Model access, account tier and credentials must be confirmed at execution time; if unavailable, stop rather than substitute |
 | Input token ceiling | 40,000 per request |
 | Output token ceiling | 4,000 per request |
 | Maximum model requests | **2 total** (1 assessment + 1 transport retry; no semantic retry, no re-prompt) |
@@ -114,11 +127,24 @@ Pricing used for the ceiling (OpenAI pricing page, Standard tier, checked 2026-1
 | Per-request timeout | 150 s |
 | Total wall-clock ceiling | 20 min from dispatch to final recheck |
 | Spend ceiling | **USD 0.50** |
-| Worst-case arithmetic | 2 × 40k input × $0.25/1M = $0.020; 2 × 4k output × $2.00/1M = $0.016; total **$0.036** |
+| Worst-case input tokens | 2 × 40,000 = 80,000 → 0.08 M × USD 2.00/1M = **USD 0.16** |
+| Worst-case output tokens | 2 × 4,000 = 8,000 → 0.008 M × USD 10.00/1M = **USD 0.08** |
+| Total token estimate (Standard) | **USD 0.24** worst case |
 | Credential handling | `OPENAI_API_KEY` supplied by the maintainer to the qualification process only; never in the repository, logs, artifacts or report |
 
-These are **proposed limits, not authorization**. If model availability or pricing cannot be confirmed at
-execution time, the run stops and the ceiling is re-approved rather than adjusted silently.
+**What the USD 0.24 estimate excludes.** The figure is **Standard processing only, for model tokens only**.
+It excludes any optional Fast processing (twice the Standard rate), Ultrafast, Batch, hosted or billable
+tools (web search, file search, containers such as hosted shell or code interpreter), and any applicable
+regional-processing or FedRAMP surcharge (a 10% uplift for models released on or after 2026-03-05). None
+of those is proposed for use. The 40,000-input ceiling also keeps both requests far below the 272K
+short-context threshold, where input and output rates rise — so the short-context Standard rates above are
+the correct ones for this calculation.
+
+These are **proposed limits, not authorization**. Model availability, account tier and pricing must be
+re-confirmed against the official model and pricing pages immediately before any authorized execution; if
+any of them cannot be confirmed, the run stops and the ceiling is re-approved rather than adjusted
+silently. The USD 0.50 hard ceiling is preserved unchanged; USD 0.24 is the arithmetic worst case, not a
+budget to spend.
 
 ## 6. One report → one human action → one recheck
 
@@ -188,3 +214,18 @@ route and model, the request cap, the spend ceiling, and the named reader. Until
 This proposal does not authorize: any live model/provider/OCR/Gateway call; any credential use; any
 deployment, publication or spend; any automatic merge or terminal Work completion; any change to M2
 acceptance status; any model-quality, latency or cost claim from the existing fake-provider evidence.
+
+## 10. References
+
+- Model page — <https://developers.openai.com/api/docs/models/gpt-6.2-sol> (endpoints, context limits,
+  reasoning-effort constraint, Standard pricing USD 2.00 in / USD 10.00 out per 1M tokens).
+- Pricing — <https://developers.openai.com/api/docs/pricing> (Standard, Batch, Flex, Fast, Ultrafast tiers;
+  tool and surcharge notes).
+- Model selection — <https://developers.openai.com/api/docs/guides/model-selection> (GPT-6.2 Sol at
+  medium reasoning effort as the default starting point for API workflows).
+- Deprecations — <https://developers.openai.com/api/docs/deprecations> (`gpt-5-mini` deprecated, shutdown
+  2026-12-11, listed replacement `gpt-6.1-terra`).
+- Amendment v02 — `2026-11-17-m2-experiment-amendment-02.md` (comparator, scoring boundary, stop rules).
+
+All four OpenAI pages were read on 2026-11-20 while preparing this revision. Reading documentation is not
+a live model call, and no availability, quota or entitlement was tested.
