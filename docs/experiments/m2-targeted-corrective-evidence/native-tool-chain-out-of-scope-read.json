@@ -1,6 +1,6 @@
 {
   "schema": "m2.native-tool-chain/v1",
-  "runId": "ocr-608936feb1f1",
+  "runId": "ocr-2c1b8761913a",
   "candidateId": "S1-C3",
   "scenario": "out-of-scope-read",
   "snapshot": {
@@ -12,60 +12,60 @@
     {
       "index": 0,
       "bodyBytes": 18956,
-      "bodySha256": "608936feb1f1925eeee0be7100dd79a38a18347b76c4076bf476a47fc0c0f66d",
+      "bodySha256": "2c1b8761913af326cf18d7231c52548315c1e9d9091b7b82205201d7a541cc22",
       "items": []
     },
     {
       "index": 1,
       "bodyBytes": 23400,
-      "bodySha256": "6e5e318ca993c217f72891e54a505e29dd843c88ab76019908368bc384581e4f",
+      "bodySha256": "75e7ac13d3628881f5f66dc77ad53ad8fa0b42c44f2f4ebe5675aab4edc2eecd",
       "items": []
     },
     {
       "index": 2,
       "bodyBytes": 23956,
-      "bodySha256": "a9af148c36144ae4e8867663bb50734105623819f9ba9498e770253ab4e95829",
+      "bodySha256": "dc8429f419784c15d43b633d33a50d37781583a77b8eb98ce3e2c9dd33ffd9f8",
       "items": [
         {
           "type": "function_call",
-          "callId": "call_2ae16211-ba4c-4dfe-b6bf-061be5a728d9",
+          "callId": "call_21cea397-a35f-44e0-8f46-1e3cd171f104",
           "name": "file_read",
           "requestedPath": "../outside-secret.ts"
         },
         {
           "type": "function_call_output",
-          "callId": "call_2ae16211-ba4c-4dfe-b6bf-061be5a728d9",
+          "callId": "call_21cea397-a35f-44e0-8f46-1e3cd171f104",
           "outputBytes": 255,
-          "outputSha256": "32b813164a4e4aa9dcac0c87249dea09c0efa307b62784fc863d5810cc743c29"
+          "outputSha256": "202a669cbeaa4de44a033c9d5b70d3dee706cd21f825d6770d5cc969011d86fa"
         }
       ]
     },
     {
       "index": 3,
       "bodyBytes": 24636,
-      "bodySha256": "1b03d9908bd028f0a52ad8bb2a2002ef965097aede9d5bae6a8996674a3c4022",
+      "bodySha256": "1c66fbf65ffea973e2d838aa88f4e0f76411a6ae3327f6430ef23d9f660841fd",
       "items": [
         {
           "type": "function_call",
-          "callId": "call_2ae16211-ba4c-4dfe-b6bf-061be5a728d9",
+          "callId": "call_21cea397-a35f-44e0-8f46-1e3cd171f104",
           "name": "file_read",
           "requestedPath": "../outside-secret.ts"
         },
         {
           "type": "function_call_output",
-          "callId": "call_2ae16211-ba4c-4dfe-b6bf-061be5a728d9",
+          "callId": "call_21cea397-a35f-44e0-8f46-1e3cd171f104",
           "outputBytes": 255,
-          "outputSha256": "32b813164a4e4aa9dcac0c87249dea09c0efa307b62784fc863d5810cc743c29"
+          "outputSha256": "202a669cbeaa4de44a033c9d5b70d3dee706cd21f825d6770d5cc969011d86fa"
         },
         {
           "type": "function_call",
-          "callId": "call_18925208-8eac-41b9-89e7-85833842ac0d",
+          "callId": "call_126570bc-ccec-4c92-8095-1798465a3b00",
           "name": "file_read",
           "requestedPath": "/etc/passwd"
         },
         {
           "type": "function_call_output",
-          "callId": "call_18925208-8eac-41b9-89e7-85833842ac0d",
+          "callId": "call_126570bc-ccec-4c92-8095-1798465a3b00",
           "outputBytes": 387,
           "outputSha256": "08061ddbc83882943408912501577e477e0334c50b6553f81c5836c3bcf9f455"
         }

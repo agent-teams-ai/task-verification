@@ -1,6 +1,6 @@
 {
   "schema": "m2.pr349-development-case-sources/v1",
-  "classification": "DEVELOPMENT EXAMPLE — NOT HELD-OUT MODEL-QUALITY EVIDENCE",
+  "classification": "DEVELOPMENT EXAMPLE — NOT INDEPENDENT MODEL-QUALITY EVIDENCE",
   "requirementSource": {
     "repository": "777genius/review-router-ai",
     "commit": "6797745dd568149e6314cd44b24cb901de1819e2",

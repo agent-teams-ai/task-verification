@@ -3,33 +3,48 @@
   "files": [
     {
       "path": "README.md",
-      "bytes": 2742,
-      "sha256": "a249b841acd53312b158b8f04b33ab3cb86755be802e620b685453034188f8ef"
+      "bytes": 6522,
+      "sha256": "0a78b3274a52665f6a29cbc0b2f9aff9bbd4e7e53d2ff4fcf53237a6c8114049"
     },
     {
       "path": "native-tool-chain-out-of-scope-read.json",
       "bytes": 2409,
-      "sha256": "08319623f5391edacf2f0b4671f2663374619b67ef9fc19d89f1764661ca563d"
+      "sha256": "e5a48615923c952f37c54982e9e8be97aacb4cf6cc5623bef04f0cd50fc300b8"
     },
     {
       "path": "native-tool-chain-unchanged-dependency-read.json",
       "bytes": 1340,
-      "sha256": "fe08b5ae383a6226ecd3dc4c486854d99d4d7ba5a3aa450f59dd8864cd907ddc"
+      "sha256": "5ea7ba5dd15d743c20dfb50c0d2c14af03f20bb8a1a64e5fff72ec5e7a7cee14"
+    },
+    {
+      "path": "native-tool-payloads-out-of-scope-read.json",
+      "bytes": 3006,
+      "sha256": "3c406a1cc3c3ba9296249649ac37c7f997b8ac6348684d30c02de86456122fa7"
+    },
+    {
+      "path": "native-tool-payloads-unchanged-dependency-read.json",
+      "bytes": 4565,
+      "sha256": "b8d8348f3bcfaeddaa56a547f74b7e9881eb3e8ca6c98108b4d31704712e806b"
     },
     {
       "path": "native-tool-transcript.jsonl",
       "bytes": 4266,
-      "sha256": "e097d59836bc84f2e4d9be39536e4180acf27fa677cb33e0c9c6cffbaf49b211"
+      "sha256": "94256fffebb141dfe20edac8e7a5b7ec0b5cbd9016880904d6f37f7e54f4a36b"
     },
     {
       "path": "pr349-development-case-sources.json",
-      "bytes": 2116,
-      "sha256": "998bf35b7b08bf73904d5245a3afb5a7ee395c097551cc00101b71e5c5dc5144"
+      "bytes": 2119,
+      "sha256": "2505052377f5937425a9948bcd653344f2f887204b6bbcf0811d9c1cb8af3ebd"
     },
     {
       "path": "pr349-memory-delivery-probe.json",
-      "bytes": 1325,
-      "sha256": "64afa71be1396200a0698b1eb7a1dd238c76f6b8bb86e0eca0441268fa36815c"
+      "bytes": 1677,
+      "sha256": "a7f7682b600b5f17aa7e6a008ecf2562b601f79608b8d6e313c201034bfd72ef"
+    },
+    {
+      "path": "repro-profile-a-explicit-contradiction.json",
+      "bytes": 16671,
+      "sha256": "b2e44d3a021cc26e5236472d40b236f29536989a33a5f14fd86a430c5fbd2778"
     },
     {
       "path": "repro-profile-a-finding-collision.json",

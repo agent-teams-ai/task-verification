@@ -34,5 +34,8 @@
       "nativeError": null
     }
   },
-  "conclusion": "Pre-fix rule key `content` is ignored by the native parser: approved memory does not reach the provider request. The post-fix `rule` key delivers it."
+  "conclusion": "Pre-fix rule key `content` is ignored by the native parser: approved memory does not reach the provider request. The post-fix `rule` key delivers it.",
+  "evidenceClass": "reported-summary-not-raw-request-evidence",
+  "rawRequestBodiesRetained": false,
+  "evidenceNote": "Summary of a prior local probe execution (real rr.7 binary, loopback fake provider). The captured provider request bodies were not retained, so this is not raw request evidence and must not be described as a captured raw request."
 }

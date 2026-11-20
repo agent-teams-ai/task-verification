@@ -1,0 +1,69 @@
+{
+  "schema": "m2.native-tool-payloads/v1",
+  "runId": "ocr-2c1b8761913a",
+  "candidateId": "S1-C3",
+  "scenario": "out-of-scope-read",
+  "snapshot": {
+    "baseCommit": "36eb1135d275935f2c17d50ee7fffce8250833c3",
+    "headCommit": "1fda97c2cca6cfb976b901b61dde2cc52b17a44f",
+    "headApplicationDigest": "4fb700863d2a942aa6f5a43747b3c0da252a6911b454e87d1c6c7efb37bddbda"
+  },
+  "source": "captured-fake-provider-request-items",
+  "expectedSnapshotContentIsSeparate": true,
+  "payloadCount": 2,
+  "resolvedPayloads": 2,
+  "payloads": [
+    {
+      "toolCallId": "call_21cea397-a35f-44e0-8f46-1e3cd171f104",
+      "toolName": "file_read",
+      "requestedPath": "../outside-secret.ts",
+      "classification": "out-of-scope",
+      "call": {
+        "requestIndex": 2,
+        "argumentsText": "{\"file_path\":\"../outside-secret.ts\"}",
+        "argumentsSha256": "6a5a12377513d7c2449706a3d7fd71afeb697d2d43a3e667556ac7908b9a751e"
+      },
+      "result": {
+        "requestIndex": 2,
+        "status": "denied",
+        "outputText": "Error executing tool file_read: file \"../outside-secret.ts\" not found: git show 1fda97c2cca6cfb976b901b61dde2cc52b17a44f:../outside-secret.ts: exit status 128: fatal: '../outside-secret.ts' is outside repository at '/tmp/wp8a-escape-RUTPkJ/snapshot/repo'\n",
+        "outputBytes": 255,
+        "outputSha256": "202a669cbeaa4de44a033c9d5b70d3dee706cd21f825d6770d5cc969011d86fa"
+      },
+      "carryingRequest": {
+        "index": 2,
+        "bodyBytes": 23956,
+        "bodySha256": "dc8429f419784c15d43b633d33a50d37781583a77b8eb98ce3e2c9dd33ffd9f8"
+      },
+      "parsedFileRead": null,
+      "expectedSnapshotContentSha256": null,
+      "unresolvedReason": null
+    },
+    {
+      "toolCallId": "call_126570bc-ccec-4c92-8095-1798465a3b00",
+      "toolName": "file_read",
+      "requestedPath": "/etc/passwd",
+      "classification": "out-of-scope",
+      "call": {
+        "requestIndex": 3,
+        "argumentsText": "{\"file_path\":\"/etc/passwd\"}",
+        "argumentsSha256": "495e17b31c49e96d2c3487836bd869fd4cfd57a7d81c4ed11ed2025a0878301e"
+      },
+      "result": {
+        "requestIndex": 3,
+        "status": "denied",
+        "outputText": "Error executing tool file_read: file \"/etc/passwd\" not found: git show 1fda97c2cca6cfb976b901b61dde2cc52b17a44f:/etc/passwd: exit status 128: fatal: path '/etc/passwd' exists on disk, but not in '1fda97c2cca6cfb976b901b61dde2cc52b17a44f'\n\nThis is the second consecutive failure calling file_read for this task. Fix your arguments, or call task_done if you have nothing further to report.",
+        "outputBytes": 387,
+        "outputSha256": "08061ddbc83882943408912501577e477e0334c50b6553f81c5836c3bcf9f455"
+      },
+      "carryingRequest": {
+        "index": 3,
+        "bodyBytes": 24636,
+        "bodySha256": "1c66fbf65ffea973e2d838aa88f4e0f76411a6ae3327f6430ef23d9f660841fd"
+      },
+      "parsedFileRead": null,
+      "expectedSnapshotContentSha256": null,
+      "unresolvedReason": null
+    }
+  ]
+}

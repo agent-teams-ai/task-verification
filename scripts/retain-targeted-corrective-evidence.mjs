@@ -487,7 +487,16 @@ writeJson("pr349-development-case-sources.json", PR349);
 
 const probePath = path.join(TMP, "pr349", "memory-delivery-probe.json");
 if (fs.existsSync(probePath)) {
-  fs.copyFileSync(probePath, path.join(OUT, "pr349-memory-delivery-probe.json"));
+  // The probe retained a summary, not the captured request bodies. Label it in
+  // the file itself so it cannot be quoted as raw request evidence.
+  const probe = JSON.parse(fs.readFileSync(probePath, "utf8"));
+  writeJson("pr349-memory-delivery-probe.json", {
+    ...probe,
+    evidenceClass: "reported-summary-not-raw-request-evidence",
+    rawRequestBodiesRetained: false,
+    evidenceNote:
+      "Summary of a prior local probe execution (real rr.7 binary, loopback fake provider). The captured provider request bodies were not retained, so this is not raw request evidence and must not be described as a captured raw request.",
+  });
 }
 
 const wp8aDir = path.join(TMP, "wp8a-evidence");
