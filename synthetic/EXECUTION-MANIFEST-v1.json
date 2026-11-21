@@ -128,7 +128,9 @@
     "accounting": {
       "perRequestLedger": "JSONL: stage, decision, model, tier, effort, estimates, reported usage, charged tokens, halt state, running totals",
       "chargingPolicy": "reported usage when present; otherwise the full reservation. Never zero, never a floor.",
-      "cacheHandling": "usage.input_tokens is charged at the full input rate (no cache discount assumed); usage.output_tokens includes reasoning tokens",
+      "cacheHandling": "usage.input_tokens is charged at the full input rate (no cache discount assumed, so cached input can only be over-charged, never under-charged)",
+      "reasoningTokens": "bounded by the injected max_output_tokens parameter; the ledger charges reported output_tokens and does not assume reasoning is reported separately",
+      "reconciliationStopRule": "if the /api/v1/key usage delta exceeds the ledger's modeled spend for a stage, halt: the ledger is then known to under-count",
       "authoritativeReconciliation": "GET https://openrouter.ai/api/v1/key usage delta before and after each stage",
       "credentialInLedger": false,
       "headersRecorded": false
