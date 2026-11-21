@@ -294,7 +294,7 @@
           "reference artifact://serializer.ts: resolved and mechanically valid",
           "criterion AC-3: claim-scoped support decision",
           "explicit contradiction conflicts with the supporting reference(s): artifact://serializer.ts",
-          "mapped to truth-violated criterion AC-3 → supported detection"
+          "mapped to truth-violated criterion AC-3 → not a supported detection: explicit contradiction from artifact://serializer.ts"
         ]
       }
     ],
@@ -306,7 +306,7 @@
       "skipped": 0,
       "normalizationDropped": 0,
       "falseAllegations": 1,
-      "supportedDetections": 1,
+      "supportedDetections": 0,
       "duplicateMappings": 0,
       "ambiguousSupport": 0,
       "evidenceConflicts": 1,

@@ -43,8 +43,8 @@
     },
     {
       "path": "repro-profile-a-explicit-contradiction.json",
-      "bytes": 16671,
-      "sha256": "b2e44d3a021cc26e5236472d40b236f29536989a33a5f14fd86a430c5fbd2778"
+      "bytes": 16731,
+      "sha256": "3dfbca6d8bdee4849f23346094821020e8ce92f30798ca9dbbcd3c15d6f608a6"
     },
     {
       "path": "repro-profile-a-finding-collision.json",

@@ -963,6 +963,11 @@ test("repro C6 (maintainer): supporting plus neutral stays admissible; supportin
   );
   assert.deepEqual(neutral.decision.supportedDetections, ["f-pair"]);
   assert.equal(neutral.decision.admittedFindings, 2);
+  // Case A accounting: one admitted detection, and the scorer summary agrees.
+  assert.equal(neutralFinding.supportedDetection, true, "the admitted pair is counted");
+  assert.equal(neutral.scorer.profileA.summary.supportedDetections, 1);
+  assert.equal(neutral.scorer.profileA.summary.evidenceConflicts, 0);
+  assert.equal(neutral.decision.supportedDetections.length, 1);
 
   // --- Case B: reference A supports, reference B explicitly contradicts ---
   const conflicting = scoreA({
@@ -1011,6 +1016,27 @@ test("repro C6 (maintainer): supporting plus neutral stays admissible; supportin
     "the contradictory finding is excluded from supported detections",
   );
   assert.equal(conflicting.decision.supportedDetectionOccurrences.length, 0);
+  // Case B accounting: rejected by its own admission gates, so the scorer
+  // summary must not count it either, and no diagnostic may claim it was one.
+  assert.equal(conflictFinding.supportedDetection, false, "the contradictory occurrence is not counted");
+  assert.equal(conflicting.scorer.profileA.summary.supportedDetections, 0, "summary agrees with admission");
+  assert.equal(conflicting.decision.supportedDetections.length, 0);
+  assert.equal(conflicting.scorer.profileA.summary.evidenceConflicts, 1);
+  // Original scoring accounting is preserved: both findings delivered, both
+  // mapped, and the control finding's false allegation unchanged.
+  assert.equal(conflicting.scorer.profileA.summary.delivered, 2);
+  assert.equal(conflicting.scorer.profileA.summary.mapped, 2);
+  assert.equal(conflicting.scorer.profileA.summary.falseAllegations, 1);
+  assert.ok(
+    !conflictFinding.diagnostics.some((d) => d.includes("→ supported detection")),
+    "a rejected finding emits no supported-detection diagnostic",
+  );
+  const accountingReason = conflictFinding.diagnostics.find((d) => d.includes("not a supported detection"));
+  assert.ok(accountingReason, "the accounting decision is explained on the finding");
+  assert.ok(
+    accountingReason.includes(SERIALIZER),
+    `the accounting reason names the contradictory reference: ${accountingReason}`,
+  );
   // Finding-level accounting keeps both findings: one rejected, one admitted.
   assert.equal(conflicting.decision.findings.length, 2);
   assert.equal(conflicting.decision.deliveredFindings, 2);
@@ -1032,4 +1058,16 @@ test("repro C6 (maintainer): supporting plus neutral stays admissible; supportin
   // Review-execution admission is a separate decision from finding admission:
   // one rejected finding does not invalidate the review, per existing policy.
   assert.equal(conflicting.decision.admitted, neutral.decision.admitted);
+
+  // The paired accounting table this correction exists to guarantee.
+  assert.deepEqual(
+    [
+      { case: "supporting + neutral", admitted: neutralDecision.admitted, count: neutral.scorer.profileA.summary.supportedDetections },
+      { case: "supporting + contradictory", admitted: conflictDecision.admitted, count: conflicting.scorer.profileA.summary.supportedDetections },
+    ],
+    [
+      { case: "supporting + neutral", admitted: true, count: 1 },
+      { case: "supporting + contradictory", admitted: false, count: 0 },
+    ],
+  );
 });

@@ -720,6 +720,17 @@ export interface ProfileAFindingOutput {
   /** References whose explicit judgment is `contradictsClaim` for this claim. */
   contradictoryReferences: string[];
   truthComparison: "matches" | "contradicts" | "neutral" | "n/a";
+  /**
+   * This occurrence is counted in the summary as a supported detection. It is
+   * true only when the finding passed every individual admission and support
+   * gate the scorer can evaluate — delivered and mapped, resolved references,
+   * no ambiguous support, no explicit evidence conflict, no duplicate criterion
+   * claim, and established semantic support — and Truth records the mapped
+   * criterion as violated. A supporting citation alone is never enough: an
+   * explicitly contradicting citation cancels it, exactly as it does for
+   * admission.
+   */
+  supportedDetection: boolean;
   qualityFlags: string[];
   diagnostics: string[];
 }
@@ -1276,7 +1287,6 @@ function computeProfileAOutput(
   let skippedCount = 0;
   let normalizationDroppedCount = 0;
   let falseAllegations = 0;
-  let supportedDetections = 0;
 
   for (let i = 0; i < rc.findings.length; i++) {
     const f = rc.findings[i];
@@ -1311,6 +1321,7 @@ function computeProfileAOutput(
         evidenceConflict: false,
         contradictoryReferences: [],
         truthComparison: "n/a",
+        supportedDetection: false,
         qualityFlags: f.qualityFlags,
         diagnostics: [f.skipReason ? `skipped: ${f.skipReason}` : "skipped"],
       });
@@ -1342,6 +1353,7 @@ function computeProfileAOutput(
         evidenceConflict: false,
         contradictoryReferences: [],
         truthComparison: "n/a",
+        supportedDetection: false,
         qualityFlags: f.qualityFlags,
         diagnostics: ["normalization dropped the raw native finding"],
       });
@@ -1437,12 +1449,19 @@ function computeProfileAOutput(
         findingDiagnostics.push(`mapped to truth-satisfied criterion ${criterionMapping} → false allegation`);
       } else {
         truthComparison = "matches";
-        if (anySupporting) {
-          supportedDetections++;
+        // A supporting citation alone does not make this a detection. The
+        // conflict and ambiguity gates are reported here; the duplicate-mapping
+        // gate is only known after the pass below, so the positive diagnostic
+        // is emitted there once every gate has been applied.
+        if (evidenceConflict) {
           findingDiagnostics.push(
-            `mapped to truth-violated criterion ${criterionMapping} → supported detection`,
+            `mapped to truth-violated criterion ${criterionMapping} → not a supported detection: explicit contradiction from ${contradictoryReferences.join(", ")}`,
           );
-        } else {
+        } else if (supportAmbiguous) {
+          findingDiagnostics.push(
+            `mapped to truth-violated criterion ${criterionMapping} → not a supported detection: semantic support is ambiguous`,
+          );
+        } else if (!anySupporting) {
           findingDiagnostics.push(
             `mapped to truth-violated criterion ${criterionMapping} → detection without a supporting reference`,
           );
@@ -1451,6 +1470,12 @@ function computeProfileAOutput(
     } else if (mappingStatus === "mapped") {
       findingDiagnostics.push("truth binding invalid → truth comparison suspended");
     }
+
+    // Accounting follows the gates, not the raw citation: an occurrence whose
+    // support was rejected (conflict, ambiguity, absent support) is not counted
+    // even when another cited reference is positive.
+    const supportedDetection =
+      truthComparison === "matches" && semanticSupport === "supported" && !supportAmbiguous;
 
     findings.push({
       findingId,
@@ -1474,6 +1499,7 @@ function computeProfileAOutput(
       evidenceConflict,
       contradictoryReferences,
       truthComparison,
+      supportedDetection,
       qualityFlags: f.qualityFlags,
       diagnostics: findingDiagnostics,
     });
@@ -1506,6 +1532,27 @@ function computeProfileAOutput(
     }
   }
 
+  // Supported-detection accounting is settled only after every gate has been
+  // applied, so a duplicate criterion claim can never be counted and a counted
+  // occurrence always has a truthful positive diagnostic.
+  for (const finding of findings) {
+    if (finding.duplicateMapping) {
+      if (finding.supportedDetection) {
+        finding.supportedDetection = false;
+        finding.diagnostics.push(
+          `mapped to truth-violated criterion ${finding.criterionMapping} → not a supported detection: the criterion is claimed by more than one delivered finding`,
+        );
+      }
+      continue;
+    }
+    if (finding.supportedDetection) {
+      finding.diagnostics.push(
+        `mapped to truth-violated criterion ${finding.criterionMapping} → supported detection`,
+      );
+    }
+  }
+  const supportedDetectionCount = findings.filter((f) => f.supportedDetection).length;
+
   const overallStatus: "complete" | "partial" | "inconclusive" =
     deliveredCount === 0 && skippedCount === 0 && normalizationDroppedCount === 0
       ? "complete"
@@ -1526,7 +1573,7 @@ function computeProfileAOutput(
       skipped: skippedCount,
       normalizationDropped: normalizationDroppedCount,
       falseAllegations,
-      supportedDetections,
+      supportedDetections: supportedDetectionCount,
       duplicateMappings,
       ambiguousSupport: findings.filter((f) => f.supportAmbiguous).length,
       evidenceConflicts: findings.filter((f) => f.evidenceConflict).length,

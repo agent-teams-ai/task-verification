@@ -180,6 +180,19 @@ records `semanticSupport: unsupported` with the contradicting reference named, a
 detection, while the identical input with a neutral second reference stays admissible and leaves an
 unrelated finding's decision untouched.
 
+**Supported-detection accounting (final).** `ProfileAFindingOutput.supportedDetection` is a gate
+conclusion, not a citation fact: it is true only for a delivered, mapped occurrence whose references
+resolved, whose support is not ambiguous, whose evidence carries no explicit contradiction, whose
+criterion is not claimed by another delivered finding, and whose semantic support is established —
+and only when Truth records the mapped criterion as violated. The scorer summary's
+`supportedDetections` count is recomputed from that field after the duplicate-mapping pass, so the
+summary can no longer disagree with admission. In the paired case the summary reads **1** for
+supporting + neutral and **0** for supporting + contradictory; the rejected occurrence is diagnosed as
+`not a supported detection: explicit contradiction from artifact://serializer.ts`. The original
+finding, both references, the explicit contradictory judgment and every other count (`delivered`,
+`mapped`, `falseAllegations`, `evidenceConflicts`) are unchanged, and `repro C6` asserts the paired
+admission/accounting table directly. No Truth outcome changed.
+
 **Exact Profile B reproduction (maintainer input).** `repro B1x` uses the six records the maintainer
 actually supplied: five ordinary expected assessments, one for each of AC-1…AC-5, then a sixth AC-3
 record that contradicts the first AC-3 claim. It runs the real decoder → ResultContract → scorer
