@@ -1,0 +1,147 @@
+name: M2-A deterministic checks
+
+on:
+  push:
+    branches: [feat/m2-a-foundation-fixture-oracle, feat/m2-b-truth-evidence, feat/m2-c-scorer-ledger]
+  pull_request:
+    branches: [research/milestone-1-experiment-plan-2026-11-12, feat/m2-a-foundation-fixture-oracle, feat/m2-b-truth-evidence]
+
+permissions:
+  contents: read
+
+env:
+  # M2-A base runtime pin (unchanged by the SDK qualification runtime).
+  M2_NODE_VERSION: 24.13.1
+  M2_PNPM_VERSION: 9.15.0
+  # Exact approved OCR release.
+  RR7_TAG: ocr-v1.13.1-rr.7
+  RR7_SHA256: 2f290fb407a5cb6fbe854cb6702b8c713325fce603a71c1be83f5284034aaa29
+  RR7_SIZE: 80513021
+  # Exact approved SDK source pin.
+  SDK_COMMIT: 539418d5935a9e336d480b128a1cdb93c1daa6e1
+  SDK_TARBALL_SIZE: 54221
+  SDK_TARBALL_SHA256: dfa8fad3058813d4b0db52f3a05e347c0c8a531286bcbea2183554045e179f00
+  # The SDK declares >=24.21.0 <25 || >=26.10.0 <27; qualification uses 24.21.x.
+  SDK_NODE_VERSION: 24.21.0
+  SDK_PNPM_VERSION: 11.28.2
+
+jobs:
+  verify:
+    strategy:
+      matrix:
+        os: [ubuntu-24.04, windows-2022]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 24.13.1
+      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+        with:
+          version: 9.15.0
+      - name: Verify M2-A base runtime pin
+        shell: bash
+        run: test "$(node --version)" = "v${M2_NODE_VERSION}"
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run typecheck
+      - name: Typecheck the opt-in rr.7 suites
+        run: npx tsc --noEmit -p tsconfig.rr7.json
+      - run: pnpm run build:types
+      - run: pnpm run test
+
+  rr7-ocr:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 24.13.1
+      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+        with:
+          version: 9.15.0
+      - name: Download rr.7 asset
+        run: |
+          mkdir -p /tmp/rr7
+          base="https://github.com/agent-teams-ai/open-code-review/releases/download/${RR7_TAG}"
+          curl -fsSL -o /tmp/rr7/opencodereview-linux-amd64 "${base}/opencodereview-linux-amd64"
+          curl -fsSL -o /tmp/rr7/MANIFEST "${base}/MANIFEST"
+          curl -fsSL -o /tmp/rr7/qualification.json "${base}/qualification.json"
+      - name: Verify rr.7
+        run: |
+          echo "${RR7_SHA256}  /tmp/rr7/opencodereview-linux-amd64" | sha256sum -c -
+          test "$(stat -c%s /tmp/rr7/opencodereview-linux-amd64)" = "${RR7_SIZE}"
+          chmod +x /tmp/rr7/opencodereview-linux-amd64
+          /tmp/rr7/opencodereview-linux-amd64 --version
+      - run: pnpm install --frozen-lockfile
+      - name: WP7 rr.7 suite (Linux only)
+        run: OCR_RR7_DIR=/tmp/rr7 node --experimental-transform-types --test --test-concurrency=1 tests/rr7/wp7-rr7.test.ts
+      - name: WP8-A integrated Profile A suite (Linux only)
+        run: OCR_RR7_DIR=/tmp/rr7 node --experimental-transform-types --test --test-concurrency=1 tests/rr7/wp8-profile-a.test.ts
+      - name: Upload retained Profile A evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: wp8a-evidence
+          path: |
+            .isolation-tmp/wp8a-evidence/**
+          if-no-files-found: error
+          include-hidden-files: true
+
+  sdk-qualification:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 24.21.0
+      - name: Verify SDK qualification runtime
+        run: test "$(node --version)" = "v${SDK_NODE_VERSION}"
+      - name: Clone the exact approved SDK source
+        run: |
+          git clone --quiet --no-checkout https://github.com/agent-teams-ai/account-gateway.git /tmp/sdk
+          git -C /tmp/sdk config core.autocrlf true
+          git -C /tmp/sdk checkout -f --quiet "${SDK_COMMIT}"
+          test "$(git -C /tmp/sdk rev-parse HEAD)" = "${SDK_COMMIT}"
+          test "$(git -C /tmp/sdk rev-parse HEAD^{tree})" = "608b577e2da608b09d77ca2cf19661a82543185c"
+      - name: Install, build and pack the SDK
+        working-directory: /tmp/sdk
+        run: |
+          # The approved tarball was produced from a checkout with CRLF working-tree
+          # files; reproduce that content so the artifact identity is meaningful.
+          git config core.autocrlf true
+          git checkout -f --quiet "${SDK_COMMIT}"
+          npx --yes pnpm@${SDK_PNPM_VERSION} install --frozen-lockfile
+          node scripts/build.mjs
+          mkdir -p /tmp/sdk-out
+          npx --yes pnpm@${SDK_PNPM_VERSION} --dir packages/account-gateway pack --pack-destination /tmp/sdk-out
+      - name: Verify the packed tarball identity
+        env:
+          SDK_TARBALL_EVIDENCE: /tmp/sdk-out/tarball-verification.json
+        run: node scripts/verify-sdk-tarball.mjs /tmp/sdk-out/agent-teams-account-gateway-0.1.0.tgz
+      - name: Install the tarball in an isolated qualification project
+        run: |
+          mkdir -p /tmp/sdk-qual
+          cd /tmp/sdk-qual
+          printf '{"name":"m2-sdk-qualification","private":true,"version":"0.0.0","type":"module"}\n' > package.json
+          npm install --no-audit --no-fund /tmp/sdk-out/agent-teams-account-gateway-0.1.0.tgz
+      - name: SDK qualification (20 scenarios)
+        env:
+          SDK_PROJECT_DIR: /tmp/sdk-qual
+          SDK_QUALIFICATION_OUT: /tmp/sdk-qual/sdk-qualification.json
+        run: node scripts/qualify-sdk.mjs
+      - name: WP8-B Profile B through the packed SDK (C1-C4)
+        env:
+          SDK_PROJECT_DIR: /tmp/sdk-qual
+          PROFILE_B_OUT: /tmp/sdk-qual/profile-b-evidence.json
+          PROFILE_B_EVIDENCE_DIR: /tmp/sdk-qual/wp8b-evidence
+        run: node --experimental-strip-types scripts/qualify-profile-b.mjs
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: sdk-qualification-evidence
+          path: |
+            /tmp/sdk-qual/sdk-qualification.json
+            /tmp/sdk-qual/profile-b-evidence.json
+            /tmp/sdk-qual/wp8b-evidence/**
+            /tmp/sdk-qual/request-identity.jsonl
+            /tmp/sdk-out/tarball-verification.json
+          if-no-files-found: error

@@ -1,0 +1,222 @@
+[
+  {
+    "baselineId": "baseline-v1",
+    "version": "v1",
+    "policyId": "baseline-policy-baseline-policy-v1",
+    "policyVersion": "baseline-policy-v1",
+    "candidateAnonId": "S1-FIX-5ba5153fec57",
+    "candidateSnapshotDigest": "327d0a9690ff70ed5ff8b19e03cd4f9eb822fa4f6a87203b37f4b91499f4030a",
+    "outcomes": [
+      {
+        "criterionId": "AC-1",
+        "outcome": "satisfied",
+        "rationale": "All required applicable fresh observations pass: EV-S1-FIX-5ba5153fec57-AC-1-P-active-a-0, EV-S1-FIX-5ba5153fec57-AC-1-P-active-b-1.",
+        "evidenceRefs": [
+          "EV-S1-FIX-5ba5153fec57-AC-1-P-active-a-0",
+          "EV-S1-FIX-5ba5153fec57-AC-1-P-active-b-1"
+        ]
+      },
+      {
+        "criterionId": "AC-2",
+        "outcome": "satisfied",
+        "rationale": "All required applicable fresh observations pass: EV-S1-FIX-5ba5153fec57-AC-2-P-missing-2.",
+        "evidenceRefs": [
+          "EV-S1-FIX-5ba5153fec57-AC-2-P-missing-2"
+        ]
+      },
+      {
+        "criterionId": "AC-3",
+        "outcome": "satisfied",
+        "rationale": "All required applicable fresh observations pass: EV-S1-FIX-5ba5153fec57-AC-3-P-revoked-3.",
+        "evidenceRefs": [
+          "EV-S1-FIX-5ba5153fec57-AC-3-P-revoked-3"
+        ]
+      },
+      {
+        "criterionId": "AC-4",
+        "outcome": "satisfied",
+        "rationale": "All required applicable fresh observations pass: EV-S1-FIX-5ba5153fec57-AC-4-P-active-a-4, EV-S1-FIX-5ba5153fec57-AC-4-P-active-b-5, EV-S1-FIX-5ba5153fec57-AC-4-P-missing-6, EV-S1-FIX-5ba5153fec57-AC-4-P-revoked-7.",
+        "evidenceRefs": [
+          "EV-S1-FIX-5ba5153fec57-AC-4-P-active-a-4",
+          "EV-S1-FIX-5ba5153fec57-AC-4-P-active-b-5",
+          "EV-S1-FIX-5ba5153fec57-AC-4-P-missing-6",
+          "EV-S1-FIX-5ba5153fec57-AC-4-P-revoked-7"
+        ]
+      },
+      {
+        "criterionId": "AC-5",
+        "outcome": "satisfied",
+        "rationale": "All required applicable fresh observations pass: EV-S1-FIX-5ba5153fec57-AC-5-P-missing-8.",
+        "evidenceRefs": [
+          "EV-S1-FIX-5ba5153fec57-AC-5-P-missing-8"
+        ]
+      }
+    ],
+    "rejected": false
+  },
+  {
+    "baselineId": "baseline-v1",
+    "version": "v1",
+    "policyId": "baseline-policy-baseline-policy-v1",
+    "policyVersion": "baseline-policy-v1",
+    "candidateAnonId": "S1-FIX-9f1b492fe31a",
+    "candidateSnapshotDigest": "229cd951be058c0d099a50298713c81d666cf79bb653f921939303caa97d793c",
+    "outcomes": [
+      {
+        "criterionId": "AC-1",
+        "outcome": "satisfied",
+        "rationale": "All required applicable fresh observations pass: EV-S1-FIX-9f1b492fe31a-AC-1-P-active-a-0, EV-S1-FIX-9f1b492fe31a-AC-1-P-active-b-1.",
+        "evidenceRefs": [
+          "EV-S1-FIX-9f1b492fe31a-AC-1-P-active-a-0",
+          "EV-S1-FIX-9f1b492fe31a-AC-1-P-active-b-1"
+        ]
+      },
+      {
+        "criterionId": "AC-2",
+        "outcome": "satisfied",
+        "rationale": "All required applicable fresh observations pass: EV-S1-FIX-9f1b492fe31a-AC-2-P-missing-2.",
+        "evidenceRefs": [
+          "EV-S1-FIX-9f1b492fe31a-AC-2-P-missing-2"
+        ]
+      },
+      {
+        "criterionId": "AC-3",
+        "outcome": "satisfied",
+        "rationale": "All required applicable fresh observations pass: EV-S1-FIX-9f1b492fe31a-AC-3-P-revoked-3.",
+        "evidenceRefs": [
+          "EV-S1-FIX-9f1b492fe31a-AC-3-P-revoked-3"
+        ]
+      },
+      {
+        "criterionId": "AC-4",
+        "outcome": "satisfied",
+        "rationale": "All required applicable fresh observations pass: EV-S1-FIX-9f1b492fe31a-AC-4-P-active-a-4, EV-S1-FIX-9f1b492fe31a-AC-4-P-active-b-5, EV-S1-FIX-9f1b492fe31a-AC-4-P-missing-6, EV-S1-FIX-9f1b492fe31a-AC-4-P-revoked-7.",
+        "evidenceRefs": [
+          "EV-S1-FIX-9f1b492fe31a-AC-4-P-active-a-4",
+          "EV-S1-FIX-9f1b492fe31a-AC-4-P-active-b-5",
+          "EV-S1-FIX-9f1b492fe31a-AC-4-P-missing-6",
+          "EV-S1-FIX-9f1b492fe31a-AC-4-P-revoked-7"
+        ]
+      },
+      {
+        "criterionId": "AC-5",
+        "outcome": "satisfied",
+        "rationale": "All required applicable fresh observations pass: EV-S1-FIX-9f1b492fe31a-AC-5-P-missing-8.",
+        "evidenceRefs": [
+          "EV-S1-FIX-9f1b492fe31a-AC-5-P-missing-8"
+        ]
+      }
+    ],
+    "rejected": false
+  },
+  {
+    "baselineId": "baseline-v1",
+    "version": "v1",
+    "policyId": "baseline-policy-baseline-policy-v1",
+    "policyVersion": "baseline-policy-v1",
+    "candidateAnonId": "S1-FIX-c719e43e54e4",
+    "candidateSnapshotDigest": "4fb700863d2a942aa6f5a43747b3c0da252a6911b454e87d1c6c7efb37bddbda",
+    "outcomes": [
+      {
+        "criterionId": "AC-1",
+        "outcome": "satisfied",
+        "rationale": "All required applicable fresh observations pass: EV-S1-FIX-c719e43e54e4-AC-1-P-active-a-0, EV-S1-FIX-c719e43e54e4-AC-1-P-active-b-1.",
+        "evidenceRefs": [
+          "EV-S1-FIX-c719e43e54e4-AC-1-P-active-a-0",
+          "EV-S1-FIX-c719e43e54e4-AC-1-P-active-b-1"
+        ]
+      },
+      {
+        "criterionId": "AC-2",
+        "outcome": "satisfied",
+        "rationale": "All required applicable fresh observations pass: EV-S1-FIX-c719e43e54e4-AC-2-P-missing-2.",
+        "evidenceRefs": [
+          "EV-S1-FIX-c719e43e54e4-AC-2-P-missing-2"
+        ]
+      },
+      {
+        "criterionId": "AC-3",
+        "outcome": "violated",
+        "rationale": "Applicable observed violation(s): EV-S1-FIX-c719e43e54e4-AC-3-P-revoked-3.",
+        "evidenceRefs": [
+          "EV-S1-FIX-c719e43e54e4-AC-3-P-revoked-3"
+        ]
+      },
+      {
+        "criterionId": "AC-4",
+        "outcome": "satisfied",
+        "rationale": "All required applicable fresh observations pass: EV-S1-FIX-c719e43e54e4-AC-4-P-active-a-4, EV-S1-FIX-c719e43e54e4-AC-4-P-active-b-5, EV-S1-FIX-c719e43e54e4-AC-4-P-missing-6, EV-S1-FIX-c719e43e54e4-AC-4-P-revoked-7.",
+        "evidenceRefs": [
+          "EV-S1-FIX-c719e43e54e4-AC-4-P-active-a-4",
+          "EV-S1-FIX-c719e43e54e4-AC-4-P-active-b-5",
+          "EV-S1-FIX-c719e43e54e4-AC-4-P-missing-6",
+          "EV-S1-FIX-c719e43e54e4-AC-4-P-revoked-7"
+        ]
+      },
+      {
+        "criterionId": "AC-5",
+        "outcome": "satisfied",
+        "rationale": "All required applicable fresh observations pass: EV-S1-FIX-c719e43e54e4-AC-5-P-missing-8.",
+        "evidenceRefs": [
+          "EV-S1-FIX-c719e43e54e4-AC-5-P-missing-8"
+        ]
+      }
+    ],
+    "rejected": false
+  },
+  {
+    "baselineId": "baseline-v1",
+    "version": "v1",
+    "policyId": "baseline-policy-baseline-policy-v1",
+    "policyVersion": "baseline-policy-v1",
+    "candidateAnonId": "S1-FIX-f91b12c2cee5",
+    "candidateSnapshotDigest": "e3700e622872ba32465e28ef014978236de90fec2bc21c5865a6a42aab253b92",
+    "outcomes": [
+      {
+        "criterionId": "AC-1",
+        "outcome": "satisfied",
+        "rationale": "All required applicable fresh observations pass: EV-S1-FIX-f91b12c2cee5-AC-1-P-active-a-0, EV-S1-FIX-f91b12c2cee5-AC-1-P-active-b-1.",
+        "evidenceRefs": [
+          "EV-S1-FIX-f91b12c2cee5-AC-1-P-active-a-0",
+          "EV-S1-FIX-f91b12c2cee5-AC-1-P-active-b-1"
+        ]
+      },
+      {
+        "criterionId": "AC-2",
+        "outcome": "satisfied",
+        "rationale": "All required applicable fresh observations pass: EV-S1-FIX-f91b12c2cee5-AC-2-P-missing-2.",
+        "evidenceRefs": [
+          "EV-S1-FIX-f91b12c2cee5-AC-2-P-missing-2"
+        ]
+      },
+      {
+        "criterionId": "AC-3",
+        "outcome": "satisfied",
+        "rationale": "All required applicable fresh observations pass: EV-S1-FIX-f91b12c2cee5-AC-3-P-revoked-3.",
+        "evidenceRefs": [
+          "EV-S1-FIX-f91b12c2cee5-AC-3-P-revoked-3"
+        ]
+      },
+      {
+        "criterionId": "AC-4",
+        "outcome": "violated",
+        "rationale": "Applicable observed violation(s): EV-S1-FIX-f91b12c2cee5-AC-4-P-active-a-4, EV-S1-FIX-f91b12c2cee5-AC-4-P-active-b-5.",
+        "evidenceRefs": [
+          "EV-S1-FIX-f91b12c2cee5-AC-4-P-active-a-4",
+          "EV-S1-FIX-f91b12c2cee5-AC-4-P-active-b-5",
+          "EV-S1-FIX-f91b12c2cee5-AC-4-P-missing-6",
+          "EV-S1-FIX-f91b12c2cee5-AC-4-P-revoked-7"
+        ]
+      },
+      {
+        "criterionId": "AC-5",
+        "outcome": "satisfied",
+        "rationale": "All required applicable fresh observations pass: EV-S1-FIX-f91b12c2cee5-AC-5-P-missing-8.",
+        "evidenceRefs": [
+          "EV-S1-FIX-f91b12c2cee5-AC-5-P-missing-8"
+        ]
+      }
+    ],
+    "rejected": false
+  }
+]

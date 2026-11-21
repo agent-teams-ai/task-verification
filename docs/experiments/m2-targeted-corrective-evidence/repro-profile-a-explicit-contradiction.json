@@ -1,0 +1,475 @@
+{
+  "schema": "m2.repro.profile-a-explicit-contradiction/v1",
+  "note": "Paired case with identical inputs. Case A: reference A supports AC-3 and reference B is neutral, so the finding stays admissible. Case B: the same reference B carries contradictsClaim=true, so the finding is rejected with an evidence-conflict gate and is not a supported detection. Original findings, references and diagnostics are preserved in both cases, and an unrelated AC-1 finding is unaffected.",
+  "inputs": {
+    "findings": [
+      {
+        "findingId": "f-control",
+        "nativeComment": "AC-1: the profile route is missing.",
+        "normalizedFinding": "AC-1: the profile route is missing.",
+        "skipped": false,
+        "skipReason": null,
+        "qualityFlags": [],
+        "criterionMapping": "AC-1",
+        "references": [
+          "artifact://app.ts"
+        ]
+      },
+      {
+        "findingId": "f-pair",
+        "nativeComment": "AC-3: the profile route is missing.",
+        "normalizedFinding": "AC-3: the profile route is missing.",
+        "skipped": false,
+        "skipReason": null,
+        "qualityFlags": [],
+        "criterionMapping": "AC-3",
+        "references": [
+          "artifact://app.ts",
+          "artifact://serializer.ts"
+        ]
+      }
+    ],
+    "criteria": [
+      "AC-1",
+      "AC-2",
+      "AC-3",
+      "AC-4",
+      "AC-5"
+    ],
+    "candidate": "S1-FIX-audit",
+    "snapshot": "4dc7793dda315d657a146a65ee341576594a09ffc51aa55247f77b0451ffe222"
+  },
+  "caseA_supportingPlusNeutral": {
+    "scoredFindings": [
+      {
+        "findingId": "f-control",
+        "occurrenceId": "fo-7e2f1a3eea09a98a",
+        "criterionMapping": "AC-1",
+        "references": [
+          "artifact://app.ts"
+        ],
+        "semanticSupport": "supported",
+        "evidenceConflict": false,
+        "contradictoryReferences": [],
+        "supportAmbiguous": false,
+        "truthComparison": "contradicts",
+        "diagnostics": [
+          "reference artifact://app.ts: resolved and mechanically valid",
+          "mapped to truth-satisfied criterion AC-1 → false allegation"
+        ]
+      },
+      {
+        "findingId": "f-pair",
+        "occurrenceId": "fo-28f77978202cfdf1",
+        "criterionMapping": "AC-3",
+        "references": [
+          "artifact://app.ts",
+          "artifact://serializer.ts"
+        ],
+        "semanticSupport": "supported",
+        "evidenceConflict": false,
+        "contradictoryReferences": [],
+        "supportAmbiguous": false,
+        "truthComparison": "matches",
+        "diagnostics": [
+          "reference artifact://app.ts: resolved and mechanically valid",
+          "reference artifact://serializer.ts: resolved and mechanically valid",
+          "criterion AC-3: no semantic support decision for this claim",
+          "mapped to truth-violated criterion AC-3 → supported detection"
+        ]
+      }
+    ],
+    "summary": {
+      "delivered": 2,
+      "mapped": 2,
+      "unmapped": 0,
+      "outOfScope": 0,
+      "skipped": 0,
+      "normalizationDropped": 0,
+      "falseAllegations": 1,
+      "supportedDetections": 1,
+      "duplicateMappings": 0,
+      "ambiguousSupport": 0,
+      "evidenceConflicts": 0,
+      "overallStatus": "partial"
+    },
+    "admission": {
+      "reviewAdmitted": true,
+      "deliveredFindings": 2,
+      "admittedFindings": 2,
+      "rejectedFindings": 0,
+      "supportedDetections": [
+        "f-pair"
+      ],
+      "supportedDetectionOccurrences": [
+        "fo-28f77978202cfdf1"
+      ],
+      "findings": [
+        {
+          "findingId": "f-control",
+          "occurrenceId": "fo-7e2f1a3eea09a98a",
+          "criterionId": "AC-1",
+          "references": [
+            "artifact://app.ts"
+          ],
+          "semanticSupported": true,
+          "evidenceConflict": false,
+          "contradictoryReferences": [],
+          "admitted": true,
+          "supportedDetection": false,
+          "primaryFailureGate": null,
+          "reason": "admitted",
+          "gates": [
+            {
+              "id": "occurrence-identity",
+              "scope": "claim",
+              "applicable": true,
+              "status": "pass",
+              "source": "scorer.profileA.findings[].occurrenceId",
+              "reason": "occurrence fo-7e2f1a3eea09a98a at native position 0 resolved exactly once"
+            },
+            {
+              "id": "claim-association",
+              "scope": "claim",
+              "applicable": true,
+              "status": "pass",
+              "source": "scorer.profileA.findings[].criterionMapping",
+              "reason": "finding maps to applicable criterion AC-1"
+            },
+            {
+              "id": "candidate-binding",
+              "scope": "claim",
+              "applicable": true,
+              "status": "pass",
+              "source": "artifact registry candidateBinding",
+              "reason": "every cited artifact is bound to this candidate"
+            },
+            {
+              "id": "snapshot-binding",
+              "scope": "claim",
+              "applicable": true,
+              "status": "pass",
+              "source": "artifact registry snapshotDigest",
+              "reason": "every cited artifact is bound to this snapshot"
+            },
+            {
+              "id": "reference-validity",
+              "scope": "claim",
+              "applicable": true,
+              "status": "pass",
+              "source": "artifact registry",
+              "reason": "every cited artifact is byte-verified, allowlisted, current and applicable"
+            },
+            {
+              "id": "evidence-conflict",
+              "scope": "claim",
+              "applicable": true,
+              "status": "pass",
+              "source": "scorer.profileA.findings[].contradictoryReferences",
+              "reason": "no cited reference contradicts this claim"
+            },
+            {
+              "id": "reference-sufficiency",
+              "scope": "claim",
+              "applicable": true,
+              "status": "pass",
+              "source": "occurrence-scoped semantic support",
+              "reason": "a cited artifact supports this occurrence's claim"
+            }
+          ]
+        },
+        {
+          "findingId": "f-pair",
+          "occurrenceId": "fo-28f77978202cfdf1",
+          "criterionId": "AC-3",
+          "references": [
+            "artifact://app.ts",
+            "artifact://serializer.ts"
+          ],
+          "semanticSupported": true,
+          "evidenceConflict": false,
+          "contradictoryReferences": [],
+          "admitted": true,
+          "supportedDetection": true,
+          "primaryFailureGate": null,
+          "reason": "admitted",
+          "gates": [
+            {
+              "id": "occurrence-identity",
+              "scope": "claim",
+              "applicable": true,
+              "status": "pass",
+              "source": "scorer.profileA.findings[].occurrenceId",
+              "reason": "occurrence fo-28f77978202cfdf1 at native position 1 resolved exactly once"
+            },
+            {
+              "id": "claim-association",
+              "scope": "claim",
+              "applicable": true,
+              "status": "pass",
+              "source": "scorer.profileA.findings[].criterionMapping",
+              "reason": "finding maps to applicable criterion AC-3"
+            },
+            {
+              "id": "candidate-binding",
+              "scope": "claim",
+              "applicable": true,
+              "status": "pass",
+              "source": "artifact registry candidateBinding",
+              "reason": "every cited artifact is bound to this candidate"
+            },
+            {
+              "id": "snapshot-binding",
+              "scope": "claim",
+              "applicable": true,
+              "status": "pass",
+              "source": "artifact registry snapshotDigest",
+              "reason": "every cited artifact is bound to this snapshot"
+            },
+            {
+              "id": "reference-validity",
+              "scope": "claim",
+              "applicable": true,
+              "status": "pass",
+              "source": "artifact registry",
+              "reason": "every cited artifact is byte-verified, allowlisted, current and applicable"
+            },
+            {
+              "id": "evidence-conflict",
+              "scope": "claim",
+              "applicable": true,
+              "status": "pass",
+              "source": "scorer.profileA.findings[].contradictoryReferences",
+              "reason": "no cited reference contradicts this claim"
+            },
+            {
+              "id": "reference-sufficiency",
+              "scope": "claim",
+              "applicable": true,
+              "status": "pass",
+              "source": "occurrence-scoped semantic support",
+              "reason": "a cited artifact supports this occurrence's claim"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "caseB_supportingPlusContradiction": {
+    "scoredFindings": [
+      {
+        "findingId": "f-control",
+        "occurrenceId": "fo-7e2f1a3eea09a98a",
+        "criterionMapping": "AC-1",
+        "references": [
+          "artifact://app.ts"
+        ],
+        "semanticSupport": "supported",
+        "evidenceConflict": false,
+        "contradictoryReferences": [],
+        "supportAmbiguous": false,
+        "truthComparison": "contradicts",
+        "diagnostics": [
+          "reference artifact://app.ts: resolved and mechanically valid",
+          "mapped to truth-satisfied criterion AC-1 → false allegation"
+        ]
+      },
+      {
+        "findingId": "f-pair",
+        "occurrenceId": "fo-28f77978202cfdf1",
+        "criterionMapping": "AC-3",
+        "references": [
+          "artifact://app.ts",
+          "artifact://serializer.ts"
+        ],
+        "semanticSupport": "unsupported",
+        "evidenceConflict": true,
+        "contradictoryReferences": [
+          "artifact://serializer.ts"
+        ],
+        "supportAmbiguous": false,
+        "truthComparison": "matches",
+        "diagnostics": [
+          "reference artifact://app.ts: resolved and mechanically valid",
+          "reference artifact://serializer.ts: resolved and mechanically valid",
+          "criterion AC-3: claim-scoped support decision",
+          "explicit contradiction conflicts with the supporting reference(s): artifact://serializer.ts",
+          "mapped to truth-violated criterion AC-3 → not a supported detection: explicit contradiction from artifact://serializer.ts"
+        ]
+      }
+    ],
+    "summary": {
+      "delivered": 2,
+      "mapped": 2,
+      "unmapped": 0,
+      "outOfScope": 0,
+      "skipped": 0,
+      "normalizationDropped": 0,
+      "falseAllegations": 1,
+      "supportedDetections": 0,
+      "duplicateMappings": 0,
+      "ambiguousSupport": 0,
+      "evidenceConflicts": 1,
+      "overallStatus": "partial"
+    },
+    "admission": {
+      "reviewAdmitted": true,
+      "deliveredFindings": 2,
+      "admittedFindings": 1,
+      "rejectedFindings": 1,
+      "supportedDetections": [],
+      "supportedDetectionOccurrences": [],
+      "findings": [
+        {
+          "findingId": "f-control",
+          "occurrenceId": "fo-7e2f1a3eea09a98a",
+          "criterionId": "AC-1",
+          "references": [
+            "artifact://app.ts"
+          ],
+          "semanticSupported": true,
+          "evidenceConflict": false,
+          "contradictoryReferences": [],
+          "admitted": true,
+          "supportedDetection": false,
+          "primaryFailureGate": null,
+          "reason": "admitted",
+          "gates": [
+            {
+              "id": "occurrence-identity",
+              "scope": "claim",
+              "applicable": true,
+              "status": "pass",
+              "source": "scorer.profileA.findings[].occurrenceId",
+              "reason": "occurrence fo-7e2f1a3eea09a98a at native position 0 resolved exactly once"
+            },
+            {
+              "id": "claim-association",
+              "scope": "claim",
+              "applicable": true,
+              "status": "pass",
+              "source": "scorer.profileA.findings[].criterionMapping",
+              "reason": "finding maps to applicable criterion AC-1"
+            },
+            {
+              "id": "candidate-binding",
+              "scope": "claim",
+              "applicable": true,
+              "status": "pass",
+              "source": "artifact registry candidateBinding",
+              "reason": "every cited artifact is bound to this candidate"
+            },
+            {
+              "id": "snapshot-binding",
+              "scope": "claim",
+              "applicable": true,
+              "status": "pass",
+              "source": "artifact registry snapshotDigest",
+              "reason": "every cited artifact is bound to this snapshot"
+            },
+            {
+              "id": "reference-validity",
+              "scope": "claim",
+              "applicable": true,
+              "status": "pass",
+              "source": "artifact registry",
+              "reason": "every cited artifact is byte-verified, allowlisted, current and applicable"
+            },
+            {
+              "id": "evidence-conflict",
+              "scope": "claim",
+              "applicable": true,
+              "status": "pass",
+              "source": "scorer.profileA.findings[].contradictoryReferences",
+              "reason": "no cited reference contradicts this claim"
+            },
+            {
+              "id": "reference-sufficiency",
+              "scope": "claim",
+              "applicable": true,
+              "status": "pass",
+              "source": "occurrence-scoped semantic support",
+              "reason": "a cited artifact supports this occurrence's claim"
+            }
+          ]
+        },
+        {
+          "findingId": "f-pair",
+          "occurrenceId": "fo-28f77978202cfdf1",
+          "criterionId": "AC-3",
+          "references": [
+            "artifact://app.ts",
+            "artifact://serializer.ts"
+          ],
+          "semanticSupported": false,
+          "evidenceConflict": true,
+          "contradictoryReferences": [
+            "artifact://serializer.ts"
+          ],
+          "admitted": false,
+          "supportedDetection": false,
+          "primaryFailureGate": "evidence-conflict",
+          "reason": "contradictory evidence conflicts with supporting evidence: artifact://serializer.ts",
+          "gates": [
+            {
+              "id": "occurrence-identity",
+              "scope": "claim",
+              "applicable": true,
+              "status": "pass",
+              "source": "scorer.profileA.findings[].occurrenceId",
+              "reason": "occurrence fo-28f77978202cfdf1 at native position 1 resolved exactly once"
+            },
+            {
+              "id": "claim-association",
+              "scope": "claim",
+              "applicable": true,
+              "status": "pass",
+              "source": "scorer.profileA.findings[].criterionMapping",
+              "reason": "finding maps to applicable criterion AC-3"
+            },
+            {
+              "id": "candidate-binding",
+              "scope": "claim",
+              "applicable": true,
+              "status": "pass",
+              "source": "artifact registry candidateBinding",
+              "reason": "every cited artifact is bound to this candidate"
+            },
+            {
+              "id": "snapshot-binding",
+              "scope": "claim",
+              "applicable": true,
+              "status": "pass",
+              "source": "artifact registry snapshotDigest",
+              "reason": "every cited artifact is bound to this snapshot"
+            },
+            {
+              "id": "reference-validity",
+              "scope": "claim",
+              "applicable": true,
+              "status": "pass",
+              "source": "artifact registry",
+              "reason": "every cited artifact is byte-verified, allowlisted, current and applicable"
+            },
+            {
+              "id": "evidence-conflict",
+              "scope": "claim",
+              "applicable": true,
+              "status": "fail",
+              "source": "scorer.profileA.findings[].contradictoryReferences",
+              "reason": "contradictory evidence conflicts with supporting evidence: artifact://serializer.ts"
+            },
+            {
+              "id": "reference-sufficiency",
+              "scope": "claim",
+              "applicable": true,
+              "status": "fail",
+              "source": "occurrence-scoped semantic support",
+              "reason": "reference does not semantically support the finding"
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

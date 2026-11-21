@@ -1,0 +1,10 @@
+{
+  "requestId": "P-revoked",
+  "statusCode": 401,
+  "body": {
+    "error": "token_revoked"
+  },
+  "profileFieldsPresent": [],
+  "deniedFieldsPresent": [],
+  "available": true
+}

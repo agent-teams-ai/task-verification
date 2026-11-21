@@ -1,0 +1,21 @@
+{
+  "requestId": "P-active-a",
+  "statusCode": 200,
+  "body": {
+    "id": "caller-a",
+    "email": "caller-a@example.example",
+    "role": "reviewer",
+    "internal": true
+  },
+  "profileFieldsPresent": [
+    "id",
+    "email",
+    "role",
+    "internal"
+  ],
+  "deniedFieldsPresent": [
+    "role",
+    "internal"
+  ],
+  "available": true
+}

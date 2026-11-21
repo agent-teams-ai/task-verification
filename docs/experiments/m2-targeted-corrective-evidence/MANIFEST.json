@@ -1,0 +1,60 @@
+{
+  "schema": "m2.targeted-corrective-evidence/v1",
+  "files": [
+    {
+      "path": "README.md",
+      "bytes": 7173,
+      "sha256": "12225ad85ffd2e99b3327ac9d32c8cc067dd350edd46df9cdba72d09b8fa1c60"
+    },
+    {
+      "path": "native-tool-chain-out-of-scope-read.json",
+      "bytes": 2409,
+      "sha256": "e5a48615923c952f37c54982e9e8be97aacb4cf6cc5623bef04f0cd50fc300b8"
+    },
+    {
+      "path": "native-tool-chain-unchanged-dependency-read.json",
+      "bytes": 1340,
+      "sha256": "5ea7ba5dd15d743c20dfb50c0d2c14af03f20bb8a1a64e5fff72ec5e7a7cee14"
+    },
+    {
+      "path": "native-tool-payloads-out-of-scope-read.json",
+      "bytes": 3006,
+      "sha256": "3c406a1cc3c3ba9296249649ac37c7f997b8ac6348684d30c02de86456122fa7"
+    },
+    {
+      "path": "native-tool-payloads-unchanged-dependency-read.json",
+      "bytes": 4565,
+      "sha256": "b8d8348f3bcfaeddaa56a547f74b7e9881eb3e8ca6c98108b4d31704712e806b"
+    },
+    {
+      "path": "native-tool-transcript.jsonl",
+      "bytes": 4266,
+      "sha256": "94256fffebb141dfe20edac8e7a5b7ec0b5cbd9016880904d6f37f7e54f4a36b"
+    },
+    {
+      "path": "pr349-development-case-sources.json",
+      "bytes": 2119,
+      "sha256": "2505052377f5937425a9948bcd653344f2f887204b6bbcf0811d9c1cb8af3ebd"
+    },
+    {
+      "path": "pr349-memory-delivery-probe.json",
+      "bytes": 1677,
+      "sha256": "a7f7682b600b5f17aa7e6a008ecf2562b601f79608b8d6e313c201034bfd72ef"
+    },
+    {
+      "path": "repro-profile-a-explicit-contradiction.json",
+      "bytes": 16731,
+      "sha256": "3dfbca6d8bdee4849f23346094821020e8ce92f30798ca9dbbcd3c15d6f608a6"
+    },
+    {
+      "path": "repro-profile-a-finding-collision.json",
+      "bytes": 2571,
+      "sha256": "c6f854476695dc102404584061512fe4ef174b650d8529f7c2a1d09e92da3f1a"
+    },
+    {
+      "path": "repro-profile-b-conflicting-duplicate.json",
+      "bytes": 12767,
+      "sha256": "0e3bafff9379dbabee37813f501ad2b2c417ab09a41fffb3645377e835e62191"
+    }
+  ]
+}

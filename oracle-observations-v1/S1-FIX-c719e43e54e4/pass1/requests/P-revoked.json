@@ -1,0 +1,14 @@
+{
+  "requestId": "P-revoked",
+  "statusCode": 200,
+  "body": {
+    "id": "caller-revoked",
+    "email": "caller-revoked@example.example"
+  },
+  "profileFieldsPresent": [
+    "id",
+    "email"
+  ],
+  "deniedFieldsPresent": [],
+  "available": true
+}

@@ -1,0 +1,10 @@
+{
+  "requestId": "P-missing",
+  "statusCode": 401,
+  "body": {
+    "error": "missing_credential"
+  },
+  "profileFieldsPresent": [],
+  "deniedFieldsPresent": [],
+  "available": true
+}

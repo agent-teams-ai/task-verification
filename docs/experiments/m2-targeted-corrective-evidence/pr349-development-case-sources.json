@@ -1,0 +1,44 @@
+{
+  "schema": "m2.pr349-development-case-sources/v1",
+  "classification": "DEVELOPMENT EXAMPLE — NOT INDEPENDENT MODEL-QUALITY EVIDENCE",
+  "requirementSource": {
+    "repository": "777genius/review-router-ai",
+    "commit": "6797745dd568149e6314cd44b24cb901de1819e2",
+    "commitDate": "2026-10-27T16:14:28Z",
+    "tree": "bf39355b9b5704cd5564d345c4f40466a586ec66",
+    "path": "ai-docs/plans/2026-10-23-hindsight-memory-replacement.md",
+    "blob": "940747b75122f7d079abbfa8f18cf0f5aa1e4991",
+    "sha256": "586446003338e3b40971145221a629256af2df9619cd663535ad1337863c5e3e",
+    "bytes": 83052,
+    "section": "§8 — requires integration into the actual T0 review path and the correct prompt/cache/replay/attestation inputs"
+  },
+  "preFixCandidate": {
+    "repository": "777genius/review-router",
+    "commit": "056952b5a3d625fd1d19384942d452114804380f",
+    "commitDate": "2026-10-27T18:25:10Z",
+    "tree": "dc7da86a2b23d1c12fde90f39cf31628f988c58c",
+    "parent": "cb13109566b10813a90de31741c17df7ed0e9f2a",
+    "changedPaths": [
+      ".github/workflows/reviewrouter-execution-reusable.yml",
+      ".github/workflows/reviewrouter-interaction-reusable.yml",
+      ".github/workflows/reviewrouter-runtime.yml",
+      "AGENTS.md",
+      "__tests__/unit/github/reusable-workflows.test.ts",
+      "__tests__/unit/review-orchestration/production-t0-review-runner.test.ts"
+    ],
+    "adapter": {
+      "path": "src/review-orchestration/infrastructure/ocr-review-invocation-adapter.ts",
+      "blob": "5c0ed267724567dd9b4173c64e873ecc8007d99c",
+      "sha256": "203da28e4b1082b122f29583e8e31e65e04efaec31d71d71a1fd8b9e48744740",
+      "bytes": 45875
+    }
+  },
+  "fix": {
+    "commit": "f87abf4817bcee10a6be830c834cb599a971372f",
+    "commitDate": "2026-10-28T10:53:17Z",
+    "tree": "9af4977dad105af2413867bb3b4443c24538376e",
+    "parent": "056952b5a3d625fd1d19384942d452114804380f",
+    "subject": "fix(memory): deliver approved memory to OCR model requests",
+    "adapterChange": "+11/-5: translate the legacy `content` rule key into { path: '**', rule, merge_system_rule: true } before appending memory"
+  }
+}

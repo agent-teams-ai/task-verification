@@ -1,0 +1,138 @@
+{
+  "S1-C1": {
+    "candidate": "S1-C1",
+    "snapshotPair": "B0@36eb1135d275 -> H1@0d9786c0ef3c",
+    "base": {
+      "id": "B0",
+      "commit": "36eb1135d275935f2c17d50ee7fffce8250833c3",
+      "tree": "e5960036ffe81b2136ff5f06d552123893ab00e3",
+      "applicationDigest": "037cbdbfc1df045ccf634e1b14ca6faa4afdc9e2d40d2633c57753a879350ed4"
+    },
+    "head": {
+      "id": "H1",
+      "commit": "0d9786c0ef3c794d656a5515bbf83701f947881e",
+      "tree": "3f21da18d0ebcf5bd2b1fb7369d600a60fa1baba",
+      "applicationDigest": "327d0a9690ff70ed5ff8b19e03cd4f9eb822fa4f6a87203b37f4b91499f4030a"
+    },
+    "diffStat": "app.ts | 77 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++--------\n 1 file changed, 68 insertions(+), 9 deletions(-)",
+    "diffFull": "diff --git a/app.ts b/app.ts\nindex 7a4e424..c8a1abb 100644\n--- a/app.ts\n+++ b/app.ts\n@@ -1,8 +1,11 @@\n /**\n- * Base (pre-feature) stub application: secure-by-default deny-all.\n+ * Canonical Task Verification fixture application (WP1).\n  *\n- * This is the base snapshot application. The feature under review adds the\n- * GET /profile route; the stub never serves profile data.\n+ * Minimal, deterministic HTTP service: GET /profile with bearer-token\n+ * authorization, fixed initial state, explicit reset and a JSON audit sink.\n+ *\n+ * The request flow is implemented locally; the base serializer and audit sink\n+ * are used unchanged.\n  *\n  * Licensed under Apache 2.0. See LICENSE.\n  */\n@@ -10,6 +13,26 @@\n import { createServer, type IncomingMessage, type ServerResponse } from \"node:http\";\n import type { AddressInfo } from \"node:net\";\n import type { AppDeps, AuditRecord } from \"./types.ts\";\n+import { AuditSink } from \"./audit.ts\";\n+import { serializeProfile } from \"./serializer.ts\";\n+\n+/** Path served by the fixture. */\n+export const PROFILE_PATH = \"/profile\";\n+\n+/** Audit events and reasons. */\n+export const AUDIT_EVENT_DENIED = \"profile.access.denied\";\n+export const AUDIT_REASON_MISSING_CREDENTIAL = \"missing_credential\";\n+export const AUDIT_REASON_TOKEN_REVOKED = \"token_revoked\";\n+export const AUDIT_REASON_GRANTED = \"access_granted\";\n+\n+function parseBearerToken(headers: IncomingMessage[\"headers\"]): string | undefined {\n+  const auth = headers.authorization;\n+  if (typeof auth !== \"string\") {\n+    return undefined;\n+  }\n+  const match = /^Bearer\\s+(\\S+)$/i.exec(auth.trim());\n+  return match ? match[1] : undefined;\n+}\n \n function sendJson(res: ServerResponse, statusCode: number, body: unknown): void {\n   const payload = JSON.stringify(body);\n@@ -20,9 +43,41 @@ function sendJson(res: ServerResponse, statusCode: number, body: unknown): void\n   res.end(payload);\n }\n \n-export function createApp(_deps: AppDeps) {\n-  const app = createServer((_req: IncomingMessage, res: ServerResponse) => {\n-    sendJson(res, 401, { error: \"not_implemented\" });\n+export function createApp(deps: AppDeps) {\n+  const audit = new AuditSink();\n+\n+  const app = createServer((req: IncomingMessage, res: ServerResponse) => {\n+    const url = new URL(req.url ?? \"/\", \"http://localhost\");\n+    const path = url.pathname;\n+\n+    if (req.method !== \"GET\" || path !== PROFILE_PATH) {\n+      sendJson(res, 404, { error: \"not found\" });\n+      return;\n+    }\n+\n+    const token = parseBearerToken(req.headers);\n+    if (!token) {\n+      audit.record(AUDIT_EVENT_DENIED, AUDIT_REASON_MISSING_CREDENTIAL, path, false, undefined);\n+      sendJson(res, 401, { error: \"missing_credential\" });\n+      return;\n+    }\n+\n+    const caller = deps.validTokens.get(token);\n+    if (!caller) {\n+      audit.record(AUDIT_EVENT_DENIED, \"unknown_token\", path, true, undefined);\n+      sendJson(res, 401, { error: \"unknown_token\" });\n+      return;\n+    }\n+\n+    if (deps.revokedTokens.has(token)) {\n+      audit.record(AUDIT_EVENT_DENIED, AUDIT_REASON_TOKEN_REVOKED, path, true, caller.id);\n+      sendJson(res, 401, { error: \"token_revoked\" });\n+      return;\n+    }\n+\n+    const profile = serializeProfile(caller);\n+    audit.record(AUDIT_EVENT_DENIED, AUDIT_REASON_GRANTED, path, true, caller.id);\n+    sendJson(res, 200, profile);\n   });\n \n   let listening = false;\n@@ -31,7 +86,11 @@ export function createApp(_deps: AppDeps) {\n     get app() {\n       return app;\n     },\n+    get audit() {\n+      return audit;\n+    },\n     async start(port: number): Promise<AddressInfo> {\n+      audit.reset();\n       return new Promise<AddressInfo>((resolve, reject) => {\n         app.once(\"error\", reject);\n         app.listen(port, () => {\n@@ -50,13 +109,13 @@ export function createApp(_deps: AppDeps) {\n       });\n     },\n     reset(): void {\n-      /* no audit sink in the stub */\n+      audit.reset();\n     },\n     auditDelta(): AuditRecord[] {\n-      return [];\n+      return audit.delta().added;\n     },\n     auditAll(): ReadonlyArray<AuditRecord> {\n-      return [];\n+      return audit.all();\n     },\n     get isListening(): boolean {\n       return listening;",
+    "files": [
+      "app.ts",
+      "audit.ts",
+      "authz.ts",
+      "behavior.ts",
+      "serializer.ts",
+      "types.ts"
+    ],
+    "expectedCriteria": {
+      "AC1": true,
+      "AC2": true,
+      "AC3": true,
+      "AC4": true,
+      "AC5": true
+    },
+    "sanitized": true
+  },
+  "S1-C2": {
+    "candidate": "S1-C2",
+    "snapshotPair": "B0@36eb1135d275 -> H2@3b3ad3880497",
+    "base": {
+      "id": "B0",
+      "commit": "36eb1135d275935f2c17d50ee7fffce8250833c3",
+      "tree": "e5960036ffe81b2136ff5f06d552123893ab00e3",
+      "applicationDigest": "037cbdbfc1df045ccf634e1b14ca6faa4afdc9e2d40d2633c57753a879350ed4"
+    },
+    "head": {
+      "id": "H2",
+      "commit": "3b3ad3880497569eb04cd42902fa27115346e864",
+      "tree": "f7a8b91f9688cb075b02127bf9ad31919880424b",
+      "applicationDigest": "229cd951be058c0d099a50298713c81d666cf79bb653f921939303caa97d793c"
+    },
+    "diffStat": "app.ts | 43 ++++++++++++++++++++++++++++++++++---------\n 1 file changed, 34 insertions(+), 9 deletions(-)",
+    "diffFull": "diff --git a/app.ts b/app.ts\nindex 7a4e424..40f0d97 100644\n--- a/app.ts\n+++ b/app.ts\n@@ -1,8 +1,8 @@\n /**\n- * Base (pre-feature) stub application: secure-by-default deny-all.\n+ * Task Verification fixture application (delegating variant).\n  *\n- * This is the base snapshot application. The feature under review adds the\n- * GET /profile route; the stub never serves profile data.\n+ * Thin HTTP router that delegates profile handling to the unchanged\n+ * authorization helper in `authz.ts`.\n  *\n  * Licensed under Apache 2.0. See LICENSE.\n  */\n@@ -10,6 +10,13 @@\n import { createServer, type IncomingMessage, type ServerResponse } from \"node:http\";\n import type { AddressInfo } from \"node:net\";\n import type { AppDeps, AuditRecord } from \"./types.ts\";\n+import { AuditSink } from \"./audit.ts\";\n+import { PROFILE_PATH, handleProfile } from \"./authz.ts\";\n+\n+export const AUDIT_EVENT_DENIED = \"profile.access.denied\";\n+export const AUDIT_REASON_MISSING_CREDENTIAL = \"missing_credential\";\n+export const AUDIT_REASON_TOKEN_REVOKED = \"token_revoked\";\n+export const AUDIT_REASON_GRANTED = \"access_granted\";\n \n function sendJson(res: ServerResponse, statusCode: number, body: unknown): void {\n   const payload = JSON.stringify(body);\n@@ -20,9 +27,23 @@ function sendJson(res: ServerResponse, statusCode: number, body: unknown): void\n   res.end(payload);\n }\n \n-export function createApp(_deps: AppDeps) {\n-  const app = createServer((_req: IncomingMessage, res: ServerResponse) => {\n-    sendJson(res, 401, { error: \"not_implemented\" });\n+export function createApp(deps: AppDeps) {\n+  const audit = new AuditSink();\n+\n+  const app = createServer((req: IncomingMessage, res: ServerResponse) => {\n+    const url = new URL(req.url ?? \"/\", \"http://localhost\");\n+    const path = url.pathname;\n+\n+    if (req.method !== \"GET\" || path !== PROFILE_PATH) {\n+      sendJson(res, 404, { error: \"not found\" });\n+      return;\n+    }\n+\n+    const auth = req.headers.authorization;\n+    const match = typeof auth === \"string\" ? /^Bearer\\s+(\\S+)$/i.exec(auth.trim()) : null;\n+    const token = match ? match[1] : undefined;\n+    const result = handleProfile(token, deps, audit, path);\n+    sendJson(res, result.statusCode, result.body);\n   });\n \n   let listening = false;\n@@ -31,7 +52,11 @@ export function createApp(_deps: AppDeps) {\n     get app() {\n       return app;\n     },\n+    get audit() {\n+      return audit;\n+    },\n     async start(port: number): Promise<AddressInfo> {\n+      audit.reset();\n       return new Promise<AddressInfo>((resolve, reject) => {\n         app.once(\"error\", reject);\n         app.listen(port, () => {\n@@ -50,13 +75,13 @@ export function createApp(_deps: AppDeps) {\n       });\n     },\n     reset(): void {\n-      /* no audit sink in the stub */\n+      audit.reset();\n     },\n     auditDelta(): AuditRecord[] {\n-      return [];\n+      return audit.delta().added;\n     },\n     auditAll(): ReadonlyArray<AuditRecord> {\n-      return [];\n+      return audit.all();\n     },\n     get isListening(): boolean {\n       return listening;",
+    "files": [
+      "app.ts",
+      "audit.ts",
+      "authz.ts",
+      "behavior.ts",
+      "serializer.ts",
+      "types.ts"
+    ],
+    "expectedCriteria": {
+      "AC1": true,
+      "AC2": true,
+      "AC3": true,
+      "AC4": true,
+      "AC5": true
+    },
+    "sanitized": true
+  },
+  "S1-C3": {
+    "candidate": "S1-C3",
+    "snapshotPair": "B0@36eb1135d275 -> H3@1fda97c2cca6",
+    "base": {
+      "id": "B0",
+      "commit": "36eb1135d275935f2c17d50ee7fffce8250833c3",
+      "tree": "e5960036ffe81b2136ff5f06d552123893ab00e3",
+      "applicationDigest": "037cbdbfc1df045ccf634e1b14ca6faa4afdc9e2d40d2633c57753a879350ed4"
+    },
+    "head": {
+      "id": "H3",
+      "commit": "1fda97c2cca6cfb976b901b61dde2cc52b17a44f",
+      "tree": "313c3e4ac8dc1e704a9c6edbb9fc735b4ca4c35e",
+      "applicationDigest": "4fb700863d2a942aa6f5a43747b3c0da252a6911b454e87d1c6c7efb37bddbda"
+    },
+    "diffStat": "app.ts | 70 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++---------\n 1 file changed, 61 insertions(+), 9 deletions(-)",
+    "diffFull": "diff --git a/app.ts b/app.ts\nindex 7a4e424..70d2579 100644\n--- a/app.ts\n+++ b/app.ts\n@@ -1,8 +1,7 @@\n /**\n- * Base (pre-feature) stub application: secure-by-default deny-all.\n+ * Task Verification fixture application.\n  *\n- * This is the base snapshot application. The feature under review adds the\n- * GET /profile route; the stub never serves profile data.\n+ * Implements the profile route inline.\n  *\n  * Licensed under Apache 2.0. See LICENSE.\n  */\n@@ -10,6 +9,23 @@\n import { createServer, type IncomingMessage, type ServerResponse } from \"node:http\";\n import type { AddressInfo } from \"node:net\";\n import type { AppDeps, AuditRecord } from \"./types.ts\";\n+import { AuditSink } from \"./audit.ts\";\n+import { serializeProfile } from \"./serializer.ts\";\n+\n+export const PROFILE_PATH = \"/profile\";\n+export const AUDIT_EVENT_DENIED = \"profile.access.denied\";\n+export const AUDIT_REASON_MISSING_CREDENTIAL = \"missing_credential\";\n+export const AUDIT_REASON_TOKEN_REVOKED = \"token_revoked\";\n+export const AUDIT_REASON_GRANTED = \"access_granted\";\n+\n+function parseBearerToken(headers: IncomingMessage[\"headers\"]): string | undefined {\n+  const auth = headers.authorization;\n+  if (typeof auth !== \"string\") {\n+    return undefined;\n+  }\n+  const match = /^Bearer\\s+(\\S+)$/i.exec(auth.trim());\n+  return match ? match[1] : undefined;\n+}\n \n function sendJson(res: ServerResponse, statusCode: number, body: unknown): void {\n   const payload = JSON.stringify(body);\n@@ -20,9 +36,41 @@ function sendJson(res: ServerResponse, statusCode: number, body: unknown): void\n   res.end(payload);\n }\n \n-export function createApp(_deps: AppDeps) {\n-  const app = createServer((_req: IncomingMessage, res: ServerResponse) => {\n-    sendJson(res, 401, { error: \"not_implemented\" });\n+export function createApp(deps: AppDeps) {\n+  const audit = new AuditSink();\n+\n+  const app = createServer((req: IncomingMessage, res: ServerResponse) => {\n+    const url = new URL(req.url ?? \"/\", \"http://localhost\");\n+    const path = url.pathname;\n+\n+    if (req.method !== \"GET\" || path !== PROFILE_PATH) {\n+      sendJson(res, 404, { error: \"not found\" });\n+      return;\n+    }\n+\n+    const token = parseBearerToken(req.headers);\n+    if (!token) {\n+      audit.record(AUDIT_EVENT_DENIED, AUDIT_REASON_MISSING_CREDENTIAL, path, false, undefined);\n+      sendJson(res, 401, { error: \"missing_credential\" });\n+      return;\n+    }\n+\n+    const caller = deps.validTokens.get(token);\n+    if (!caller) {\n+      audit.record(AUDIT_EVENT_DENIED, \"unknown_token\", path, true, undefined);\n+      sendJson(res, 401, { error: \"unknown_token\" });\n+      return;\n+    }\n+\n+    if (deps.revokedTokens.has(caller.id)) {\n+      audit.record(AUDIT_EVENT_DENIED, AUDIT_REASON_TOKEN_REVOKED, path, true, caller.id);\n+      sendJson(res, 401, { error: \"token_revoked\" });\n+      return;\n+    }\n+\n+    const profile = serializeProfile(caller);\n+    audit.record(AUDIT_EVENT_DENIED, AUDIT_REASON_GRANTED, path, true, caller.id);\n+    sendJson(res, 200, profile);\n   });\n \n   let listening = false;\n@@ -31,7 +79,11 @@ export function createApp(_deps: AppDeps) {\n     get app() {\n       return app;\n     },\n+    get audit() {\n+      return audit;\n+    },\n     async start(port: number): Promise<AddressInfo> {\n+      audit.reset();\n       return new Promise<AddressInfo>((resolve, reject) => {\n         app.once(\"error\", reject);\n         app.listen(port, () => {\n@@ -50,13 +102,13 @@ export function createApp(_deps: AppDeps) {\n       });\n     },\n     reset(): void {\n-      /* no audit sink in the stub */\n+      audit.reset();\n     },\n     auditDelta(): AuditRecord[] {\n-      return [];\n+      return audit.delta().added;\n     },\n     auditAll(): ReadonlyArray<AuditRecord> {\n-      return [];\n+      return audit.all();\n     },\n     get isListening(): boolean {\n       return listening;",
+    "files": [
+      "app.ts",
+      "audit.ts",
+      "authz.ts",
+      "behavior.ts",
+      "serializer.ts",
+      "types.ts"
+    ],
+    "expectedCriteria": {
+      "AC1": true,
+      "AC2": true,
+      "AC3": false,
+      "AC4": true,
+      "AC5": true
+    },
+    "sanitized": true
+  },
+  "S1-C4": {
+    "candidate": "S1-C4",
+    "snapshotPair": "B1@97b9f5f97ad4 -> H4@3f25ac8032ef",
+    "base": {
+      "id": "B1",
+      "commit": "97b9f5f97ad4f02d8d1ae42991cf55908b5d51f7",
+      "tree": "22b92389dd2c6ccd691937c2e5b2516166e0c75b",
+      "applicationDigest": "8f5f2ab08607fe4dc725835e5937f0ac45df2546ba6356ccb479cf54cfc18a44"
+    },
+    "head": {
+      "id": "H4",
+      "commit": "3f25ac8032ef8a80e89d2b8a7843ac924b65bc4f",
+      "tree": "4b53b1f319e2191774615abf199cce71f49b6dad",
+      "applicationDigest": "97969adc524893e4ce087796a8e04ef33bd501f18c79e8dbcf727eac444a75fc"
+    },
+    "diffStat": "app.ts | 77 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++--------\n 1 file changed, 68 insertions(+), 9 deletions(-)",
+    "diffFull": "diff --git a/app.ts b/app.ts\nindex 7a4e424..c8a1abb 100644\n--- a/app.ts\n+++ b/app.ts\n@@ -1,8 +1,11 @@\n /**\n- * Base (pre-feature) stub application: secure-by-default deny-all.\n+ * Canonical Task Verification fixture application (WP1).\n  *\n- * This is the base snapshot application. The feature under review adds the\n- * GET /profile route; the stub never serves profile data.\n+ * Minimal, deterministic HTTP service: GET /profile with bearer-token\n+ * authorization, fixed initial state, explicit reset and a JSON audit sink.\n+ *\n+ * The request flow is implemented locally; the base serializer and audit sink\n+ * are used unchanged.\n  *\n  * Licensed under Apache 2.0. See LICENSE.\n  */\n@@ -10,6 +13,26 @@\n import { createServer, type IncomingMessage, type ServerResponse } from \"node:http\";\n import type { AddressInfo } from \"node:net\";\n import type { AppDeps, AuditRecord } from \"./types.ts\";\n+import { AuditSink } from \"./audit.ts\";\n+import { serializeProfile } from \"./serializer.ts\";\n+\n+/** Path served by the fixture. */\n+export const PROFILE_PATH = \"/profile\";\n+\n+/** Audit events and reasons. */\n+export const AUDIT_EVENT_DENIED = \"profile.access.denied\";\n+export const AUDIT_REASON_MISSING_CREDENTIAL = \"missing_credential\";\n+export const AUDIT_REASON_TOKEN_REVOKED = \"token_revoked\";\n+export const AUDIT_REASON_GRANTED = \"access_granted\";\n+\n+function parseBearerToken(headers: IncomingMessage[\"headers\"]): string | undefined {\n+  const auth = headers.authorization;\n+  if (typeof auth !== \"string\") {\n+    return undefined;\n+  }\n+  const match = /^Bearer\\s+(\\S+)$/i.exec(auth.trim());\n+  return match ? match[1] : undefined;\n+}\n \n function sendJson(res: ServerResponse, statusCode: number, body: unknown): void {\n   const payload = JSON.stringify(body);\n@@ -20,9 +43,41 @@ function sendJson(res: ServerResponse, statusCode: number, body: unknown): void\n   res.end(payload);\n }\n \n-export function createApp(_deps: AppDeps) {\n-  const app = createServer((_req: IncomingMessage, res: ServerResponse) => {\n-    sendJson(res, 401, { error: \"not_implemented\" });\n+export function createApp(deps: AppDeps) {\n+  const audit = new AuditSink();\n+\n+  const app = createServer((req: IncomingMessage, res: ServerResponse) => {\n+    const url = new URL(req.url ?? \"/\", \"http://localhost\");\n+    const path = url.pathname;\n+\n+    if (req.method !== \"GET\" || path !== PROFILE_PATH) {\n+      sendJson(res, 404, { error: \"not found\" });\n+      return;\n+    }\n+\n+    const token = parseBearerToken(req.headers);\n+    if (!token) {\n+      audit.record(AUDIT_EVENT_DENIED, AUDIT_REASON_MISSING_CREDENTIAL, path, false, undefined);\n+      sendJson(res, 401, { error: \"missing_credential\" });\n+      return;\n+    }\n+\n+    const caller = deps.validTokens.get(token);\n+    if (!caller) {\n+      audit.record(AUDIT_EVENT_DENIED, \"unknown_token\", path, true, undefined);\n+      sendJson(res, 401, { error: \"unknown_token\" });\n+      return;\n+    }\n+\n+    if (deps.revokedTokens.has(token)) {\n+      audit.record(AUDIT_EVENT_DENIED, AUDIT_REASON_TOKEN_REVOKED, path, true, caller.id);\n+      sendJson(res, 401, { error: \"token_revoked\" });\n+      return;\n+    }\n+\n+    const profile = serializeProfile(caller);\n+    audit.record(AUDIT_EVENT_DENIED, AUDIT_REASON_GRANTED, path, true, caller.id);\n+    sendJson(res, 200, profile);\n   });\n \n   let listening = false;\n@@ -31,7 +86,11 @@ export function createApp(_deps: AppDeps) {\n     get app() {\n       return app;\n     },\n+    get audit() {\n+      return audit;\n+    },\n     async start(port: number): Promise<AddressInfo> {\n+      audit.reset();\n       return new Promise<AddressInfo>((resolve, reject) => {\n         app.once(\"error\", reject);\n         app.listen(port, () => {\n@@ -50,13 +109,13 @@ export function createApp(_deps: AppDeps) {\n       });\n     },\n     reset(): void {\n-      /* no audit sink in the stub */\n+      audit.reset();\n     },\n     auditDelta(): AuditRecord[] {\n-      return [];\n+      return audit.delta().added;\n     },\n     auditAll(): ReadonlyArray<AuditRecord> {\n-      return [];\n+      return audit.all();\n     },\n     get isListening(): boolean {\n       return listening;",
+    "files": [
+      "app.ts",
+      "audit.ts",
+      "authz.ts",
+      "behavior.ts",
+      "serializer.ts",
+      "types.ts"
+    ],
+    "expectedCriteria": {
+      "AC1": true,
+      "AC2": true,
+      "AC3": true,
+      "AC4": false,
+      "AC5": true
+    },
+    "sanitized": true
+  }
+}

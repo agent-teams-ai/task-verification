@@ -1,0 +1,48 @@
+{
+  "schema": "m2.native-tool-payloads/v1",
+  "runId": "ocr-97ed9514b199",
+  "candidateId": "S1-C3",
+  "scenario": "unchanged-dependency-read",
+  "snapshot": {
+    "baseCommit": "36eb1135d275935f2c17d50ee7fffce8250833c3",
+    "headCommit": "1fda97c2cca6cfb976b901b61dde2cc52b17a44f",
+    "headApplicationDigest": "4fb700863d2a942aa6f5a43747b3c0da252a6911b454e87d1c6c7efb37bddbda"
+  },
+  "source": "captured-fake-provider-request-items",
+  "expectedSnapshotContentIsSeparate": true,
+  "payloadCount": 1,
+  "resolvedPayloads": 1,
+  "payloads": [
+    {
+      "toolCallId": "call_2153fdf1-9479-42a7-bc91-42f1e11b2d29",
+      "toolName": "file_read",
+      "requestedPath": "audit.ts",
+      "classification": "unchanged",
+      "call": {
+        "requestIndex": 2,
+        "argumentsText": "{\"file_path\":\"audit.ts\"}",
+        "argumentsSha256": "13a3db137072c7a12d4237767fe10fea529f555840c60cd9d3f902e3023b0583"
+      },
+      "result": {
+        "requestIndex": 2,
+        "status": "success",
+        "outputText": "File: audit.ts (Total lines: 50)\nIS_TRUNCATED: false\nLINE_RANGE: 1-50\n1|/**\n2| * JSON audit sink (WP1).\n3| *\n4| * Deterministic, append-only in-memory audit log with explicit reset and\n5| * delta capture. All timestamps are ISO-8601 UTC.\n6| *\n7| * Licensed under Apache 2.0. See LICENSE.\n8| */\n9|\n10|import type { AuditRecord, AuditDelta } from \"./types.ts\";\n11|\n12|export class AuditSink {\n13|  private readonly records: AuditRecord[] = [];\n14|  private deltaCursor = 0;\n15|\n16|  record(event: string, reason: string, path: string, tokenPresent: boolean, callerId?: string): void {\n17|    this.records.push({\n18|      event,\n19|      reason,\n20|      path,\n21|      tokenPresent,\n22|      callerId,\n23|      timestamp: new Date(Date.now()).toISOString(),\n24|    });\n25|  }\n26|\n27|  /** Snapshot every record ever recorded (for full-tree inspection). */\n28|  all(): ReadonlyArray<AuditRecord> {\n29|    return this.records;\n30|  }\n31|\n32|  /** Records added since the last `reset()` or `delta()` call. */\n33|  delta(): AuditDelta {\n34|    const added = this.records.slice(this.deltaCursor);\n35|    this.deltaCursor = this.records.length;\n36|    return { added, count: added.length };\n37|  }\n38|\n39|  /** Clear the sink and the delta cursor. Deterministic state initialization. */\n40|  reset(): void {\n41|    this.records.length = 0;\n42|    this.deltaCursor = 0;\n43|  }\n44|\n45|  /** Number of records currently stored. */\n46|  size(): number {\n47|    return this.records.length;\n48|  }\n49|}\n50|\n",
+        "outputBytes": 1493,
+        "outputSha256": "d7ebfffc852e2395b598f58ce1d6875f8be0e8509543365d3d917f3e7228e290"
+      },
+      "carryingRequest": {
+        "index": 2,
+        "bodyBytes": 25224,
+        "bodySha256": "ba594d98980d4c84b81ef4078d4ce8486f050341f291be0e9200c47c1378ce68"
+      },
+      "parsedFileRead": {
+        "path": "audit.ts",
+        "contentText": "/**\n * JSON audit sink (WP1).\n *\n * Deterministic, append-only in-memory audit log with explicit reset and\n * delta capture. All timestamps are ISO-8601 UTC.\n *\n * Licensed under Apache 2.0. See LICENSE.\n */\n\nimport type { AuditRecord, AuditDelta } from \"./types.ts\";\n\nexport class AuditSink {\n  private readonly records: AuditRecord[] = [];\n  private deltaCursor = 0;\n\n  record(event: string, reason: string, path: string, tokenPresent: boolean, callerId?: string): void {\n    this.records.push({\n      event,\n      reason,\n      path,\n      tokenPresent,\n      callerId,\n      timestamp: new Date(Date.now()).toISOString(),\n    });\n  }\n\n  /** Snapshot every record ever recorded (for full-tree inspection). */\n  all(): ReadonlyArray<AuditRecord> {\n    return this.records;\n  }\n\n  /** Records added since the last `reset()` or `delta()` call. */\n  delta(): AuditDelta {\n    const added = this.records.slice(this.deltaCursor);\n    this.deltaCursor = this.records.length;\n    return { added, count: added.length };\n  }\n\n  /** Clear the sink and the delta cursor. Deterministic state initialization. */\n  reset(): void {\n    this.records.length = 0;\n    this.deltaCursor = 0;\n  }\n\n  /** Number of records currently stored. */\n  size(): number {\n    return this.records.length;\n  }\n}\n",
+        "contentBytes": 1281,
+        "contentSha256": "7d58330a25bfe4332d17afc3e15a676b33dfcbd674bfb20ac073740e8ab3a8a6"
+      },
+      "expectedSnapshotContentSha256": "7d58330a25bfe4332d17afc3e15a676b33dfcbd674bfb20ac073740e8ab3a8a6",
+      "unresolvedReason": null
+    }
+  ]
+}

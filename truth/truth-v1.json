@@ -1,0 +1,66 @@
+{
+  "truthId": "truth-v1",
+  "version": "v1",
+  "criteriaRevision": "crit-v1",
+  "oracleId": "O-1",
+  "oracleVersion": "v1",
+  "candidateOutcomes": {
+    "S1-C1": {
+      "AC-1": true,
+      "AC-2": true,
+      "AC-3": true,
+      "AC-4": true,
+      "AC-5": true
+    },
+    "S1-C2": {
+      "AC-1": true,
+      "AC-2": true,
+      "AC-3": true,
+      "AC-4": true,
+      "AC-5": true
+    },
+    "S1-C3": {
+      "AC-1": true,
+      "AC-2": true,
+      "AC-3": false,
+      "AC-4": true,
+      "AC-5": true
+    },
+    "S1-C4": {
+      "AC-1": true,
+      "AC-2": true,
+      "AC-3": true,
+      "AC-4": false,
+      "AC-5": true
+    }
+  },
+  "assertionReferences": {
+    "AC-1": [
+      "P-active-a",
+      "P-active-b"
+    ],
+    "AC-2": [
+      "P-missing"
+    ],
+    "AC-3": [
+      "P-revoked"
+    ],
+    "AC-4": [
+      "P-active-a",
+      "P-active-b",
+      "P-missing",
+      "P-revoked"
+    ],
+    "AC-5": [
+      "P-missing"
+    ]
+  },
+  "candidateHeadDigests": {
+    "S1-C1": "327d0a9690ff70ed5ff8b19e03cd4f9eb822fa4f6a87203b37f4b91499f4030a",
+    "S1-C2": "229cd951be058c0d099a50298713c81d666cf79bb653f921939303caa97d793c",
+    "S1-C3": "4fb700863d2a942aa6f5a43747b3c0da252a6911b454e87d1c6c7efb37bddbda",
+    "S1-C4": "97969adc524893e4ce087796a8e04ef33bd501f18c79e8dbcf727eac444a75fc"
+  },
+  "scope": "Approved pilot labels under the declared fixture/input policy (crit-v1). Finite examples; not a claim of universal coverage.",
+  "publicArtifactPolicy": "Public reproducibility artifact. Frozen and excluded from reviewer inputs and tool reach. Not a secret."
+}

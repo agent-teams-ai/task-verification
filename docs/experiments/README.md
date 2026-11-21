@@ -13,5 +13,7 @@ Dated plans and, once they exist, dated results. A plan is not an execution: the
 ## Documents
 
 - [Task Verification — Stage A/B Experiment Plan, 2026-11-12](2026-11-12-stage-a-b-experiment-plan.md) — Owner-review revision 2026-11-14: up to 36 scheduled review attempts (12 managed OCR sessions, 24 single `/llm` calls), four sealed candidates, conditional recorded-evidence comparison with a deterministic baseline, three separate model-free admission controls, and zero live reviewer executions. The earlier 39-run proposal is explicitly superseded.
+- M2-A (WP0–WP2) results: [verification report](m2-a-verification-report.md), [environment](m2-a-environment.md), [fixture](m2-a-fixture.md), [candidate snapshots](m2-a-candidates.md), [oracle protocol](m2-a-oracle-protocol.md), [criterion mapping](m2-a-oracle-mapping.md), [adequacy](m2-a-oracle-adequacy.md), [repeatability](m2-a-repeatability.md), [reviewer isolation](m2-a-reviewer-isolation.md). Model-free; no live reviewer execution.
+- M2-B (WP3–WP4) results: [truth and evidence](m2-b-truth-evidence.md). Model-free; no live model calls.
 
 [Documentation map](../README.md)

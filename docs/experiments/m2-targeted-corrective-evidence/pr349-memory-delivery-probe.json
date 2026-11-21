@@ -1,0 +1,41 @@
+{
+  "schema": "m2.pr349-memory-delivery-probe/v1",
+  "memorySentinelSha256": "168c0e7ad65a0fcc780a1f842ffb9cb57a62d6edd5c5d8da5b92f2876f85422d",
+  "findings": {
+    "pre": {
+      "shape": "pre-fix",
+      "ruleDocumentSha256": "305f702ceb197788eb0ed376a76bf03f950c777edbffd01f512f169eed21f1e3",
+      "ruleKey": "content (legacy, ignored by the native parser)",
+      "exitCode": 0,
+      "requestCount": 2,
+      "providerProblem": null,
+      "memorySentinelInRequest": false,
+      "sentinelRequestIndexes": [],
+      "managedRuleEchoed": false,
+      "managedPolicyHeaderEchoed": false,
+      "nativeStatus": "complete",
+      "nativeError": null
+    },
+    "post": {
+      "shape": "post-fix",
+      "ruleDocumentSha256": "811264f967844548ce291810a8de179439d72267575f16c204f68a24f615be03",
+      "ruleKey": "rule (native)",
+      "exitCode": 0,
+      "requestCount": 2,
+      "providerProblem": null,
+      "memorySentinelInRequest": true,
+      "sentinelRequestIndexes": [
+        0,
+        1
+      ],
+      "managedRuleEchoed": true,
+      "managedPolicyHeaderEchoed": true,
+      "nativeStatus": "complete",
+      "nativeError": null
+    }
+  },
+  "conclusion": "Pre-fix rule key `content` is ignored by the native parser: approved memory does not reach the provider request. The post-fix `rule` key delivers it.",
+  "evidenceClass": "reported-summary-not-raw-request-evidence",
+  "rawRequestBodiesRetained": false,
+  "evidenceNote": "Summary of a prior local probe execution (real rr.7 binary, loopback fake provider). The captured provider request bodies were not retained, so this is not raw request evidence and must not be described as a captured raw request."
+}
