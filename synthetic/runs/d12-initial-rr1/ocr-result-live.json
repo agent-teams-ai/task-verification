@@ -1,0 +1,199 @@
+{
+  "status": "complete",
+  "llm": {
+    "provider": "reviewrouter",
+    "model": "openai/gpt-6.1-terra"
+  },
+  "message": "Review complete: 4 finding(s) across 4 selected item(s).",
+  "summary": {
+    "files_reviewed": 4,
+    "comments": 4,
+    "total_tokens": 73462,
+    "input_tokens": 70346,
+    "output_tokens": 3116,
+    "cache_read_tokens": 35411,
+    "elapsed": "58s"
+  },
+  "tool_calls": {
+    "total": 19,
+    "by_tool": {
+      "code_comment": 2,
+      "code_search": 2,
+      "file_find": 1,
+      "file_read": 14
+    },
+    "failure": 0,
+    "failure_by_tool": {},
+    "failure_details": []
+  },
+  "comments": [
+    {
+      "path": "tests/records.test.ts",
+      "content": "Returning `any` disables type checking for every response assertion in this suite. Use typed helpers for list and error responses (or return `unknown` and validate it) so mistakes in the asserted payload shape are caught.",
+      "existing_code": "function body(response: { body: string }): any {",
+      "start_line": 11,
+      "end_line": 11,
+      "category": "maintainability",
+      "severity": "low"
+    },
+    {
+      "path": "tests/records.test.ts",
+      "content": "The rejection tests never exercise `offset` or the upper limit bound, so removing those validations would leave the suite passing despite breaking the 400 contract. Add cases for invalid offsets (for example, a negative or non-integer value) and a limit above 100, asserting both status and field.",
+      "existing_code": "test(\"records: an unusable limit is refused, not silently clamped\", () =\u003e {\n  const response = handle(get(\"/records\", { limit: \"0\" }));\n  assert.equal(response.status, 400);\n  assert.equal(body(response).field, \"limit\");\n});",
+      "start_line": 64,
+      "end_line": 68,
+      "category": "test",
+      "severity": "low"
+    },
+    {
+      "path": "src/records.ts",
+      "content": "Explicitly empty pagination values such as `limit=` and `offset=` are silently treated as omitted, despite the stated contract that unusable values return 400. The status check below also accepts `status=`. Default only absent parameters and reject explicitly empty values with the corresponding field.",
+      "existing_code": "  if (raw === undefined || raw === \"\") return fallback;",
+      "start_line": 46,
+      "end_line": 46,
+      "category": "bug",
+      "severity": "medium"
+    },
+    {
+      "path": "src/router.ts",
+      "content": "The required CSV export is not exposed by this router, so callers cannot export the filtered records at all. Add an export endpoint that applies the same filters as the listing, formats timestamps via the shared formatter, and emits headers and escaped rows using the CSV helper.",
+      "existing_code": "  if (request.method === \"GET\" \u0026\u0026 request.path === \"/records\") {",
+      "start_line": 28,
+      "end_line": 28,
+      "category": "bug",
+      "severity": "high"
+    }
+  ],
+  "groups": [
+    {
+      "label": "Records feature, routing, tests, and documentation",
+      "files": [
+        "README.md",
+        "src/records.ts",
+        "src/router.ts",
+        "tests/records.test.ts"
+      ]
+    }
+  ],
+  "session_id": "e539f5c6-d34f-44a1-a3e7-917f9eecf749",
+  "manifest": {
+    "schema_version": "ocr.run-manifest/v1",
+    "run_id": "e539f5c6-d34f-44a1-a3e7-917f9eecf749",
+    "operation": "review",
+    "terminal_state": "complete",
+    "repository": {},
+    "input": {
+      "mode": "range",
+      "requested_from": "ce99b0d65d645124413a746ecb137b5497aad80f",
+      "requested_head": "23864e3c877f2b34bbbdd90c4527ef46eb19cbd9",
+      "resolved_base": "ce99b0d65d645124413a746ecb137b5497aad80f",
+      "resolved_head": "23864e3c877f2b34bbbdd90c4527ef46eb19cbd9",
+      "exact_range": "ce99b0d65d645124413a746ecb137b5497aad80f..23864e3c877f2b34bbbdd90c4527ef46eb19cbd9",
+      "source_artifact_sha256": "4298d4f0ca4bbe21dffa08f24064c0be18e7b72098c9cc465726e39fe2f52f12"
+    },
+    "execution": {
+      "ocr_version": "1.14.0-rr.1",
+      "provider": "reviewrouter",
+      "model": "openai/gpt-6.1-terra",
+      "configured_concurrency": 1,
+      "max_tool_request_times": 100,
+      "rule_config_sha256": "9488c87b6833b1c7ffb194f335c4597713e1d1641f932e99228340db32e83a5a",
+      "runtime_config_sha256": "518f1fe68649447d463390f693afb20478d16aa19605a18f63b391bbf50d7c9f"
+    },
+    "coverage": {
+      "selected": [
+        {
+          "item_id": "5513e08b2a7a2bd1474a6452d9bc1b53c9b16406f75a10e4eaf4d17e219a038c",
+          "path": "README.md",
+          "fingerprint": "25d48868c30bee31cae2bb90e18dd541147c0d61aeb8a213a82edffb1ea3f198"
+        },
+        {
+          "item_id": "6551ea9fec5ec6d29d45193da6c1e5862595efe4f44050346367e40902bd987d",
+          "path": "tests/records.test.ts",
+          "fingerprint": "604fb5705df6fd37a253ed8a711f86a25ba03e044928bd25bd5ae3e6d87ecc58"
+        },
+        {
+          "item_id": "83ba5f038ce1c26cc41912587652419964cbc134e47f8b95bb511054c03a69d3",
+          "path": "src/router.ts",
+          "fingerprint": "6f843bbf3f6c6a00ac4f3825c55ad314051e26737390c974af664789007690b8"
+        },
+        {
+          "item_id": "eb7466b9086335572f74896295eb6fe855f6cce57366f906bd841eddbda49787",
+          "path": "src/records.ts",
+          "fingerprint": "92a7983f4ead0d3e964c8a531e6d4f091666aeece431531c1dc1b97fa3e1e849"
+        }
+      ],
+      "completed": [
+        {
+          "item_id": "5513e08b2a7a2bd1474a6452d9bc1b53c9b16406f75a10e4eaf4d17e219a038c",
+          "path": "README.md",
+          "fingerprint": "25d48868c30bee31cae2bb90e18dd541147c0d61aeb8a213a82edffb1ea3f198"
+        },
+        {
+          "item_id": "6551ea9fec5ec6d29d45193da6c1e5862595efe4f44050346367e40902bd987d",
+          "path": "tests/records.test.ts",
+          "fingerprint": "604fb5705df6fd37a253ed8a711f86a25ba03e044928bd25bd5ae3e6d87ecc58"
+        },
+        {
+          "item_id": "83ba5f038ce1c26cc41912587652419964cbc134e47f8b95bb511054c03a69d3",
+          "path": "src/router.ts",
+          "fingerprint": "6f843bbf3f6c6a00ac4f3825c55ad314051e26737390c974af664789007690b8"
+        },
+        {
+          "item_id": "eb7466b9086335572f74896295eb6fe855f6cce57366f906bd841eddbda49787",
+          "path": "src/records.ts",
+          "fingerprint": "92a7983f4ead0d3e964c8a531e6d4f091666aeece431531c1dc1b97fa3e1e849"
+        }
+      ],
+      "reused": [],
+      "failed": [],
+      "waived": [],
+      "excluded": []
+    },
+    "elapsed_ms": 57744
+  },
+  "reviewrouter_outcome": {
+    "schema_version": "reviewrouter.ocr-outcome/v1",
+    "run_stop_cause": null,
+    "grouping": {
+      "state": "completed",
+      "reason": null
+    },
+    "groups": [
+      {
+        "paths": [
+          "README.md",
+          "src/records.ts",
+          "src/router.ts",
+          "tests/records.test.ts"
+        ],
+        "main_completed": true,
+        "stop_cause": null,
+        "rounds": {
+          "configured": 2,
+          "started": 2,
+          "completed": 2
+        },
+        "phases": {
+          "plan": {
+            "state": "completed",
+            "reason": null
+          },
+          "compression": {
+            "state": "not_applicable",
+            "reason": "no_zone"
+          },
+          "relocation": {
+            "state": "not_applicable",
+            "reason": "no_candidates"
+          },
+          "filter": {
+            "state": "completed",
+            "reason": null
+          }
+        },
+        "filter_decision_valid": true
+      }
+    ]
+  }
+}

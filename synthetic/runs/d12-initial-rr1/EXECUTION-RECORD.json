@@ -1,0 +1,144 @@
+{
+  "schema": "d12.execution-record/v2",
+  "recordedAt": "2026-11-21",
+  "stage": "d12-initial-rr1",
+  "authorization": {
+    "id": "D1/D2-first-bounded-synthetic-pilot",
+    "amendment": "qualified 1.14.0-rr.1 supersedes rr.7 for the current synthetic pilot and its recheck only",
+    "approvedModel": "openai/gpt-6.1-terra",
+    "approvedProvider": "OpenRouter",
+    "approvedCeilingUsd": 1.0
+  },
+  "repository": {
+    "branch": "exp/synthetic-live-pilot-01",
+    "m2Head": "996cdcb002f898a5b73ce8f9ce7931e6299b14e4",
+    "m2WorktreeClean": true,
+    "pullRequest": { "number": 2, "state": "OPEN", "isDraft": true, "headRefOid": "996cdcb002f898a5b73ce8f9ce7931e6299b14e4", "modified": false, "pushed": false },
+    "historicalRr7StagePreserved": "synthetic/runs/d12-initial/ (not modified)"
+  },
+  "fixture": {
+    "base": "ce99b0d65d645124413a746ecb137b5497aad80f",
+    "candidateA": "23864e3c877f2b34bbbdd90c4527ef46eb19cbd9",
+    "candidateB": "absent",
+    "refs": ["refs/heads/main"],
+    "frozenDigestsVerified": {
+      "requirements": "ca868a3fcc2a9100eabda736c48a8e107125a1f5a8477eede3665be96bde727f",
+      "prJson": "9b48eb1b7c31af0becbe5d49a0fd507cbd450f222d4ce4a5c04120be610c1bcf",
+      "reviewerInput": "4ffebc0d194a0b56b0c00f79006b9ad48a4c548ef6e6d637b63dfe54d9dbaf88",
+      "ordinaryChecks": "85d60b7b9abc67d42b47bf75875feebafb90ac534271f81e8c87666019f9b26d"
+    },
+    "managedRules": { "id": "reviewrouter-managed-v1", "sha256": "b3fd4702808db2f21f49fa8c4f8c9527f520d8c9f72e42af7d57ea26716acd0c", "bytes": 620 },
+    "background": { "sha256": "8a8a62ff9a99bb6daab25a1bbf86a86a1e3264d387ce8bc4195c7b9056702e7a", "chars": 2605 },
+    "config": { "sha256": "2f1ef31e5ad9ce5ff5ce139aea20517ca223120c64fc0cbbf1c91382353ff2bf", "credential": "none" },
+    "filtering": "unchanged; --no-filter never passed"
+  },
+  "comparator": {
+    "label": "QUALIFIED 1.14.0-rr.1 DEVELOPMENT OCR CANDIDATE",
+    "binarySha256": "443d7777b9fffae6300085c3afc6027181de181befa118bbe6f580dce3fcb399",
+    "binarySizeBytes": 87356967,
+    "sourceCommit": "8a70944f567beba9ffc12d1153e33ef5fd60967d",
+    "sourceTree": "4b12dfb33be04127f0315303ccb01e8d158a882c",
+    "ciRun": 44924052949,
+    "artifact": "managed-ocr-8a70944f567beba9ffc12d1153e33ef5fd60967d",
+    "artifactZipDigest": "sha256:aadbd95bf44983544df3da31c80bc13d5e4004be1a8602a3545e7ec36ee0e526",
+    "qualificationPassed": true,
+    "modelFree": true,
+    "versionOutput": "open-code-review 1.14.0-rr.1 linux/amd64"
+  },
+  "modelFreeCompatibility": {
+    "status": "pass",
+    "proxyAudit": { "tests": 20, "passed": 20, "failed": 0 },
+    "shapes": [
+      { "shape": "one-group", "requests": 6, "exitCode": 0, "terminal": "complete", "maxBodyBytes": 29509, "commentsVisible": 1, "suppressed": 0 },
+      { "shape": "one-group with context tools (4 file_read + 1 code_search)", "requests": 11, "exitCode": 0, "terminal": "complete", "maxBodyBytes": 40636, "commentsVisible": 3, "suppressed": 1 },
+      { "shape": "per-file grouping", "requests": 18, "exitCode": 0, "terminal": "complete", "maxBodyBytes": 22595, "commentsVisible": 3, "suppressed": 1 }
+    ],
+    "interception": "fake upstream request count == proxy forwarded count in every run",
+    "filterPhase": "completed with filter_decision_valid true in every run",
+    "engineOrAdapterChanges": "none"
+  },
+  "requestWidth": {
+    "previousCeilingBytes": 20000,
+    "reconstructedBodies": [1502, 17161, 18674, 21964, 19507, 18812, 22102],
+    "reconstructedRefusals": 2,
+    "cause": "context-tool result accumulation inside one review round (live run: 6 file_read + 1 code_search grew the turn from 29450 to 47334 bytes)",
+    "liveMaximumObservedBytes": 47334,
+    "modelFreeMaximumObservedBytes": 40636,
+    "revisedCeilingBytes": 65536,
+    "enforcementUnit": "serialized bytes (tokens <= bytes)",
+    "regressionTests": [
+      "the revised 64 KiB bound admits exactly 65,536 bytes and refuses 65,537",
+      "the complete initial+recheck plan stays inside the approved aggregate ceiling"
+    ],
+    "truncation": "none",
+    "estimatedTokensUsedAsBound": false
+  },
+  "stages": {
+    "initialOcrAttempt1": {
+      "result": "refused_at_width",
+      "failCause": "proxy_input_ceiling_exceeded at 47334 bytes",
+      "forwarded": 3,
+      "refused": 1,
+      "usage": { "inputTokens": 12491, "outputTokens": 1222 },
+      "stopCause": "provider_error",
+      "findings": 0,
+      "reportProduced": false
+    },
+    "initialOcr": {
+      "result": "complete",
+      "exitCode": 0,
+      "requests": 10,
+      "requestBytes": [1502, 24884, 29709, 48468, 55399, 18792, 29556, 45889, 62517, 18183],
+      "maxBodyBytes": 62517,
+      "usage": { "inputTokens": 70346, "outputTokens": 3116, "cacheReadTokens": 35411, "reasoningTokens": null },
+      "durationMs": 57744,
+      "toolCalls": { "file_read": 14, "code_search": 2, "code_comment": 2, "file_find": 1 },
+      "grouping": "single group of all four changed paths",
+      "filter": { "state": "completed", "decisionValid": true },
+      "commentsDelivered": 4,
+      "commentsVisible": 4,
+      "findings": [
+        { "path": "tests/records.test.ts", "line": 11, "severity": "low", "category": "maintainability" },
+        { "path": "tests/records.test.ts", "line": "64-68", "severity": "low", "category": "test" },
+        { "path": "src/records.ts", "line": 46, "severity": "medium", "category": "bug" },
+        { "path": "src/router.ts", "line": 28, "severity": "high", "category": "bug", "subject": "required CSV export not exposed" }
+      ],
+      "identifiedMissingCsvExport": true
+    },
+    "criteriaAssessment": {
+      "reused": true,
+      "repeated": false,
+      "requests": 1,
+      "inputBytes": 18194,
+      "usage": { "inputTokens": 4312, "outputTokens": 578, "reasoningTokens": 93 },
+      "providerReportedCostUsd": 0.00827925,
+      "statuses": { "R1": "satisfied", "R2": "satisfied", "R3": "violated" },
+      "accountUsageCorroboration": "provider key usage read exactly 0.00827925 before this stage"
+    }
+  },
+  "budget": {
+    "ceilingUsd": 1.0,
+    "accountAuthoritativeSpendUsd": 0.09085455,
+    "remainingUsd": 0.90914545,
+    "proxyModelledChargesUsd": { "criteria": 0.00827925, "ocrAttempt1": 0.018601, "ocrAttempt2": 0.085926, "sum": 0.11280625 },
+    "modelingNote": "the proxy does not model prompt-cache discounts, so modelled charges exceed the true spend",
+    "plannedWorstCaseUsd": { "initialOcr": 0.4, "recheckOcr": 0.4, "criteriaRecheck": 0.04, "alreadySpent": 0.00827925, "total": 0.84827925 },
+    "providerKeyLimitUsd": 5.0,
+    "providerKeyLimitNote": "provider hard stop is USD 5.00; the USD 1.00 aggregate bound is proxy-enforced only",
+    "oldKeyRevocation": "unverified"
+  },
+  "gateway": {
+    "entry": "@agent-teams/account-gateway/llm -> createLlmClient()",
+    "deployedService": false,
+    "limitation": "control and execution ports supplied locally; the bounded proxy, not a Gateway service, was the enforcing and accounting boundary"
+  },
+  "checkpoint": {
+    "candidateB": "not created",
+    "correction": "not implemented",
+    "recheck": "not run",
+    "additionalInference": "none after the initial stage",
+    "evaluatorMaterial": "not consulted",
+    "prAction": "none"
+  },
+  "verdict": "INITIAL_COMPARISON_COMPLETE — AWAITING_ILIYA_FEEDBACK"
+}

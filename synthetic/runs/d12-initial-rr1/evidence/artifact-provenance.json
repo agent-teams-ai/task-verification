@@ -1,0 +1,54 @@
+{
+  "schema": "d12.ocr-artifact-provenance/v1",
+  "label": "QUALIFIED 1.14.0-rr.1 DEVELOPMENT OCR CANDIDATE",
+  "repository": "agent-teams-ai/open-code-review",
+  "sourceCommit": "8a70944f567beba9ffc12d1153e33ef5fd60967d",
+  "sourceTree": "4b12dfb33be04127f0315303ccb01e8d158a882c",
+  "workflowRun": {
+    "id": 44924052949,
+    "name": "Managed OCR CI",
+    "event": "push",
+    "headBranch": "main",
+    "headSha": "8a70944f567beba9ffc12d1153e33ef5fd60967d",
+    "conclusion": "success",
+    "job": "verify"
+  },
+  "artifact": {
+    "id": 14714439075,
+    "name": "managed-ocr-8a70944f567beba9ffc12d1153e33ef5fd60967d",
+    "zipDigestFromApi": "sha256:aadbd95bf44983544df3da31c80bc13d5e4004be1a8602a3545e7ec36ee0e526",
+    "zipSizeBytes": 32690877,
+    "expired": false
+  },
+  "binary": {
+    "name": "opencodereview-linux-amd64",
+    "sha256": "443d7777b9fffae6300085c3afc6027181de181befa118bbe6f580dce3fcb399",
+    "sizeBytes": 87356967,
+    "format": "ELF 64-bit LSB executable, x86-64, statically linked",
+    "platform": "linux",
+    "architecture": "amd64",
+    "goamd64": "v1",
+    "cgo": "0",
+    "toolchain": "go1.26.11"
+  },
+  "manifest": {
+    "releaseVersion": "1.14.0-rr.1",
+    "outcomeSchemaVersion": "reviewrouter.ocr-outcome/v1",
+    "binarySha256FromManifest": "443d7777b9fffae6300085c3afc6027181de181befa118bbe6f580dce3fcb399"
+  },
+  "qualification": {
+    "passed": true,
+    "modelFree": true,
+    "cases": "4/4 openai-responses and anthropic finding + missing-terminal",
+    "versionOutput": "open-code-review 1.14.0-rr.1 linux/amd64"
+  },
+  "localExecution": {
+    "versionOutputVerified": "open-code-review 1.14.0-rr.1 linux/amd64",
+    "exitCode": 0
+  },
+  "digestAgreement": {
+    "apiZipDigestCoversZip": true,
+    "manifestVsBinary": true,
+    "sha256File": "443d7777b9fffae6300085c3afc6027181de181befa118bbe6f580dce3fcb399"
+  }
+}

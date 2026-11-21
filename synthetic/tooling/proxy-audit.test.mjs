@@ -468,3 +468,86 @@ test('reported usage above the per-request ceiling halts the run', async () => {
   assert.equal(forwarded[0].chargedOutputTokens, 9000);
   assert.equal(forwarded[0].halted, 'ceiling_breached_by_reported_usage');
 });
+
+// ---- revised per-request byte bound (1.14.0-rr.1 stage) ---------------------
+// The qualified 1.14.0-rr.1 candidate emits larger bodies than rr.7 did, and its
+// context-tool loop appends file/search results to the next turn. The bound is
+// a round 64 KiB, still enforced on serialized bytes, so `tokens <= 65,536`
+// remains provable before dispatch.
+const REVISED_INPUT_CEILING = 65_536;
+const REVISED_OUTPUT_CEILING = 4_000;
+// Largest body actually observed: 47,334 bytes, from a live run whose review turn
+// called file_read 6x and code_search once. A model-free reproduction of that
+// loop peaked at 40,636 bytes.
+const MEASURED_WORST_BODY = 47_334;
+
+const bodyOfExactBytes = (bytes) => {
+  const prefix = JSON.stringify({ model: MODEL, input: '' }).length;
+  return JSON.stringify({ model: MODEL, input: 'a'.repeat(bytes - prefix) });
+};
+
+test('the revised 64 KiB bound admits exactly 65,536 bytes and refuses 65,537', async () => {
+  const stub = await startStub((_req, res) => {
+    res.writeHead(200, { 'content-type': 'application/json' });
+    res.end(JSON.stringify({ usage: { input_tokens: 10, output_tokens: 5 } }));
+  });
+  const proxy = await startProxy(
+    upstreamArgs(stub.port, [
+      '--max-requests',
+      '4',
+      '--request-input-tokens',
+      String(REVISED_INPUT_CEILING),
+    ])
+  );
+  const atBound = bodyOfExactBytes(REVISED_INPUT_CEILING);
+  const overBound = bodyOfExactBytes(REVISED_INPUT_CEILING + 1);
+  assert.equal(Buffer.byteLength(atBound, 'utf8'), REVISED_INPUT_CEILING);
+  assert.equal(Buffer.byteLength(overBound, 'utf8'), REVISED_INPUT_CEILING + 1);
+  const admitted = await post(proxy.port, atBound);
+  const refused = await post(proxy.port, overBound);
+  const ledger = proxy.read();
+  proxy.close();
+  stub.close();
+  assert.equal(admitted.status, 200);
+  assert.equal(refused.status, 413);
+  assert.equal(stub.calls.length, 1, 'the over-bound body never reaches the upstream');
+  const forwarded = ledger.filter((l) => l.decision === 'forwarded');
+  assert.equal(forwarded[0].inputBytes, REVISED_INPUT_CEILING);
+  assert.equal(forwarded[0].inputEnforcement, 'bytes');
+  assert.ok(
+    REVISED_INPUT_CEILING >= MEASURED_WORST_BODY,
+    'the bound must cover the largest body the qualified candidate was measured to emit'
+  );
+});
+
+test('the complete initial+recheck plan stays inside the approved aggregate ceiling', () => {
+  // Pricing used by the enforcement arithmetic: USD 1.00/M input, USD 5.00/M output.
+  const inputUsdPerToken = 1.0 / 1_000_000;
+  const outputUsdPerToken = 5.0 / 1_000_000;
+  const stage = (inputTokens, outputTokens) => inputTokens * inputUsdPerToken + outputTokens * outputUsdPerToken;
+
+  // Stage args shared by run-ocr.sh (initial and recheck) and the criteria path.
+  const OCR_STAGE = { maxInputTokens: 200_000, maxOutputTokens: 40_000 };
+  const CRITERIA_STAGE = { maxInputTokens: 20_000, maxOutputTokens: 4_000 };
+  const ALREADY_SPENT_USD = 0.00827925;
+
+  const perRequestReservation = stage(REVISED_INPUT_CEILING, REVISED_OUTPUT_CEILING);
+  const ocrStageWorstCase = stage(OCR_STAGE.maxInputTokens, OCR_STAGE.maxOutputTokens);
+  const criteriaWorstCase = stage(CRITERIA_STAGE.maxInputTokens, CRITERIA_STAGE.maxOutputTokens);
+  const totalWorstCase =
+    ALREADY_SPENT_USD + ocrStageWorstCase * 2 + criteriaWorstCase;
+
+  assert.equal(Number(perRequestReservation.toFixed(6)), 0.085536);
+  assert.equal(Number(ocrStageWorstCase.toFixed(6)), 0.4);
+  assert.equal(Number(totalWorstCase.toFixed(8)), 0.84827925);
+  assert.ok(totalWorstCase <= 1.0, `worst case ${totalWorstCase} must fit the USD 1.00 ceiling`);
+  // The reservation must be a true upper bound, not an estimate: the byte bound
+  // proves tokens <= ceiling for every forwarded request.
+  assert.ok(
+    OCR_STAGE.maxInputTokens / REVISED_INPUT_CEILING >= 3,
+    'the stage must admit at least three maximum-size requests without a token refusal'
+  );
+  // A per-request ceiling above the stage aggregate would make the first
+  // admission consume the whole stage budget, so the two must stay ordered.
+  assert.ok(REVISED_INPUT_CEILING < OCR_STAGE.maxInputTokens);
+});

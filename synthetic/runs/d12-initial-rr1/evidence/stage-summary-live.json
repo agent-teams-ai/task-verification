@@ -1,0 +1,110 @@
+{
+  "schema": "d12.ocr-stage-summary/v1",
+  "mode": "live",
+  "comparator": "QUALIFIED 1.14.0-rr.1 DEVELOPMENT OCR CANDIDATE",
+  "exitCode": 0,
+  "requests": {
+    "forwarded": 10,
+    "refused": 0,
+    "cap": 24
+  },
+  "ceilings": {
+    "requestInputBytes": 65536,
+    "stageInputTokens": 240000,
+    "stageOutputTokens": 40000
+  },
+  "refusals": [],
+  "inputBytes": [
+    1502,
+    24884,
+    29709,
+    48468,
+    55399,
+    18792,
+    29556,
+    45889,
+    62517,
+    18183
+  ],
+  "maxInputBytes": 62517,
+  "requested": {
+    "model": "openai/gpt-6.1-terra",
+    "serviceTier": "default",
+    "effort": "medium"
+  },
+  "observed": [
+    {
+      "status": 200,
+      "model": "openai/gpt-6.1-terra",
+      "provider": null,
+      "usagePresent": true
+    },
+    {
+      "status": 200,
+      "model": "openai/gpt-6.1-terra",
+      "provider": null,
+      "usagePresent": true
+    },
+    {
+      "status": 200,
+      "model": "openai/gpt-6.1-terra",
+      "provider": null,
+      "usagePresent": true
+    },
+    {
+      "status": 200,
+      "model": "openai/gpt-6.1-terra",
+      "provider": null,
+      "usagePresent": true
+    },
+    {
+      "status": 200,
+      "model": "openai/gpt-6.1-terra",
+      "provider": null,
+      "usagePresent": true
+    },
+    {
+      "status": 200,
+      "model": "openai/gpt-6.1-terra",
+      "provider": null,
+      "usagePresent": true
+    },
+    {
+      "status": 200,
+      "model": "openai/gpt-6.1-terra",
+      "provider": null,
+      "usagePresent": true
+    },
+    {
+      "status": 200,
+      "model": "openai/gpt-6.1-terra",
+      "provider": null,
+      "usagePresent": true
+    },
+    {
+      "status": 200,
+      "model": "openai/gpt-6.1-terra",
+      "provider": null,
+      "usagePresent": true
+    },
+    {
+      "status": 200,
+      "model": "openai/gpt-6.1-terra",
+      "provider": null,
+      "usagePresent": true
+    }
+  ],
+  "usage": {
+    "inputTokens": 70346,
+    "outputTokens": 3116,
+    "chargedUsd": 0.085926
+  },
+  "stageWorstCaseUsd": 0.44,
+  "providerKeyUsage": {
+    "before": "0.02992175",
+    "after": "0.0733758",
+    "delta": 0.04345405000000001
+  },
+  "halted": null,
+  "ledger": "/run/ledger-live.jsonl"
+}

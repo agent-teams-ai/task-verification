@@ -1,0 +1,78 @@
+{
+  "schema": "d12.ocr-comparator-identity/v1",
+  "label": "QUALIFIED 1.14.0-rr.1 DEVELOPMENT OCR CANDIDATE",
+  "supersedes": {
+    "comparator": "open-code-review 1.13.1-rr.7",
+    "scope": "current synthetic pilot and its recheck only",
+    "historicalEvidence": "synthetic/runs/d12-initial/ (preserved unchanged)",
+    "productionReviewRouter": "not upgraded",
+    "releasePublished": false
+  },
+  "binary": {
+    "name": "opencodereview-linux-amd64",
+    "sha256": "443d7777b9fffae6300085c3afc6027181de181befa118bbe6f580dce3fcb399",
+    "sizeBytes": 87356967,
+    "platform": "linux",
+    "architecture": "amd64",
+    "versionOutput": "open-code-review 1.14.0-rr.1 linux/amd64",
+    "build": "go1.26.11, goamd64=v1, CGO_ENABLED=0, -trimpath, -buildvcs=false, statically linked"
+  },
+  "source": {
+    "repository": "agent-teams-ai/open-code-review",
+    "commit": "8a70944f567beba9ffc12d1153e33ef5fd60967d",
+    "tree": "4b12dfb33be04127f0315303ccb01e8d158a882c",
+    "ciRun": { "id": 44924052949, "workflow": "Managed OCR CI", "conclusion": "success", "job": "verify" },
+    "artifact": {
+      "name": "managed-ocr-8a70944f567beba9ffc12d1153e33ef5fd60967d",
+      "id": 14714439075,
+      "zipDigest": "sha256:aadbd95bf44983544df3da31c80bc13d5e4004be1a8602a3545e7ec36ee0e526",
+      "zipSizeBytes": 32690877
+    },
+    "qualification": { "passed": true, "modelFree": true, "cases": 4 }
+  },
+  "managedContract": {
+    "mode": "reviewrouter-managed",
+    "provider": "reviewrouter",
+    "protocol": "openai-responses",
+    "outcomeSchema": "reviewrouter.ocr-outcome/v1",
+    "ruleId": "reviewrouter-managed-v1",
+    "ruleSha256": "b3fd4702808db2f21f49fa8c4f8c9527f520d8c9f72e42af7d57ea26716acd0c",
+    "ruleBytes": 620,
+    "filteringPolicy": "unchanged; --no-filter never passed; filter phase ran and completed",
+    "backgroundSha256": "8a8a62ff9a99bb6daab25a1bbf86a86a1e3264d387ce8bc4195c7b9056702e7a",
+    "backgroundChars": 2605,
+    "configSha256": "2f1ef31e5ad9ce5ff5ce139aea20517ca223120c64fc0cbbf1c91382353ff2bf",
+    "configCredential": "none (loopback placeholder only)"
+  },
+  "requestSettings": {
+    "requestedModel": "openai/gpt-6.1-terra",
+    "requestedProvider": "OpenRouter",
+    "requestedReasoningEffort": "medium",
+    "observedReasoning": "accepted; reasoning tokens billed",
+    "serviceTier": "default",
+    "observedModel": "openai/gpt-6.1-terra",
+    "observedProviderName": null,
+    "observerNote": "OpenRouter streaming responses name the model but not the upstream provider"
+  },
+  "enforcement": {
+    "requestInputCeilingBytes": 65536,
+    "requestOutputCeilingTokens": 4000,
+    "enforcementUnit": "serialized byte length (tokens <= bytes)",
+    "stageInputTokens": 240000,
+    "stageOutputTokens": 40000,
+    "stageWorstCaseUsd": 0.4,
+    "requestCap": 24,
+    "cliTokenBudget": 400000,
+    "cliBudgetNote": "above the proxy aggregate so the proxy remains the binding boundary"
+  },
+  "frozenFixture": {
+    "base": "ce99b0d65d645124413a746ecb137b5497aad80f",
+    "candidateA": "23864e3c877f2b34bbbdd90c4527ef46eb19cbd9",
+    "candidateB": "absent",
+    "requirementsSha256": "ca868a3fcc2a9100eabda736c48a8e107125a1f5a8477eede3665be96bde727f",
+    "prJsonSha256": "9b48eb1b7c31af0becbe5d49a0fd507cbd450f222d4ce4a5c04120be610c1bcf",
+    "reviewerInputSha256": "4ffebc0d194a0b56b0c00f79006b9ad48a4c548ef6e6d637b63dfe54d9dbaf88",
+    "ordinaryChecksSha256": "85d60b7b9abc67d42b47bf75875feebafb90ac534271f81e8c87666019f9b26d"
+  },
+  "reuse": "the same binary is to be used for the initial review and the later recheck"
+}

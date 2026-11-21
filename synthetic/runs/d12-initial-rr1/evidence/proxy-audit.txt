@@ -1,0 +1,28 @@
+✔ exact request ceiling: N+1 is refused before forwarding (150.2087ms)
+✔ concurrent requests cannot exceed the request cap (168.8488ms)
+✔ atomic token reservation blocks concurrent overspend (155.2965ms)
+✔ failed upstream response consumes budget and halts (127.6855ms)
+✔ timeout after forwarding charges the reservation and halts (219.3583ms)
+✔ missing usage is never charged as zero or a floor (101.275ms)
+✔ streamed terminal usage is authoritative and does not halt the stage (105.3324ms)
+✔ oversized input is refused before forwarding (98.9841ms)
+✔ a caller-declared output ceiling above the pin is refused (140.257ms)
+✔ aggregate token budget exhaustion refuses before forwarding (107.8468ms)
+✔ an unexpected model is refused and never billed (94.0662ms)
+✔ an unexpected service tier is refused and never billed (92.7289ms)
+✔ an unexpected reasoning effort is refused and never billed (87.9503ms)
+✔ the credential never reaches the ledger or the proxy output (120.01ms)
+✔ non-inference traffic is refused and does not consume request budget (101.3167ms)
+✔ per-stage budgets are independent and labelled (220.897ms)
+✔ the input ceiling is enforced on bytes, so the token bound is provable (228.9032ms)
+✔ reported usage above the per-request ceiling halts the run (134.7005ms)
+✔ the revised 64 KiB bound admits exactly 65,536 bytes and refuses 65,537 (152.6929ms)
+✔ the complete initial+recheck plan stays inside the approved aggregate ceiling (0.5681ms)
+ℹ tests 20
+ℹ suites 0
+ℹ pass 20
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2727.2906

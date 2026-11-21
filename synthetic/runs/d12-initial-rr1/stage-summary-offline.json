@@ -1,0 +1,89 @@
+{
+  "schema": "d12.ocr-stage-summary/v1",
+  "mode": "offline",
+  "comparator": "QUALIFIED 1.14.0-rr.1 DEVELOPMENT OCR CANDIDATE",
+  "exitCode": 1,
+  "requests": {
+    "forwarded": 7,
+    "refused": 0,
+    "cap": 24
+  },
+  "ceilings": {
+    "requestInputBytes": 40960,
+    "stageInputTokens": 240000,
+    "stageOutputTokens": 40000
+  },
+  "refusals": [],
+  "inputBytes": [
+    1502,
+    17161,
+    18674,
+    21964,
+    19507,
+    18812,
+    22102
+  ],
+  "maxInputBytes": 22102,
+  "requested": {
+    "model": "openai/gpt-6.1-terra",
+    "serviceTier": "default",
+    "effort": "medium"
+  },
+  "observed": [
+    {
+      "status": 200,
+      "model": null,
+      "provider": null,
+      "usagePresent": true
+    },
+    {
+      "status": 200,
+      "model": null,
+      "provider": null,
+      "usagePresent": true
+    },
+    {
+      "status": 200,
+      "model": null,
+      "provider": null,
+      "usagePresent": true
+    },
+    {
+      "status": 200,
+      "model": null,
+      "provider": null,
+      "usagePresent": true
+    },
+    {
+      "status": 200,
+      "model": null,
+      "provider": null,
+      "usagePresent": true
+    },
+    {
+      "status": 200,
+      "model": null,
+      "provider": null,
+      "usagePresent": true
+    },
+    {
+      "status": 200,
+      "model": null,
+      "provider": null,
+      "usagePresent": true
+    }
+  ],
+  "usage": {
+    "inputTokens": 29894,
+    "outputTokens": 0,
+    "chargedUsd": 0.029894
+  },
+  "stageWorstCaseUsd": 0.44,
+  "providerKeyUsage": {
+    "before": "0.00827925",
+    "after": "0.00827925",
+    "delta": 0
+  },
+  "halted": null,
+  "ledger": "/run/ledger-offline.jsonl"
+}

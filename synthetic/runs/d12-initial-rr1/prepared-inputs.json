@@ -1,0 +1,42 @@
+{
+  "schema": "d12.ocr-inputs/v1",
+  "preparedAt": "2026-11-21T19:05:07.283Z",
+  "fixture": {
+    "base": "ce99b0d65d645124413a746ecb137b5497aad80f",
+    "candidateA": "23864e3c877f2b34bbbdd90c4527ef46eb19cbd9",
+    "candidateB": "absent",
+    "repoHead": "23864e3c877f2b34bbbdd90c4527ef46eb19cbd9"
+  },
+  "frozen": {
+    "requirementsSha256": "ca868a3fcc2a9100eabda736c48a8e107125a1f5a8477eede3665be96bde727f",
+    "prJsonSha256": "9b48eb1b7c31af0becbe5d49a0fd507cbd450f222d4ce4a5c04120be610c1bcf",
+    "completedPaths": [
+      "README.md",
+      "src/records.ts",
+      "src/router.ts",
+      "tests/records.test.ts"
+    ]
+  },
+  "ocr": {
+    "binary": "opencodereview-linux-amd64",
+    "ruleId": "reviewrouter-managed-v1",
+    "ruleSha256": "b3fd4702808db2f21f49fa8c4f8c9527f520d8c9f72e42af7d57ea26716acd0c",
+    "ruleBytes": 620,
+    "includePaths": [
+      "README.md",
+      "src/records.ts",
+      "src/router.ts",
+      "tests/records.test.ts"
+    ],
+    "languageSetting": null,
+    "backgroundSha256": "8a8a62ff9a99bb6daab25a1bbf86a86a1e3264d387ce8bc4195c7b9056702e7a",
+    "backgroundChars": 2606,
+    "model": "openai/gpt-6.1-terra",
+    "protocol": "openai-responses",
+    "serviceTier": "default",
+    "reasoningEffort": "medium",
+    "filtering": "unchanged (no --no-filter)",
+    "proxyPort": 8787,
+    "configSha256": "2f1ef31e5ad9ce5ff5ce139aea20517ca223120c64fc0cbbf1c91382353ff2bf"
+  }
+}

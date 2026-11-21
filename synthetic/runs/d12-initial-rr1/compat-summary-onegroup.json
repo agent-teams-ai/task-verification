@@ -1,0 +1,310 @@
+{
+  "schema": "d12.compat-summary/v1",
+  "comparator": "QUALIFIED 1.14.0-rr.1 DEVELOPMENT OCR CANDIDATE",
+  "mode": "onegroup",
+  "exitCode": 0,
+  "fakeRequests": 11,
+  "proxyForwarded": 11,
+  "proxyRefused": 0,
+  "interceptionHolds": true,
+  "requestShape": [
+    {
+      "i": 1,
+      "bytes": 1527,
+      "model": "openai/gpt-6.1-terra",
+      "serviceTier": "default",
+      "reasoning": {
+        "effort": "medium"
+      },
+      "stream": true,
+      "store": false,
+      "maxOutputTokens": 4000,
+      "tools": []
+    },
+    {
+      "i": 2,
+      "bytes": 24909,
+      "model": "openai/gpt-6.1-terra",
+      "serviceTier": "default",
+      "reasoning": {
+        "effort": "medium"
+      },
+      "stream": true,
+      "store": false,
+      "maxOutputTokens": 4000,
+      "tools": []
+    },
+    {
+      "i": 3,
+      "bytes": 28270,
+      "model": "openai/gpt-6.1-terra",
+      "serviceTier": "default",
+      "reasoning": {
+        "effort": "medium"
+      },
+      "stream": true,
+      "store": false,
+      "maxOutputTokens": 4000,
+      "tools": [
+        "task_done",
+        "code_comment",
+        "code_search",
+        "file_read",
+        "file_read_diff",
+        "file_find"
+      ]
+    },
+    {
+      "i": 4,
+      "bytes": 29513,
+      "model": "openai/gpt-6.1-terra",
+      "serviceTier": "default",
+      "reasoning": {
+        "effort": "medium"
+      },
+      "stream": true,
+      "store": false,
+      "maxOutputTokens": 4000,
+      "tools": [
+        "task_done",
+        "code_comment",
+        "code_search",
+        "file_read",
+        "file_read_diff",
+        "file_find"
+      ]
+    },
+    {
+      "i": 5,
+      "bytes": 33170,
+      "model": "openai/gpt-6.1-terra",
+      "serviceTier": "default",
+      "reasoning": {
+        "effort": "medium"
+      },
+      "stream": true,
+      "store": false,
+      "maxOutputTokens": 4000,
+      "tools": [
+        "task_done",
+        "code_comment",
+        "code_search",
+        "file_read",
+        "file_read_diff",
+        "file_find"
+      ]
+    },
+    {
+      "i": 6,
+      "bytes": 34611,
+      "model": "openai/gpt-6.1-terra",
+      "serviceTier": "default",
+      "reasoning": {
+        "effort": "medium"
+      },
+      "stream": true,
+      "store": false,
+      "maxOutputTokens": 4000,
+      "tools": [
+        "task_done",
+        "code_comment",
+        "code_search",
+        "file_read",
+        "file_read_diff",
+        "file_find"
+      ]
+    },
+    {
+      "i": 7,
+      "bytes": 38340,
+      "model": "openai/gpt-6.1-terra",
+      "serviceTier": "default",
+      "reasoning": {
+        "effort": "medium"
+      },
+      "stream": true,
+      "store": false,
+      "maxOutputTokens": 4000,
+      "tools": [
+        "task_done",
+        "code_comment",
+        "code_search",
+        "file_read",
+        "file_read_diff",
+        "file_find"
+      ]
+    },
+    {
+      "i": 8,
+      "bytes": 39397,
+      "model": "openai/gpt-6.1-terra",
+      "serviceTier": "default",
+      "reasoning": {
+        "effort": "medium"
+      },
+      "stream": true,
+      "store": false,
+      "maxOutputTokens": 4000,
+      "tools": [
+        "task_done",
+        "code_comment",
+        "code_search",
+        "file_read",
+        "file_read_diff",
+        "file_find"
+      ]
+    },
+    {
+      "i": 9,
+      "bytes": 40636,
+      "model": "openai/gpt-6.1-terra",
+      "serviceTier": "default",
+      "reasoning": {
+        "effort": "medium"
+      },
+      "stream": true,
+      "store": false,
+      "maxOutputTokens": 4000,
+      "tools": [
+        "task_done",
+        "code_comment",
+        "code_search",
+        "file_read",
+        "file_read_diff",
+        "file_find"
+      ]
+    },
+    {
+      "i": 10,
+      "bytes": 18484,
+      "model": "openai/gpt-6.1-terra",
+      "serviceTier": "default",
+      "reasoning": {
+        "effort": "medium"
+      },
+      "stream": true,
+      "store": false,
+      "maxOutputTokens": 4000,
+      "tools": [
+        "report_incorrect_comments",
+        "approve_all_comments"
+      ]
+    },
+    {
+      "i": 11,
+      "bytes": 29008,
+      "model": "openai/gpt-6.1-terra",
+      "serviceTier": "default",
+      "reasoning": {
+        "effort": "medium"
+      },
+      "stream": true,
+      "store": false,
+      "maxOutputTokens": 4000,
+      "tools": [
+        "task_done",
+        "code_comment",
+        "code_search",
+        "file_read",
+        "file_read_diff",
+        "file_find"
+      ]
+    }
+  ],
+  "terminalState": "complete",
+  "status": "complete",
+  "groups": [
+    {
+      "label": "records listing api",
+      "files": [
+        "README.md",
+        "src/records.ts",
+        "src/router.ts",
+        "tests/records.test.ts"
+      ]
+    }
+  ],
+  "comments": [
+    {
+      "path": "src/records.ts",
+      "content": "Deterministic compatibility finding emitted by the model-free fixture provider.",
+      "existing_code": "import { toUtcIsoString } from \"./format.ts\";",
+      "start_line": 1,
+      "end_line": 1,
+      "category": "bug",
+      "severity": "medium"
+    },
+    {
+      "path": "src/router.ts",
+      "content": "Deterministic compatibility finding emitted by the model-free fixture provider.",
+      "existing_code": "import { listRecords, parseListQuery, QueryError } from \"./records.ts\";",
+      "start_line": 1,
+      "end_line": 1,
+      "category": "bug",
+      "severity": "medium"
+    },
+    {
+      "path": "tests/records.test.ts",
+      "content": "Deterministic compatibility finding emitted by the model-free fixture provider.",
+      "existing_code": "import assert from \"node:assert/strict\";",
+      "start_line": 1,
+      "end_line": 1,
+      "category": "bug",
+      "severity": "medium"
+    }
+  ],
+  "outcome": {
+    "schema_version": "reviewrouter.ocr-outcome/v1",
+    "run_stop_cause": null,
+    "grouping": {
+      "state": "completed",
+      "reason": null
+    },
+    "groups": [
+      {
+        "paths": [
+          "README.md",
+          "src/records.ts",
+          "src/router.ts",
+          "tests/records.test.ts"
+        ],
+        "main_completed": true,
+        "stop_cause": null,
+        "rounds": {
+          "configured": 2,
+          "started": 2,
+          "completed": 2
+        },
+        "phases": {
+          "plan": {
+            "state": "completed",
+            "reason": null
+          },
+          "compression": {
+            "state": "not_applicable",
+            "reason": "no_zone"
+          },
+          "relocation": {
+            "state": "not_applicable",
+            "reason": "no_candidates"
+          },
+          "filter": {
+            "state": "completed",
+            "reason": null
+          }
+        },
+        "filter_decision_valid": true
+      }
+    ]
+  },
+  "filtered": null,
+  "actionRequired": null,
+  "summaryBlock": {
+    "files_reviewed": 4,
+    "comments": 3,
+    "total_tokens": 13860,
+    "input_tokens": 13200,
+    "output_tokens": 660,
+    "elapsed": "2s"
+  }
+}
