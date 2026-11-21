@@ -1,0 +1,80 @@
+{
+  "schema": "synthetic.pilot.pr/v1",
+  "fixture": "record-management-api",
+  "title": "feat(records): add filtered, paginated record listing",
+  "body": "## What\n\nAdds `GET /records`, which lists records from the existing in-memory store with the requested\nfilters (`status`, `nameContains`) and pagination (`limit`, `offset`). `total` reports the size of\nthe filtered set before pagination.\n\n## Notes\n\n- Timestamps are rendered through the existing `toUtcIsoString` helper, so responses are UTC\n  ISO-8601 regardless of the offset stored on the record.\n- An unusable `limit`, `offset` or `status` is answered with `400` and the offending field.\n\n## Tests\n\n`npm test` covers filters, pagination, totals, UTC rendering and the two rejection paths.",
+  "baseSha": "ce99b0d65d645124413a746ecb137b5497aad80f",
+  "headSha": "23864e3c877f2b34bbbdd90c4527ef46eb19cbd9",
+  "baseRef": "main",
+  "headRef": "candidate-a",
+  "baseCommitSubject": "feat: record store, shared UTC formatter and CSV escaping helper",
+  "headCommitSubject": "feat(records): add filtered, paginated record listing",
+  "baseCommittedAt": "2026-11-14T09:00:00Z",
+  "headCommittedAt": "2026-11-15T10:00:00Z",
+  "changedPaths": [
+    {
+      "status": "M",
+      "path": "README.md",
+      "sha256": "f324decdc143de4476b4c10a31b834197d3675d6b010e04946eb8e023f267246"
+    },
+    {
+      "status": "A",
+      "path": "src/records.ts",
+      "sha256": "a538ceabc66c79e409336cf7cfa751aa6beba7ce3b5b48aa8b16dcf5a81891f6"
+    },
+    {
+      "status": "M",
+      "path": "src/router.ts",
+      "sha256": "e3ef4b530d79c67ba0c4741f9911cabdfffee00e58f36b7136ce0b2999d7edd2"
+    },
+    {
+      "status": "A",
+      "path": "tests/records.test.ts",
+      "sha256": "ac52fc5919ecf55739075c33f003168da814b7282d7dcb52739137fbd1e97613"
+    }
+  ],
+  "unchangedContext": [
+    {
+      "path": "package.json",
+      "sha256": "697356e11a9f8f471cb9c72957c7939fb5b4ee249b16d6b0f582eb7dde3ada4a"
+    },
+    {
+      "path": "src/csv.ts",
+      "sha256": "4e4ed7f24e31778265f59255d086a91dff12e63eb0c0bcd8e0430f690afeaf64"
+    },
+    {
+      "path": "src/format.ts",
+      "sha256": "2c00c1934a6fe4ff9bbfa5d4cfefeb669d794a60601af9a93d8d95e1ad83bc65"
+    },
+    {
+      "path": "src/store.ts",
+      "sha256": "6ac48fb40f656d343dd1f48a1b9e60938c340e05ad66a911270c12a67d51114f"
+    },
+    {
+      "path": "tests/csv.test.ts",
+      "sha256": "23c63fce9490477550f35faf22dc10476cae15f5ab2e4a3cc9cf322ba69ca2df"
+    },
+    {
+      "path": "tests/format.test.ts",
+      "sha256": "34f5eef2d32bf3625f69d1d3d9e49985ddd3ca2748000fd43777a4c8fa26578a"
+    },
+    {
+      "path": "tests/store.test.ts",
+      "sha256": "8eb6573ac06e935e4a28e9e7a95a8af3b79b22b88cc74491c833cd152b587ba0"
+    },
+    {
+      "path": "tsconfig.json",
+      "sha256": "0ea1b575f245c1a5de655675f20110bd7fffea0107663d839eb57f6e9419bfd5"
+    }
+  ],
+  "ordinaryChecks": {
+    "definition": "package.json#scripts.test",
+    "command": "node --experimental-strip-types --test --test-concurrency=1 tests/*.test.ts",
+    "checkDefinitionDigest": "759ae4ff1d9e57e0cfc9d781bb9dfd768f6a806b28e50bbbd3e9a50ec1b0b68e",
+    "source": "the candidate repository's own suite"
+  },
+  "requirements": {
+    "path": "synthetic/requirements/RECORD-API-v1.md",
+    "revision": "record-api-req-v1"
+  }
+}

@@ -1,13 +1,2 @@
-# M2-A experiment substrate
-node_modules/
-dist/
-*.log
-.candidates-work/
-.materialization/
-.isolation-tmp/
-
-# TypeScript
-*.tsbuildinfo
-
-# M2-A generated evidence (regenerated deterministically; results documented in docs/)
-.oracle-receipts/
+# Experiment branch: the fixture repository is its own Git repository.
+/synthetic/repo/

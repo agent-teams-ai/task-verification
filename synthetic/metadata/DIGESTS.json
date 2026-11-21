@@ -1,0 +1,17 @@
+{
+  "schema": "synthetic.pilot.digests/v1",
+  "baseSha": "ce99b0d65d645124413a746ecb137b5497aad80f",
+  "headSha": "23864e3c877f2b34bbbdd90c4527ef46eb19cbd9",
+  "trees": {
+    "base": "0f6c4d8ea79485091f98baf2bf9d216e4d100beb",
+    "head": "aa4af8c4b01304cd1efac0917a0e9cca56374108"
+  },
+  "commits": {
+    "base": "afaedd385f9beac1c3ba3c59ea22f3e4f9202bbd5a8918f30dfaabca14f90944",
+    "head": "fa98a6bd436fa7acf2a7c845e0924344927691298f80e5dde09168a141ad572b"
+  },
+  "requirements": {
+    "path": "synthetic/requirements/RECORD-API-v1.md",
+    "sha256": "ca868a3fcc2a9100eabda736c48a8e107125a1f5a8477eede3665be96bde727f"
+  }
+}
