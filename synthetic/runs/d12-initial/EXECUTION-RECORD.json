@@ -1,0 +1,84 @@
+{
+  "schema": "d12.execution-record/v1",
+  "recordedAt": "2026-11-21",
+  "authorization": {
+    "id": "D1/D2-first-bounded-synthetic-pilot",
+    "record": "synthetic/runs/d12-initial/AUTHORIZATION-D1-D2.md",
+    "approvedModel": "openai/gpt-6.1-terra",
+    "approvedProvider": "OpenRouter",
+    "approvedCeilingUsd": 1.0
+  },
+  "repository": {
+    "branch": "exp/synthetic-live-pilot-01",
+    "m2Head": "996cdcb002f898a5b73ce8f9ce7931e6299b14e4",
+    "experimentHeadBefore": "e4809ab399863f3fd56b00c6c8693f75b7b31a5c",
+    "pullRequest": { "number": 2, "state": "OPEN", "isDraft": true, "modified": false, "pushed": false }
+  },
+  "fixture": {
+    "base": "ce99b0d65d645124413a746ecb137b5497aad80f",
+    "candidateA": "23864e3c877f2b34bbbdd90c4527ef46eb19cbd9",
+    "candidateB": "absent",
+    "frozenDigests": {
+      "requirements": "ca868a3fcc2a9100eabda736c48a8e107125a1f5a8477eede3665be96bde727f",
+      "prJson": "9b48eb1b7c31af0becbe5d49a0fd507cbd450f222d4ce4a5c04120be610c1bcf",
+      "reviewerInput": "4ffebc0d194a0b56b0c00f79006b9ad48a4c548ef6e6d637b63dfe54d9dbaf88",
+      "ordinaryChecks": "85d60b7b9abc67d42b47bf75875feebafb90ac534271f81e8c87666019f9b26d"
+    },
+    "verifiedUnchanged": true
+  },
+  "gatewaySdk": {
+    "package": "@agent-teams/account-gateway",
+    "version": "0.1.0",
+    "entry": "@agent-teams/account-gateway/llm -> createLlmClient()",
+    "sourceCommit": "539418d5935a9e336d480b128a1cdb93c1daa6e1",
+    "sourceTree": "608b577e2da608b09d77ca2cf19661a82543185c",
+    "build": "scripts/build.mjs under Node v24.21.0, pnpm 11.28.2 (SDK declared engine range)",
+    "previouslyInstalled": false,
+    "installedForThisRun": true
+  },
+  "stages": {
+    "ordinaryChecks": {
+      "command": "npm test",
+      "sha": "23864e3c877f2b34bbbdd90c4527ef46eb19cbd9",
+      "tests": 21,
+      "passed": 21,
+      "failed": 0,
+      "exitStatus": 0,
+      "inferenceRequests": 0
+    },
+    "initialOcr": {
+      "dispatchAttempts": 0,
+      "inferenceRequests": 0,
+      "spendUsd": 0,
+      "result": "not_dispatched",
+      "offlineMeasurement": {
+        "requests": 6,
+        "bytes": [1502, 15842, 16266, 20645, 18188, 16404],
+        "maxBytes": 20645,
+        "ceilingBytes": 20000,
+        "overBy": 645
+      }
+    },
+    "initialCriteria": {
+      "requests": 1,
+      "inputBytes": 18194,
+      "usage": { "inputTokens": 4312, "outputTokens": 578, "cachedInputTokens": 0, "reasoningTokens": 93 },
+      "providerReportedCostUsd": 0.00827925,
+      "model": "openai/gpt-6.1-terra",
+      "observedModel": "openai/gpt-6.1-terra",
+      "providerGenerationModel": "openai/gpt-6.1-terra-20261026",
+      "providerName": "OpenAI",
+      "responseId": "gen-1795286516-DHxpFdjyVcyDAsMsvUK6"
+    }
+  },
+  "budget": {
+    "ceilingUsd": 1.0,
+    "spentUsd": 0.00827925,
+    "remainingUsd": 0.99172075,
+    "requestCeilings": { "planned": 21, "used": 1 },
+    "tokenCeilings": { "plannedInput": 420000, "plannedOutput": 84000, "usedInput": 4312, "usedOutput": 578 },
+    "proxyModeledChargeUsd": 0.04,
+    "proxyModeledChargeNote": "The pre-fix proxy could not read usage from a streamed reply and therefore kept the full reservation. The authoritative provider cost for the same request is USD 0.00827925. The defect was fixed afterwards and is covered by a regression test."
+  },
+  "verdict": "BLOCKED — EXACT_COMPATIBILITY_ACCESS_OR_BUDGET_CAUSE"
+}

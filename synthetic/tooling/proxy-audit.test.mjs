@@ -209,6 +209,49 @@ test('missing usage is never charged as zero or a floor', async () => {
   assert.equal(forwarded[0].halted, 'usage_unreliable');
 });
 
+test('streamed terminal usage is authoritative and does not halt the stage', async () => {
+  const stub = await startStub((_req, res) => {
+    res.writeHead(200, { 'content-type': 'text/event-stream' });
+    res.write(
+      'event: response.output_text.delta\ndata: ' +
+        JSON.stringify({ type: 'response.output_text.delta', delta: 'hi' }) +
+        '\n\n',
+    );
+    res.end(
+      'event: response.completed\ndata: ' +
+        JSON.stringify({
+          type: 'response.completed',
+          response: {
+            id: 'resp_sse',
+            model: MODEL,
+            provider: 'openai',
+            usage: {
+              input_tokens: 1234,
+              output_tokens: 56,
+              output_tokens_details: { reasoning_tokens: 7 },
+            },
+          },
+        }) +
+        '\n\n',
+    );
+  });
+  const proxy = await startProxy(upstreamArgs(stub.port, ['--max-requests', '6']));
+  const first = await post(proxy.port, okUsage());
+  const second = await post(proxy.port, okUsage(2));
+  const ledger = proxy.read();
+  proxy.close();
+  stub.close();
+  assert.equal(first.status, 200);
+  assert.equal(second.status, 200, 'reported usage must not stop the stage');
+  const forwarded = ledger.filter((l) => l.decision === 'forwarded');
+  assert.equal(forwarded[0].usagePresent, true);
+  assert.equal(forwarded[0].chargedInputTokens, 1234);
+  assert.equal(forwarded[0].chargedOutputTokens, 56);
+  assert.equal(forwarded[0].observedModel, MODEL);
+  assert.equal(forwarded[0].observedProvider, 'openai');
+  assert.equal(forwarded[0].halted, null);
+});
+
 test('oversized input is refused before forwarding', async () => {
   const stub = await startStub((_req, res) => {
     res.writeHead(200, { 'content-type': 'application/json' });

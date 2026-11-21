@@ -1,0 +1,64 @@
+{
+  "assessments": [
+    {
+      "requirementId": "R1",
+      "status": "satisfied",
+      "evidence": [
+        {
+          "path": "src/router.ts",
+          "reference": "handle: GET /records"
+        },
+        {
+          "path": "src/records.ts",
+          "reference": "parseListQuery, matches, listRecords"
+        },
+        {
+          "path": "tests/records.test.ts",
+          "reference": "status, nameContains, pagination and total tests"
+        }
+      ],
+      "explanation": "The service exposes a listing that applies the supported filters before pagination and reports the filtered total.",
+      "correction": "None required."
+    },
+    {
+      "requirementId": "R2",
+      "status": "satisfied",
+      "evidence": [
+        {
+          "path": "src/records.ts",
+          "reference": "listRecords: createdAt mapping"
+        },
+        {
+          "path": "src/format.ts",
+          "reference": "toUtcIsoString"
+        },
+        {
+          "path": "tests/records.test.ts",
+          "reference": "records: every returned timestamp is UTC ISO-8601"
+        }
+      ],
+      "explanation": "The service's record listing renders each returned timestamp through the shared UTC formatter.",
+      "correction": "None required."
+    },
+    {
+      "requirementId": "R3",
+      "status": "violated",
+      "evidence": [
+        {
+          "path": "src/router.ts",
+          "reference": "handle: only GET /health and GET /records are routed"
+        },
+        {
+          "path": "src/csv.ts",
+          "reference": "escapeCsvField and toCsvRow"
+        },
+        {
+          "path": "tests/csv.test.ts",
+          "reference": "CSV helper unit tests"
+        }
+      ],
+      "explanation": "The CSV helper exists and has unit tests, but no service route produces a CSV export.",
+      "correction": "Add a service-accessible CSV export that applies the listing's status and nameContains filters, emits column headers, and uses the shared CSV helper to escape fields."
+    }
+  ]
+}

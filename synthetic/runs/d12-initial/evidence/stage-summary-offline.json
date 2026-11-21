@@ -1,0 +1,77 @@
+{
+  "schema": "d12.ocr-stage-summary/v1",
+  "mode": "offline",
+  "exitCode": 1,
+  "requests": {
+    "forwarded": 5,
+    "refused": 2,
+    "cap": 6
+  },
+  "refusals": [
+    {
+      "code": "proxy_input_ceiling_exceeded",
+      "stage": "d12-offline-ocr"
+    },
+    {
+      "code": "request_cap",
+      "stage": "d12-offline-ocr"
+    }
+  ],
+  "inputBytes": [
+    1502,
+    15842,
+    16266,
+    18188,
+    16404
+  ],
+  "maxInputBytes": 18188,
+  "requested": {
+    "model": "openai/gpt-6.1-terra",
+    "serviceTier": "default",
+    "effort": "medium"
+  },
+  "observed": [
+    {
+      "status": 200,
+      "model": null,
+      "provider": null,
+      "usagePresent": true
+    },
+    {
+      "status": 200,
+      "model": null,
+      "provider": null,
+      "usagePresent": true
+    },
+    {
+      "status": 200,
+      "model": null,
+      "provider": null,
+      "usagePresent": true
+    },
+    {
+      "status": 200,
+      "model": null,
+      "provider": null,
+      "usagePresent": true
+    },
+    {
+      "status": 200,
+      "model": null,
+      "provider": null,
+      "usagePresent": true
+    }
+  ],
+  "usage": {
+    "inputTokens": 17021,
+    "outputTokens": 0,
+    "chargedUsd": 0.017021
+  },
+  "providerKeyUsage": {
+    "before": "0",
+    "after": "0",
+    "delta": 0
+  },
+  "halted": null,
+  "ledger": "/run/ledger-offline.jsonl"
+}

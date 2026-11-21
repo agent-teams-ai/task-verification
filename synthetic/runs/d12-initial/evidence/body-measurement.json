@@ -1,0 +1,17 @@
+{
+  "schema": "d12.body-measurement/v1",
+  "material": {
+    "requirementsBytes": 1766,
+    "prTitleBytes": 53,
+    "prBodyBytes": 592,
+    "trackedFilesBytes": 12793,
+    "trackedFiles": 12,
+    "inputTextBytes": 15774,
+    "instructionsBytes": 319,
+    "schemaBytes": 645
+  },
+  "criteriaRequestBodyBytes": 17859,
+  "proxyInputCeilingBytes": 20000,
+  "fits": true,
+  "headroomBytes": 2141
+}

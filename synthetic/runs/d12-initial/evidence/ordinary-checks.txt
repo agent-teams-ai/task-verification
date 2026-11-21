@@ -1,0 +1,39 @@
+# Frozen ordinary check definition: package.json#scripts.test
+# command: npm test
+# git SHA: 23864e3c877f2b34bbbdd90c4527ef46eb19cbd9
+# run at: 2026-11-21T18:43:31Z
+
+
+> record-management-api@0.1.0 test
+> node --experimental-strip-types --test --test-concurrency=1 tests/*.test.ts
+
+✔ csv: a plain value is not quoted (0.8124ms)
+✔ csv: a comma forces quoting (0.153ms)
+✔ csv: an embedded quote is doubled (0.112ms)
+✔ csv: a newline forces quoting (0.1161ms)
+✔ csv: null and undefined are empty fields (0.1182ms)
+✔ csv: a row joins escaped fields (0.1151ms)
+✔ format: a stored offset timestamp is rendered as UTC (1.4143ms)
+✔ format: a negative offset timestamp is rendered as UTC (0.1268ms)
+✔ format: a Date is rendered as UTC (0.1171ms)
+✔ format: an invalid timestamp is refused (0.4002ms)
+✔ records: the first page lists every record by default (1.7226ms)
+✔ records: status filters the listing (0.6842ms)
+✔ records: nameContains is case-insensitive and trims its input (0.1968ms)
+✔ records: limit and offset page the filtered set (0.2185ms)
+✔ records: every returned timestamp is UTC ISO-8601 (0.3357ms)
+✔ records: an unusable limit is refused, not silently clamped (0.1679ms)
+✔ records: an unknown status is refused (0.149ms)
+✔ records: the query parser applies documented defaults (0.1247ms)
+✔ records: listRecords reports the total before pagination (0.1436ms)
+✔ store: six records are seeded (0.7299ms)
+✔ store: a returned row is a copy (0.1504ms)
+ℹ tests 21
+ℹ suites 0
+ℹ pass 21
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 455.4587
+EXIT_STATUS=0

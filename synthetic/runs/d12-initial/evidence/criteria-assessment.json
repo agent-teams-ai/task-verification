@@ -1,0 +1,139 @@
+{
+  "schema": "d12.criteria-assessment/v1",
+  "generatedAt": "2026-11-21T18:42:04.045Z",
+  "sdk": {
+    "package": "@agent-teams/account-gateway",
+    "version": "0.1.0",
+    "entry": "@agent-teams/account-gateway/llm -> createLlmClient()",
+    "distPath": "D:/Project/agent-teams-ai-task-verification-m2/.isolation-tmp/d12/sdk-src/packages/account-gateway/dist/llm/index.js",
+    "mode": "caller-supplied control + execution ports (SDK encodes, streams and decodes)"
+  },
+  "requested": {
+    "model": "openai/gpt-6.1-terra",
+    "serviceTier": "default",
+    "effort": "medium",
+    "maxOutputTokens": 4000,
+    "outputMode": "json_schema",
+    "stream": true,
+    "store": false
+  },
+  "result": {
+    "ok": true,
+    "usage": {
+      "inputTokens": 4312,
+      "outputTokens": 578,
+      "cachedInputTokens": 0,
+      "reasoningTokens": 93
+    },
+    "receipt": {
+      "executionRef": "exec_d12-initial-criteria-a1-p",
+      "requestRef": "d12-initial-criteria-a1-r",
+      "accountRef": "openrouter-primary",
+      "authorizationEpoch": 1,
+      "taskId": "d12-initial-criteria",
+      "attempt": 1,
+      "profileId": "synthetic-d12-criteria",
+      "model": "openai/gpt-6.1-terra",
+      "observedModel": "openai/gpt-6.1-terra",
+      "responseId": "gen-1795286516-DHxpFdjyVcyDAsMsvUK6",
+      "requestSha256": "cb8633c8385444d7d7c9733794b8ef542b1a8abdef47140445ef9262ca0556c6",
+      "outputSha256": "19e607d44d13ba1ec49d4e4b096262f349bd428fff5baabdac7032312840e6b3"
+    },
+    "cleanup": "closed",
+    "value": {
+      "assessments": [
+        {
+          "requirementId": "R1",
+          "status": "satisfied",
+          "evidence": [
+            {
+              "path": "src/router.ts",
+              "reference": "handle: GET /records"
+            },
+            {
+              "path": "src/records.ts",
+              "reference": "parseListQuery, matches, listRecords"
+            },
+            {
+              "path": "tests/records.test.ts",
+              "reference": "status, nameContains, pagination and total tests"
+            }
+          ],
+          "explanation": "The service exposes a listing that applies the supported filters before pagination and reports the filtered total.",
+          "correction": "None required."
+        },
+        {
+          "requirementId": "R2",
+          "status": "satisfied",
+          "evidence": [
+            {
+              "path": "src/records.ts",
+              "reference": "listRecords: createdAt mapping"
+            },
+            {
+              "path": "src/format.ts",
+              "reference": "toUtcIsoString"
+            },
+            {
+              "path": "tests/records.test.ts",
+              "reference": "records: every returned timestamp is UTC ISO-8601"
+            }
+          ],
+          "explanation": "The service's record listing renders each returned timestamp through the shared UTC formatter.",
+          "correction": "None required."
+        },
+        {
+          "requirementId": "R3",
+          "status": "violated",
+          "evidence": [
+            {
+              "path": "src/router.ts",
+              "reference": "handle: only GET /health and GET /records are routed"
+            },
+            {
+              "path": "src/csv.ts",
+              "reference": "escapeCsvField and toCsvRow"
+            },
+            {
+              "path": "tests/csv.test.ts",
+              "reference": "CSV helper unit tests"
+            }
+          ],
+          "explanation": "The CSV helper exists and has unit tests, but no service route produces a CSV export.",
+          "correction": "Add a service-accessible CSV export that applies the listing's status and nameContains filters, emits column headers, and uses the shared CSV helper to escape fields."
+        }
+      ]
+    }
+  },
+  "rawText": "{\n  \"assessments\": [\n    {\n      \"requirementId\": \"R1\",\n      \"status\": \"satisfied\",\n      \"evidence\": [\n        {\n          \"path\": \"src/router.ts\",\n          \"reference\": \"handle: GET /records\"\n        },\n        {\n          \"path\": \"src/records.ts\",\n          \"reference\": \"parseListQuery, matches, listRecords\"\n        },\n        {\n          \"path\": \"tests/records.test.ts\",\n          \"reference\": \"status, nameContains, pagination and total tests\"\n        }\n      ],\n      \"explanation\": \"The service exposes a listing that applies the supported filters before pagination and reports the filtered total.\",\n      \"correction\": \"None required.\"\n    },\n    {\n      \"requirementId\": \"R2\",\n      \"status\": \"satisfied\",\n      \"evidence\": [\n        {\n          \"path\": \"src/records.ts\",\n          \"reference\": \"listRecords: createdAt mapping\"\n        },\n        {\n          \"path\": \"src/format.ts\",\n          \"reference\": \"toUtcIsoString\"\n        },\n        {\n          \"path\": \"tests/records.test.ts\",\n          \"reference\": \"records: every returned timestamp is UTC ISO-8601\"\n        }\n      ],\n      \"explanation\": \"The service's record listing renders each returned timestamp through the shared UTC formatter.\",\n      \"correction\": \"None required.\"\n    },\n    {\n      \"requirementId\": \"R3\",\n      \"status\": \"violated\",\n      \"evidence\": [\n        {\n          \"path\": \"src/router.ts\",\n          \"reference\": \"handle: only GET /health and GET /records are routed\"\n        },\n        {\n          \"path\": \"src/csv.ts\",\n          \"reference\": \"escapeCsvField and toCsvRow\"\n        },\n        {\n          \"path\": \"tests/csv.test.ts\",\n          \"reference\": \"CSV helper unit tests\"\n        }\n      ],\n      \"explanation\": \"The CSV helper exists and has unit tests, but no service route produces a CSV export.\",\n      \"correction\": \"Add a service-accessible CSV export that applies the listing's status and nameContains filters, emits column headers, and uses the shared CSV helper to escape fields.\"\n    }\n  ]\n}",
+  "execution": {
+    "elapsedMs": 10660,
+    "inputBytes": [
+      18194
+    ],
+    "forwardedRequests": 1,
+    "refusals": [],
+    "charged": {
+      "inputTokens": 20000,
+      "outputTokens": 4000,
+      "usd": 0.04
+    },
+    "observedFromProxy": [
+      {
+        "status": 200,
+        "model": null,
+        "provider": null
+      }
+    ]
+  },
+  "providerKeyUsage": {
+    "before": "0",
+    "after": "0"
+  },
+  "proxyArgs": {
+    "maxRequests": 1,
+    "maxInputTokens": 20000,
+    "maxOutputTokens": 4000,
+    "requestInputCeilingBytes": 20000
+  }
+}

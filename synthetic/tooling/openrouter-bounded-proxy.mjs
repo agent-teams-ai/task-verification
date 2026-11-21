@@ -112,6 +112,75 @@ if (!OFFLINE) {
 // is never used as the charged amount.
 const estimateTokens = (text) => (text.length === 0 ? 0 : Math.ceil(text.length / 4));
 
+/**
+ * Authoritative usage. A non-streamed reply carries `usage` at the top level; a
+ * streamed Responses reply carries it in the terminal event (`response.completed`
+ * / `response.incomplete`). Both are read here, last value wins, and an absent
+ * value stays null so the caller keeps the reservation and halts.
+ */
+function usageFromBody(bodyText) {
+  const usable = (u) => u !== null && typeof u === 'object' && !Array.isArray(u);
+  try {
+    const whole = JSON.parse(bodyText);
+    if (usable(whole?.usage)) return whole.usage;
+  } catch {
+    /* streamed: fall through to the frame scan */
+  }
+  let usage = null;
+  for (const line of bodyText.split('\n')) {
+    const trimmed = line.trim();
+    if (!trimmed.startsWith('data:')) continue;
+    const payload = trimmed.slice(5).trim();
+    if (payload === '' || payload === '[DONE]') continue;
+    try {
+      const frame = JSON.parse(payload);
+      const candidate = usable(frame?.usage) ? frame.usage : usable(frame?.response?.usage) ? frame.response.usage : null;
+      if (candidate !== null) usage = candidate;
+    } catch {
+      /* a partial frame is not evidence */
+    }
+  }
+  return usage;
+}
+
+/**
+ * Evidence only: what the upstream said it actually served. Reads `model` and
+ * `provider` from a JSON body or from the last SSE `data:` frame that carries
+ * them. Never feeds enforcement, never invents a value: absent stays null.
+ */
+function observedIdentity(bodyText) {
+  const pick = (value, out) => {
+    if (value === null || typeof value !== 'object') return out;
+    const inner = value.response !== null && typeof value.response === 'object' ? value.response : null;
+    if (typeof value.model === 'string' && value.model !== '') out.model = value.model;
+    if (typeof value.provider === 'string' && value.provider !== '') out.provider = value.provider;
+    if (inner !== null) {
+      if (typeof inner.model === 'string' && inner.model !== '') out.model = inner.model;
+      if (typeof inner.provider === 'string' && inner.provider !== '') out.provider = inner.provider;
+    }
+    return out;
+  };
+  const out = { model: null, provider: null };
+  try {
+    pick(JSON.parse(bodyText), out);
+    if (out.model !== null || out.provider !== null) return out;
+  } catch {
+    /* SSE or non-JSON: fall through to the frame scan */
+  }
+  for (const line of bodyText.split('\n')) {
+    const trimmed = line.trim();
+    if (!trimmed.startsWith('data:')) continue;
+    const payload = trimmed.slice(5).trim();
+    if (payload === '' || payload === '[DONE]') continue;
+    try {
+      pick(JSON.parse(payload), out);
+    } catch {
+      /* a partial frame is not evidence */
+    }
+  }
+  return out;
+}
+
 const state = {
   requests: 0,
   reservedInput: 0,
@@ -264,7 +333,7 @@ const server = http.createServer(async (req, res) => {
   const payload = parsed === null ? raw : Buffer.from(JSON.stringify(parsed), 'utf8');
   // ---- end critical section -------------------------------------------------
 
-  const settle = ({ status, usage, ambiguous }) => {
+  const settle = ({ status, usage, ambiguous, observed = { model: null, provider: null } }) => {
     state.reservedInput -= reservedIn;
     state.reservedOutput -= reservedOut;
     const usagePresent = usage !== null && usage !== undefined;
@@ -295,6 +364,8 @@ const server = http.createServer(async (req, res) => {
       inputTokensEstimate: estIn,
       injectedMaxOutputTokens: injectedOutput,
       status,
+      observedModel: observed.model,
+      observedProvider: observed.provider,
       usagePresent,
       usage,
       chargedInputTokens: chargedIn,
@@ -352,15 +423,10 @@ const server = http.createServer(async (req, res) => {
   });
 
   const bodyText = upstream.body.toString('utf8');
-  let usage = null;
-  try {
-    usage = JSON.parse(bodyText)?.usage ?? null;
-  } catch {
-    usage = null;
-  }
+  const usage = usageFromBody(bodyText);
   const status = upstream.status ?? 502;
   const ambiguous = Boolean(upstream.timedOut) || !(status >= 200 && status < 300);
-  settle({ status, usage, ambiguous });
+  settle({ status, usage, ambiguous, observed: observedIdentity(bodyText) });
 
   res.writeHead(status, { 'content-type': 'application/json' });
   res.end(bodyText);

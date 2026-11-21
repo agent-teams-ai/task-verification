@@ -1,0 +1,15 @@
+{
+  "merge_system_rule": true,
+  "include": [
+    "README.md",
+    "src/records.ts",
+    "src/router.ts",
+    "tests/records.test.ts"
+  ],
+  "rules": [
+    {
+      "id": "reviewrouter-managed-v1",
+      "content": "ReviewRouter managed additive policy (reviewrouter-managed-v1).\nReport only issues material to this change: introduced or aggravated by the base-to-head diff.\nFor every finding describe the causal base-to-head change that creates or worsens the issue.\nAllowed finding scope is the reviewed changed paths assigned to this run.\nWrite finding titles and messages in the repository language."
+    }
+  ]
+}
