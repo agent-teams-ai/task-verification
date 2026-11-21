@@ -448,3 +448,66 @@ the result record. It cannot be executed before Iliya approves the substituted m
 (M4), the OCR request allowance, and the `OPENAI_API_KEY` guard conflict. Environment inheritance, the
 Responses route, the Linux runtime, the pinned asset and the rule text are all confirmed ready.
 
+---
+
+# Credential rotation, comparator freeze and budget reconciliation — 2026-11-21
+
+Preparation phase only. **No inference request was sent.** Requests: 0. Tokens: 0. Spend: USD 0.00.
+
+## 1. Credential rotation
+
+| Check | Result |
+| --- | --- |
+| New credential in the Agent process | **present** (boolean test only; value never read, echoed, hashed into output or asserted on) |
+| Rotation evidence | `GET /api/v1/key` now reports `usage: 0`, `remaining: 5`, expiry `2026-11-28T17:15:38Z` — a different key from the compromised one (`usage 0.026513769`, expiry `2026-11-25`) |
+| App restarted | yes — `Freebuff.exe` 17484 started 18:20:11 from PowerShell 18948 (18:19:55), so the new environment is inherited |
+| Persisted at `User`/`Machine` scope | **no** for all four variables — `setx` was not used |
+| Old key revocation | **maintainer action outstanding** — it is not held here, so its revocation cannot be tested locally and must be confirmed in the OpenRouter dashboard |
+| `OPENAI_API_KEY` / `OPENAI_BASE_URL` | still set in the launching shell; redundant, and they trip the model-free guard. Unset them, or run model-free children with `env -u` — verified: with the four credential variables removed the `tests/wp7.ts` guard would pass |
+
+The credential is now exposed **only** in the parent process environment. The proxy reads
+`OPENROUTER_API_KEY`/`OPENROUTER_BASE_URL` explicitly and has no `OPENAI_*` fallback.
+
+## 2. Fixed comparator and compatibility
+
+`openai/gpt-6.1-terra` on OpenRouter via `openai-responses`, standard tier, `reasoning.effort=medium`,
+pinned rr.7 binary, `reviewrouter-managed-v1` rules unchanged, filtering and normalization unchanged.
+Labelled `FIXED SYNTHETIC DEVELOPMENT OCR COMPARATOR — NOT HISTORICAL PRODUCTION CONFIGURATION`.
+
+Compatibility was established by inspection of the pinned binary's CLI surface and the managed config
+builder: custom providers with `protocol: "openai-responses"`, `extra_body.service_tier`, `extra_body.reasoning`,
+the `--rule` JSON shape, `--effort`, and the loopback-only base URL constraint are all supported. **No
+blocker found; no alternative model or route is proposed.** Detail: `OCR-COMPARATOR-PROPOSAL-v1.md`.
+
+## 3. Request accounting and enforcement
+
+The managed run issues **4** requests for the M2 finding case and **5** in the release qualification — one
+invocation is never one request. Managed mode serializes to at most one in-flight call, but the model can add
+requests through tool rounds (`--max-tools`, minimum 50) and internal retries, and retries have no documented
+off switch. The binary therefore cannot bound the count; the **loopback proxy does**, by refusing request N+1
+with `429` before any upstream call.
+
+`synthetic/tooling/openrouter-bounded-proxy.mjs` + `proxy-selftest.mjs`, run offline against no provider:
+cap `3` → `200,200,200,429`, 3 accepted, 1 refused before forwarding, output ceiling injected, every accepted
+request charged, credential absent from the ledger. **PASS.**
+
+## 4. Revised budget (21 requests, USD 0.84 worst case)
+
+| Stage | Requests | Input | Output | Worst cost |
+| --- | --- | --- | --- | --- |
+| Initial OCR | 6 | 120,000 | 24,000 | 0.24 |
+| Initial criteria | 1 | 20,000 | 4,000 | 0.04 |
+| Correction workflow | 7 | 140,000 | 28,000 | 0.28 |
+| Recheck OCR | 6 | 120,000 | 24,000 | 0.24 |
+| Recheck criteria | 1 | 20,000 | 4,000 | 0.04 |
+| **Total** | **21** | **420,000** | **84,000** | **0.84** |
+
+USD 1.00 ceiling holds with USD 0.16 unused. Missing usage is charged at the floor, never zero. Machine-readable
+record: `EXECUTION-MANIFEST-v1.json` (status `PREPARED_NOT_EXECUTED`).
+
+## 5. Verdict
+
+`READY_FOR_MAINTAINER_COMPARATOR_APPROVAL` — technical preparation complete; execution waits on comparator
+approval, budget approval, and confirmation that the compromised key was revoked.
+
+

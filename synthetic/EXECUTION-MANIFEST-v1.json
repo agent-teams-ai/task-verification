@@ -1,0 +1,133 @@
+{
+  "schema": "synthetic.pilot.execution-manifest/v1",
+  "manifestId": "synthetic-live-pilot-01-manifest-v1",
+  "status": "PREPARED_NOT_EXECUTED",
+  "executionPerformed": false,
+  "inferenceRequestsMade": 0,
+  "spendIncurredUsd": 0,
+  "preparedAt": "2026-11-21",
+  "experiment": {
+    "repository": "agent-teams-ai/task-verification",
+    "branch": "exp/synthetic-live-pilot-01",
+    "m2Head": "996cdcb002f898a5b73ce8f9ce7931e6299b14e4",
+    "pullRequest": { "number": 2, "state": "OPEN", "isDraft": true },
+    "candidateB": "absent"
+  },
+  "fixture": {
+    "baseSha": "ce99b0d65d645124413a746ecb137b5497aad80f",
+    "baseTree": "0f6c4d8ea79485091f98baf2bf9d216e4d100beb",
+    "candidateASha": "23864e3c877f2b34bbbdd90c4527ef46eb19cbd9",
+    "candidateATree": "aa4af8c4b01304cd1efac0917a0e9cca56374108",
+    "candidateAChangedPaths": 4,
+    "candidateAInsertions": 212,
+    "candidateADeletions": 4,
+    "requirements": {
+      "revision": "record-api-req-v1",
+      "path": "synthetic/requirements/RECORD-API-v1.md",
+      "sha256": "ca868a3fcc2a9100eabda736c48a8e107125a1f5a8477eede3665be96bde727f"
+    },
+    "reviewerInputs": {
+      "path": "synthetic/inputs/REVIEWER-INPUT-v1.md",
+      "sha256": "4ffebc0d194a0b56b0c00f79006b9ad48a4c548ef6e6d637b63dfe54d9dbaf88"
+    },
+    "prShape": { "sha256": "9b48eb1b7c31af0becbe5d49a0fd507cbd450f222d4ce4a5c04120be610c1bcf" },
+    "ordinaryChecks": { "sha256": "85d60b7b9abc67d42b47bf75875feebafb90ac534271f81e8c87666019f9b26d" }
+  },
+  "ocrComparator": {
+    "label": "FIXED SYNTHETIC DEVELOPMENT OCR COMPARATOR — NOT HISTORICAL PRODUCTION CONFIGURATION",
+    "approved": false,
+    "requiresMaintainerApproval": true,
+    "binary": {
+      "release": "ocr-v1.13.1-rr.7",
+      "version": "open-code-review 1.13.1-rr.7 linux/amd64",
+      "sizeBytes": 80513021,
+      "sha256": "2f290fb407a5cb6fbe854cb6702b8c713325fce603a71c1be83f5284034aaa29",
+      "platform": "linux/amd64",
+      "execution": "Docker Desktop engine, --network none for model-free checks"
+    },
+    "provider": "OpenRouter",
+    "model": "openai/gpt-6.1-terra",
+    "protocol": "openai-responses",
+    "serviceTier": "default",
+    "reasoningEffort": "medium",
+    "ruleIdentity": "reviewrouter-managed-v1",
+    "filtering": "unchanged (--no-filter must not be passed)",
+    "normalization": "unchanged (reviewrouter.ocr-outcome/v1)",
+    "transport": {
+      "hop": "rr.7 -> http://127.0.0.1:<port>/responses -> https://openrouter.ai/api/v1/responses",
+      "proxy": "synthetic/tooling/openrouter-bounded-proxy.mjs",
+      "credentialsReadBy": "proxy only, from OPENROUTER_API_KEY and OPENROUTER_BASE_URL",
+      "fallbackToOpenaiEnvVars": false
+    }
+  },
+  "criteriaPath": {
+    "provider": "OpenRouter",
+    "model": "openai/gpt-6.1-terra",
+    "protocol": "openai-responses",
+    "serviceTier": "default",
+    "reasoningEffort": "medium"
+  },
+  "budget": {
+    "currency": "USD",
+    "aggregateCeilingUsd": 1.0,
+    "worstCaseUsd": 0.84,
+    "pricingPerMillionTokens": { "input": 1.0, "output": 5.0 },
+    "perRequest": { "maxInputTokens": 20000, "maxOutputTokens": 4000, "timeoutSeconds": 150 },
+    "aggregate": {
+      "maxUnderlyingInferenceRequests": 21,
+      "maxInputTokens": 420000,
+      "maxOutputTokens": 84000,
+      "maxWallClockMinutes": 60
+    },
+    "stages": [
+      { "id": "initial-ocr", "model": "openai/gpt-6.1-terra", "requestCap": 6, "maxInputTokens": 120000, "maxOutputTokens": 24000, "worstCaseUsd": 0.24, "inBinaryGuard": "--max-tokens-budget 144000", "timeoutMinutes": 15 },
+      { "id": "initial-criteria", "model": "openai/gpt-6.1-terra", "requestCap": 1, "maxInputTokens": 20000, "maxOutputTokens": 4000, "worstCaseUsd": 0.04, "timeoutMinutes": 2.5 },
+      { "id": "correction-workflow", "model": "openai/gpt-6.1-terra", "requestCap": 7, "maxInputTokens": 140000, "maxOutputTokens": 28000, "worstCaseUsd": 0.28, "timeoutMinutes": 17.5 },
+      { "id": "recheck-ocr", "model": "openai/gpt-6.1-terra", "requestCap": 6, "maxInputTokens": 120000, "maxOutputTokens": 24000, "worstCaseUsd": 0.24, "timeoutMinutes": 15 },
+      { "id": "recheck-criteria", "model": "openai/gpt-6.1-terra", "requestCap": 1, "maxInputTokens": 20000, "maxOutputTokens": 4000, "worstCaseUsd": 0.04, "timeoutMinutes": 2.5 }
+    ],
+    "enforcement": [
+      "proxy hard request cap: request N+1 refused with 429 before any upstream call (model-free self-test PASS)",
+      "in-binary --max-tokens-budget 144000 per OCR invocation, checked before every LLM round",
+      "injected max_output_tokens 4000 when the caller omits it",
+      "--timeout 15 per OCR invocation; 150 s per request"
+    ],
+    "accounting": {
+      "perRequestLedger": "JSONL: method, model, byte counts, reported usage, charged tokens, status",
+      "chargingPolicy": "max(reported usage, floor); a 2xx with missing usage is never treated as free",
+      "authoritativeReconciliation": "GET https://openrouter.ai/api/v1/key usage delta before and after",
+      "credentialInLedger": false
+    }
+  },
+  "retryPolicy": {
+    "pilotLayerAutomaticRetries": 0,
+    "binaryInternalRetries": "present and cannot be disabled by a documented flag; bounded by the proxy request cap and --timeout",
+    "capBreachAction": "stop"
+  },
+  "stopRules": [
+    "any request refused by the proxy cap",
+    "any 4xx, refusal, malformed or contract-invalid response",
+    "ambiguous transport outcome (no retry, no replay)",
+    "provider usage delta approaching USD 1.00",
+    "wall clock exceeding 60 minutes",
+    "credential absent from the Agent process, or present in any artifact"
+  ],
+  "environmentIsolation": {
+    "modelFreeChildren": ["OPENAI_API_KEY", "ANTHROPIC_API_KEY", "GATEWAY_TOKEN", "OPENROUTER_API_KEY"],
+    "livePilotExposes": ["OPENROUTER_API_KEY", "OPENROUTER_BASE_URL"],
+    "persistedAtUserOrMachineScope": false,
+    "dockerBuildLayersContainCredentials": false
+  },
+  "evaluatorSeparation": {
+    "evaluatorOnlyPaths": ["synthetic/evaluator/EXPECTATIONS.md", "synthetic/evaluator/r3-export.test.ts"],
+    "reachableFromReviewerRepo": false,
+    "reviewerVisiblePaths": "synthetic/inputs/REVIEWER-INPUT-v1.md only"
+  },
+  "approvalRequiredBeforeExecution": [
+    "old OpenRouter credential revoked by the maintainer",
+    "replacement credential visible in the actual Agent process",
+    "fixed OCR comparator approved (model substitution acknowledged)",
+    "revised 21-request budget approved",
+    "recommended: key limit lowered to USD 1.00"
+  ]
+}
