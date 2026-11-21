@@ -3,31 +3,33 @@
  * Bounded, recording loopback proxy between the pinned rr.7 managed OCR binary
  * and OpenRouter.
  *
- * Topology (required by the managed contract): the binary's `custom_providers`
- * URL must be loopback (`http://127.0.0.1:<port>`), so this proxy is the only
- * component that ever holds the provider credential. It is therefore also the
- * transport boundary where request count is enforced and usage is recorded.
+ * Managed mode forces the binary's provider URL to be loopback
+ * (`http://127.0.0.1:<port>`), so this proxy is the only component that holds
+ * the provider credential and the only place a request can be counted, capped
+ * or priced.
  *
- * Credential rules:
- * - Reads OPENROUTER_API_KEY and OPENROUTER_BASE_URL only.
- * - Never falls back to OPENAI_API_KEY / OPENAI_BASE_URL.
- * - Never writes, logs, echoes or serializes the credential: the ledger records
- *   only method, path, model, byte counts, token accounting and status.
+ * Enforcement model
+ * -----------------
+ * 1. Inference traffic is `POST /responses` (also `/v1/responses`). Anything
+ *    else is non-inference: refused, not counted, never forwarded.
+ * 2. Request slots are taken before forwarding. Check + increment is
+ *    synchronous in a single task, so concurrent requests cannot exceed the cap.
+ * 3. Token budget is reserved at the *maximum permitted request cost* before
+ *    forwarding (per-request ceilings, not an estimate). Reservation is
+ *    synchronous with the slot, so concurrent requests cannot overspend.
+ * 4. On completion the reservation is reconciled to reported usage. Usage that
+ *    is absent is never charged as zero or as a floor: the full reservation is
+ *    kept and the proxy halts, because the cost is then unknowable.
+ * 5. Non-2xx, timeout and transport error are ambiguous: full reservation kept,
+ *    proxy halts. No retry can re-enter after a halt.
  *
- * Enforcement:
- * - Hard request cap (--max-requests). Request N+1 is refused with 429 and is
- *   never forwarded upstream, so it cannot cost anything.
- * - Injects `max_output_tokens` when the caller did not set one.
- * - Charging policy: reported `usage` when present, otherwise the declared
- *   per-request ceiling. `chargedTokens` is always max(reported, floor) so a
- *   response with missing usage fields is never treated as free.
- *
- * Usage:
- *   node openrouter-bounded-proxy.mjs --max-requests 6 --ledger <path>
- *   node openrouter-bounded-proxy.mjs --offline --max-requests 3   (self-test)
+ * Credential rules: reads OPENROUTER_API_KEY / OPENROUTER_BASE_URL only, never
+ * OPENAI_*; never writes, logs, echoes or serializes the credential, and never
+ * records request headers.
  */
 
 import http from 'node:http';
+import https from 'node:https';
 import fs from 'node:fs';
 
 function parseArgs(argv) {
@@ -47,46 +49,83 @@ function parseArgs(argv) {
 }
 
 const args = parseArgs(process.argv.slice(2));
+const num = (value, fallback) => (value === undefined ? fallback : Number(value));
 
+const OFFLINE = Boolean(args.offline);
+const INSECURE_UPSTREAM = Boolean(args['allow-insecure-upstream']);
 const UPSTREAM_BASE = (args.upstream ?? process.env.OPENROUTER_BASE_URL ?? '')
   .trim()
   .replace(/\/+$/, '');
 const API_KEY = (process.env.OPENROUTER_API_KEY ?? '').trim();
-const OFFLINE = Boolean(args.offline);
-const MAX_REQUESTS = Number(args['max-requests'] ?? 6);
-const MAX_OUTPUT_TOKENS = Number(args['max-output-tokens'] ?? 4000);
-const MAX_INPUT_TOKENS = Number(args['max-input-tokens'] ?? 20000);
-const LEDGER = typeof args.ledger === 'string' ? args.ledger : null;
-const PORT = Number(args.port ?? 0);
 
-if (!Number.isInteger(MAX_REQUESTS) || MAX_REQUESTS < 1) {
-  process.stderr.write('proxy: --max-requests must be a positive integer\n');
-  process.exit(2);
+const STAGE = typeof args.stage === 'string' ? args.stage : 'unlabelled';
+const LEDGER = typeof args.ledger === 'string' ? args.ledger : null;
+const PORT = num(args.port, 0);
+
+const MAX_REQUESTS = num(args['max-requests'], 6);
+const MAX_INPUT_TOKENS = num(args['max-input-tokens'], 120_000);
+const MAX_OUTPUT_TOKENS = num(args['max-output-tokens'], 24_000);
+const REQ_INPUT_CEILING = num(args['request-input-tokens'], 20_000);
+const REQ_OUTPUT_CEILING = num(args['request-output-tokens'], 4_000);
+const REQUEST_TIMEOUT_MS = num(args['request-timeout-ms'], 150_000);
+
+const PINNED_MODEL = typeof args.model === 'string' ? args.model : 'openai/gpt-6.1-terra';
+const PINNED_TIER = typeof args['service-tier'] === 'string' ? args['service-tier'] : 'default';
+const PINNED_EFFORT = typeof args.effort === 'string' ? args.effort : 'medium';
+
+for (const [name, value] of [
+  ['max-requests', MAX_REQUESTS],
+  ['max-input-tokens', MAX_INPUT_TOKENS],
+  ['max-output-tokens', MAX_OUTPUT_TOKENS],
+  ['request-input-tokens', REQ_INPUT_CEILING],
+  ['request-output-tokens', REQ_OUTPUT_CEILING],
+]) {
+  if (!Number.isInteger(value) || value < 1) {
+    process.stderr.write(`proxy: --${name} must be a positive integer\n`);
+    process.exit(2);
+  }
 }
 
-// Fail closed. A proxy without an upstream or credential is a silent bypass.
 if (!OFFLINE) {
   if (API_KEY === '') {
     process.stderr.write('proxy: OPENROUTER_API_KEY is not set; refusing to start\n');
     process.exit(2);
   }
-  if (!/^https:\/\/[^/]+/.test(UPSTREAM_BASE)) {
-    process.stderr.write('proxy: OPENROUTER_BASE_URL is not an https origin; refusing to start\n');
+  const schemeOk = INSECURE_UPSTREAM
+    ? /^https?:\/\/[^/]+/.test(UPSTREAM_BASE)
+    : /^https:\/\/[^/]+/.test(UPSTREAM_BASE);
+  if (!schemeOk) {
+    process.stderr.write('proxy: upstream is not an https origin; refusing to start\n');
     process.exit(2);
   }
 }
 
-// Coarse input estimate only (never authoritative). Used to refuse a request
-// that is obviously over the ceiling before it can be billed.
+// Coarse guard against obviously oversized bodies. This is NOT a tokeniser and
+// is never used as the charged amount.
 const estimateTokens = (text) => (text.length === 0 ? 0 : Math.ceil(text.length / 4));
 
-let requestCount = 0;
-let chargedIn = 0;
-let chargedOut = 0;
+const state = {
+  requests: 0,
+  reservedInput: 0,
+  reservedOutput: 0,
+  chargedInput: 0,
+  chargedOutput: 0,
+  halted: null,
+};
 
 function record(entry) {
   if (LEDGER === null) return;
-  fs.appendFileSync(LEDGER, `${JSON.stringify(entry)}\n`, { mode: 0o600 });
+  fs.appendFileSync(
+    LEDGER,
+    `${JSON.stringify({ stage: STAGE, at: new Date().toISOString(), ...entry })}\n`,
+    { mode: 0o600 }
+  );
+}
+
+function refuse(res, status, code, extra = {}) {
+  record({ decision: 'refused', code, ...extra });
+  res.writeHead(status, { 'content-type': 'application/json' });
+  res.end(JSON.stringify({ error: { message: code, type: 'proxy_budget', code } }));
 }
 
 function readBody(stream) {
@@ -99,33 +138,37 @@ function readBody(stream) {
 }
 
 const server = http.createServer(async (req, res) => {
+  // Non-inference traffic is distinguished and never forwarded.
+  const inferencePath = req.url === '/responses' || req.url === '/v1/responses';
+  if (!inferencePath) {
+    record({ decision: 'refused', kind: 'non-inference', code: 'proxy_path_not_inference', path: req.url });
+    res.writeHead(404, { 'content-type': 'application/json' });
+    res.end(JSON.stringify({ error: { message: 'proxy_path_not_inference', type: 'proxy_boundary' } }));
+    return;
+  }
   if (req.method !== 'POST') {
+    record({ decision: 'refused', kind: 'non-inference', code: 'proxy_method_not_allowed', method: req.method });
     res.writeHead(405, { 'content-type': 'application/json' });
-    res.end(JSON.stringify({ error: { message: 'proxy_method_not_allowed' } }));
+    res.end(JSON.stringify({ error: { message: 'proxy_method_not_allowed', type: 'proxy_boundary' } }));
     return;
   }
 
   const raw = await readBody(req).catch(() => null);
   if (raw === null) {
-    res.writeHead(400, { 'content-type': 'application/json' });
-    res.end(JSON.stringify({ error: { message: 'proxy_body_unreadable' } }));
+    refuse(res, 400, 'proxy_body_unreadable');
     return;
   }
 
-  // Hard cap: refuse before any upstream call, so the request cannot be billed.
-  if (requestCount >= MAX_REQUESTS) {
-    record({ i: null, refused: 'request_cap', cap: MAX_REQUESTS, at: new Date().toISOString() });
-    res.writeHead(429, { 'content-type': 'application/json' });
-    res.end(
-      JSON.stringify({
-        error: { message: 'proxy_request_cap_exceeded', type: 'proxy_budget', code: 'request_cap' },
-      })
-    );
+  // ---- synchronous critical section: halt, slot, policy, reservation --------
+  if (state.halted !== null) {
+    refuse(res, 402, 'proxy_halted', { haltReason: state.halted });
     return;
   }
-
-  requestCount += 1;
-  const index = requestCount;
+  if (state.requests >= MAX_REQUESTS) {
+    refuse(res, 429, 'request_cap', { cap: MAX_REQUESTS });
+    return;
+  }
+  // A halted or capped request never forwards, so it is not charged tokens.
 
   let parsed = null;
   try {
@@ -133,108 +176,168 @@ const server = http.createServer(async (req, res) => {
   } catch {
     parsed = null;
   }
+  const text = raw.toString('utf8');
+  const estIn = estimateTokens(text);
 
-  const estIn = estimateTokens(raw.toString('utf8'));
-  if (estIn > MAX_INPUT_TOKENS) {
-    record({ i: index, refused: 'input_ceiling', estimatedInputTokens: estIn, cap: MAX_INPUT_TOKENS });
-    res.writeHead(413, { 'content-type': 'application/json' });
-    res.end(JSON.stringify({ error: { message: 'proxy_input_ceiling_exceeded', type: 'proxy_budget' } }));
+  // Policy pinning: a substituted model, tier or effort is refused, not billed.
+  const model = parsed?.model ?? null;
+  if (model !== PINNED_MODEL) {
+    state.requests += 1;
+    refuse(res, 400, 'proxy_policy_model', { attemptedModel: model, pinned: PINNED_MODEL });
+    return;
+  }
+  const tier = parsed?.service_tier ?? null;
+  if (tier !== null && tier !== PINNED_TIER) {
+    state.requests += 1;
+    refuse(res, 400, 'proxy_policy_service_tier', { attemptedTier: tier, pinned: PINNED_TIER });
+    return;
+  }
+  const effort = parsed?.reasoning?.effort ?? null;
+  if (effort !== null && effort !== PINNED_EFFORT) {
+    state.requests += 1;
+    refuse(res, 400, 'proxy_policy_reasoning_effort', { attemptedEffort: effort, pinned: PINNED_EFFORT });
     return;
   }
 
-  // Deterministic output ceiling; recorded so the manifest can prove it.
-  let injectedOutput = null;
-  if (parsed !== null && typeof parsed === 'object' && parsed.max_output_tokens === undefined) {
-    parsed.max_output_tokens = MAX_OUTPUT_TOKENS;
-    injectedOutput = MAX_OUTPUT_TOKENS;
+  // A caller-declared output ceiling above the pinned one is refused, not clamped.
+  const declaredOutput = parsed?.max_output_tokens;
+  if (typeof declaredOutput === 'number' && declaredOutput > REQ_OUTPUT_CEILING) {
+    state.requests += 1;
+    refuse(res, 413, 'proxy_output_ceiling_exceeded', {
+      declaredOutput,
+      ceiling: REQ_OUTPUT_CEILING,
+    });
+    return;
   }
-  const forwardBody = parsed === null ? raw : Buffer.from(JSON.stringify(parsed), 'utf8');
+  if (estIn > REQ_INPUT_CEILING) {
+    state.requests += 1;
+    refuse(res, 413, 'proxy_input_ceiling_exceeded', {
+      estimatedInputTokens: estIn,
+      ceiling: REQ_INPUT_CEILING,
+    });
+    return;
+  }
 
-  const base = { i: index, model: parsed?.model ?? null, inputTokensEstimate: estIn };
+  // Atomic reservation at the maximum permitted request cost. Committed spend
+  // plus in-flight reservations plus this reservation must fit the stage cap.
+  if (
+    state.chargedInput + state.reservedInput + REQ_INPUT_CEILING > MAX_INPUT_TOKENS ||
+    state.chargedOutput + state.reservedOutput + REQ_OUTPUT_CEILING > MAX_OUTPUT_TOKENS
+  ) {
+    state.requests += 1;
+    refuse(res, 429, 'token_budget_exhausted', {
+      chargedInputTokens: state.chargedInput,
+      chargedOutputTokens: state.chargedOutput,
+      reservedInput: state.reservedInput,
+      reservedOutput: state.reservedOutput,
+      inputCap: MAX_INPUT_TOKENS,
+      outputCap: MAX_OUTPUT_TOKENS,
+    });
+    return;
+  }
+
+  state.requests += 1;
+  state.reservedInput += REQ_INPUT_CEILING;
+  state.reservedOutput += REQ_OUTPUT_CEILING;
+  const slot = state.requests;
+  const reservedIn = REQ_INPUT_CEILING;
+  const reservedOut = REQ_OUTPUT_CEILING;
+
+  let injectedOutput = null;
+  if (parsed !== null && typeof parsed === 'object' && declaredOutput === undefined) {
+    parsed.max_output_tokens = REQ_OUTPUT_CEILING;
+    injectedOutput = REQ_OUTPUT_CEILING;
+  }
+  const payload = parsed === null ? raw : Buffer.from(JSON.stringify(parsed), 'utf8');
+  // ---- end critical section -------------------------------------------------
+
+  const settle = ({ status, usage, ambiguous }) => {
+    state.reservedInput -= reservedIn;
+    state.reservedOutput -= reservedOut;
+    const usagePresent = usage !== null && usage !== undefined;
+    const chargedIn = usagePresent ? Math.max(Number(usage.input_tokens ?? 0), estIn) : reservedIn;
+    const chargedOut = usagePresent ? Number(usage.output_tokens ?? reservedOut) : reservedOut;
+    state.chargedInput += chargedIn;
+    state.chargedOutput += chargedOut;
+    if (ambiguous || !usagePresent) {
+      state.halted = ambiguous ? 'ambiguous_upstream_outcome' : 'usage_unreliable';
+    }
+    record({
+      i: slot,
+      decision: 'forwarded',
+      kind: 'inference',
+      model,
+      requestedServiceTier: tier,
+      requestedEffort: effort,
+      inputTokensEstimate: estIn,
+      injectedMaxOutputTokens: injectedOutput,
+      status,
+      usagePresent,
+      usage,
+      chargedInputTokens: chargedIn,
+      chargedOutputTokens: chargedOut,
+      halted: state.halted,
+      totals: {
+        requests: state.requests,
+        chargedInputTokens: state.chargedInput,
+        chargedOutputTokens: state.chargedOutput,
+      },
+    });
+    return { chargedIn, chargedOut, usagePresent };
+  };
 
   if (OFFLINE) {
     const usage = { input_tokens: estIn, output_tokens: 0 };
-    record({
-      ...base,
-      status: 200,
-      offline: true,
-      usage,
-      chargedInputTokens: estIn,
-      chargedOutputTokens: 0,
-      injectedMaxOutputTokens: injectedOutput,
-    });
-    chargedIn += estIn;
+    settle({ status: 200, usage, ambiguous: false });
     res.writeHead(200, { 'content-type': 'application/json' });
-    res.end(
-      JSON.stringify({ id: `offline-${index}`, object: 'response', model: base.model, output: [], usage })
-    );
+    res.end(JSON.stringify({ id: `offline-${slot}`, object: 'response', model, output: [], usage }));
     return;
   }
 
   const target = `${UPSTREAM_BASE}/responses`;
-  const upstream = http
-    ? await new Promise((resolve) => {
-        const url = new URL(target);
-        const client = (url.protocol === 'https:' ? import('node:https') : import('node:http'));
-        client.then((mod) => {
-          const request = mod.request(
-            {
-              protocol: url.protocol,
-              hostname: url.hostname,
-              port: url.port || (url.protocol === 'https:' ? 443 : 80),
-              path: `${url.pathname}${url.search}`,
-              method: 'POST',
-              headers: {
-                'content-type': 'application/json',
-                authorization: `Bearer ${API_KEY}`,
-                'content-length': Buffer.byteLength(forwardBody),
-              },
-              timeout: 150_000,
-            },
-            (response) => {
-              const chunks = [];
-              response.on('data', (chunk) => chunks.push(chunk));
-              response.on('end', () =>
-                resolve({ status: response.statusCode, body: Buffer.concat(chunks) })
-              );
-            }
-          );
-          request.on('timeout', () => request.destroy(new Error('proxy_upstream_timeout')));
-          request.on('error', (error) => resolve({ status: 502, body: Buffer.from(String(error)) }));
-          request.end(forwardBody);
-        });
-      })
-    : null;
+  const url = new URL(target);
+  const client = url.protocol === 'https:' ? https : http;
+  const upstream = await new Promise((resolve) => {
+    const request = client.request(
+      {
+        protocol: url.protocol,
+        hostname: url.hostname,
+        port: url.port || (url.protocol === 'https:' ? 443 : 80),
+        path: `${url.pathname}${url.search}`,
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          authorization: `Bearer ${API_KEY}`,
+          'content-length': Buffer.byteLength(payload),
+        },
+        timeout: REQUEST_TIMEOUT_MS,
+      },
+      (response) => {
+        const chunks = [];
+        response.on('data', (chunk) => chunks.push(chunk));
+        response.on('end', () => resolve({ status: response.statusCode, body: Buffer.concat(chunks), timedOut: false }));
+      }
+    );
+    request.on('timeout', () => {
+      request.destroy();
+      resolve({ status: 504, body: Buffer.from('{"error":{"message":"proxy_upstream_timeout"}}'), timedOut: true });
+    });
+    request.on('error', () =>
+      resolve({ status: 502, body: Buffer.from('{"error":{"message":"proxy_upstream_error"}}'), timedOut: true })
+    );
+    request.end(payload);
+  });
 
-  const status = upstream?.status ?? 502;
-  const bodyText = upstream?.body?.toString('utf8') ?? '';
-
+  const bodyText = upstream.body.toString('utf8');
   let usage = null;
   try {
-    const decoded = JSON.parse(bodyText);
-    usage = decoded?.usage ?? null;
+    usage = JSON.parse(bodyText)?.usage ?? null;
   } catch {
     usage = null;
   }
-
-  // Never treat a successful response as free because usage was absent.
-  const chargedInput = Math.max(Number(usage?.input_tokens ?? 0), estIn);
-  const chargedOutput = Math.max(Number(usage?.output_tokens ?? 0), 0);
-  chargedIn += chargedInput;
-  chargedOut += chargedOutput;
-
-  record({
-    ...base,
-    status,
-    usage,
-    usagePresent: usage !== null,
-    chargedInputTokens: chargedInput,
-    chargedOutputTokens: chargedOutput,
-    injectedMaxOutputTokens: injectedOutput,
-    totalRequestsSoFar: requestCount,
-    chargedInputTokensTotal: chargedIn,
-    chargedOutputTokensTotal: chargedOut,
-  });
+  const status = upstream.status ?? 502;
+  const ambiguous = Boolean(upstream.timedOut) || !(status >= 200 && status < 300);
+  settle({ status, usage, ambiguous });
 
   res.writeHead(status, { 'content-type': 'application/json' });
   res.end(bodyText);
@@ -243,5 +346,9 @@ const server = http.createServer(async (req, res) => {
 server.listen(PORT, '127.0.0.1', () => {
   const address = server.address();
   process.stdout.write(`proxy listening on http://127.0.0.1:${address.port}\n`);
-  process.stdout.write(`proxy max-requests=${MAX_REQUESTS} ledger=${LEDGER ?? '<disabled>'}\n`);
+  process.stdout.write(
+    `proxy stage=${STAGE} requests=${MAX_REQUESTS} tokens=${MAX_INPUT_TOKENS}/${MAX_OUTPUT_TOKENS} ` +
+      `per-request=${REQ_INPUT_CEILING}/${REQ_OUTPUT_CEILING} model=${PINNED_MODEL} ` +
+      `tier=${PINNED_TIER} effort=${PINNED_EFFORT} ledger=${LEDGER ?? '<disabled>'}\n`
+  );
 });

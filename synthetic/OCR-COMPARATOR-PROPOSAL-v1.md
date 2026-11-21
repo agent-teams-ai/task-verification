@@ -70,18 +70,30 @@ rr.7 (managed) → http://127.0.0.1:<port>/responses → https://openrouter.ai/a
 
 - reads **only** `OPENROUTER_API_KEY` and `OPENROUTER_BASE_URL`; it never falls back to
   `OPENAI_API_KEY` / `OPENAI_BASE_URL`, and refuses to start without them (fail closed);
-- enforces a hard per-invocation request cap and refuses request N+1 with `429` **before**
-  any upstream call, so a refused request cannot be billed;
-- injects `max_output_tokens` when the caller omits it;
-- charges every accepted response at `max(reported usage, floor)` — a 2xx response with
-  missing usage fields is never treated as free;
-- writes a JSONL ledger with method, model, byte counts, token accounting and status, and
-  **never** the credential or the Authorization header.
+- classifies traffic: only `POST /responses` and `POST /v1/responses` are inference. Any other
+  path is `404` and never forwarded, so a non-inference call cannot consume or bypass budget;
+- takes a request slot **before** forwarding and refuses request N+1 with `429`; the check and
+  the increment are synchronous in one task, so concurrent requests cannot exceed the cap;
+- pins `model`, `service_tier` and `reasoning.effort`; any other value is refused `400` with no
+  forward, so a silent substitution cannot happen and cannot be billed;
+- reserves the **maximum permitted request cost** (20,000 in + 4,000 out) atomically before
+  forwarding, and reconciles the reservation to reported usage afterwards;
+- refuses a caller-declared `max_output_tokens` above the pin (`413`) rather than clamping it,
+  and injects the pin when the field is absent;
+- charges reported usage when present and otherwise keeps the **full reservation** — never
+  zero, never a floor;
+- halts (`402` for every later request) when a forwarded response has no usage, or when the
+  outcome is a non-2xx, timeout or transport error, because the cost is then unknowable;
+- writes a JSONL ledger with stage, decision, model, tier, effort, estimates, reported usage,
+  charged tokens, halt state and running totals — and **never** the credential, the request
+  headers or the `Authorization` value.
 
-Model-free proof (`synthetic/tooling/proxy-selftest.mjs`, offline mode, no provider contact):
-cap `3` → statuses `200,200,200,429`; 3 accepted, 1 refused before forwarding; output ceiling
-injected on every accepted request; every accepted request charged; credential absent from the
-ledger. **PASS.**
+Model-free proof, no provider contacted:
+
+| Suite | Coverage | Result |
+| --- | --- | --- |
+| `proxy-audit.test.mjs` (15 tests, local stub upstream) | exact ceiling, concurrency, atomic token reservation, failed upstream, timeout, missing usage, oversized input, oversized declared output, budget exhaustion, unexpected model, unexpected tier, unexpected effort, credential redaction, non-inference classification, per-stage independence | **15/15 pass** |
+| `proxy-selftest.mjs` (offline smoke) | cap `3` → `200,200,200,429`, output ceiling injected, every request charged, credential absent | **PASS** |
 
 ## 5. Native OCR request lifecycle — measured, not assumed
 
@@ -101,6 +113,24 @@ Consequence for the experiment: the request ceiling is expressed **per OCR invoc
 against the proxy cap**, not per model "turn", and a cap breach is a stop condition, not a
 retry.
 
+## 5.1 What `--max-tokens-budget` actually measures
+
+From the pinned source (`0001-managed-mode-core.patch`): the budget is compared against
+`a.runner.TotalTokensUsed()` — **combined input + output** — and the check runs *before each review
+round*, emitting `skipped round N of group "…": used X tokens exceeds budget Y` and latching a
+`token_budget` stop.
+
+Consequences, all of which the manifest records:
+
+- it is **not** a per-request cap and **not** a USD cap;
+- it can **overshoot by one round**, because the decision is taken between rounds and a group over
+  budget is allowed one final round to submit findings;
+- cache read/write counters exist separately and are **not** part of the compared metric, so a
+  cache-heavy run can be cheaper than the number suggests — never more expensive.
+
+It is therefore a **secondary brake**. The hard bound is the proxy's atomic reservation, which acts
+before a request is forwarded.
+
 ## 6. Revised budget
 
 Per-request ceilings: **20,000 input / 4,000 output tokens**, matching the frozen brief.
@@ -110,9 +140,10 @@ Per-request ceilings: **20,000 input / 4,000 output tokens**, matching the froze
 | --- | --- | --- | --- | --- | --- | --- |
 | 1 | Initial OCR | `gpt-6.1-terra` | 6 | 120,000 | 24,000 | USD 0.24 |
 | 2 | Initial criteria assessment | `gpt-6.1-terra` | 1 | 20,000 | 4,000 | USD 0.04 |
-| 3 | Correction workflow (OCR + criteria) | `gpt-6.1-terra` | 7 | 140,000 | 28,000 | USD 0.28 |
-| 4 | Recheck OCR | `gpt-6.1-terra` | 6 | 120,000 | 24,000 | USD 0.24 |
-| 5 | Recheck criteria assessment | `gpt-6.1-terra` | 1 | 20,000 | 4,000 | USD 0.04 |
+| 3 | Correction OCR | `gpt-6.1-terra` | 6 | 120,000 | 24,000 | USD 0.24 |
+| 4 | Correction criteria assessment | `gpt-6.1-terra` | 1 | 20,000 | 4,000 | USD 0.04 |
+| 5 | Recheck OCR | `gpt-6.1-terra` | 6 | 120,000 | 24,000 | USD 0.24 |
+| 6 | Recheck criteria assessment | `gpt-6.1-terra` | 1 | 20,000 | 4,000 | USD 0.04 |
 | | **Total** | | **21** | **420,000** | **84,000** | **USD 0.84** |
 
 - The cap of 6 per OCR invocation is the measured worst case (5) plus one request of slack.
@@ -128,6 +159,30 @@ Per-request ceilings: **20,000 input / 4,000 output tokens**, matching the froze
 If the maintainer prefers more headroom, the only lever that keeps the ceiling intact is a
 lower per-request input ceiling (e.g. 16,000 tokens → USD 0.67 worst case); it changes the
 frozen brief's ceiling and therefore needs explicit approval.
+
+### 6.1 Correction workflow accounting
+
+The six correction OCR requests and the one correction criteria request route through the same
+proxy under their own stage labels, with their own caps, and are counted in the 21.
+
+**Freebuff's own coding-agent inference is excluded.** It cannot be routed through or measured by
+this proxy, so counting it as covered would be false and authorizing it would create uncontrolled
+spend. The correction is therefore performed **manually by the operator**, after which the same OCR
+and criteria stages re-run under their caps. The reviewer report and the recorded human decision
+checkpoint are unchanged. No new orchestration is introduced.
+
+### 6.2 Limits of the guarantee
+
+- Request count is exact. Token cost is exact only where the provider reports usage; when it does
+  not, the run **halts** rather than estimating.
+- If a forwarded response is a non-2xx, a timeout or a transport error, the full reservation is
+  kept and the run halts — no retry can re-enter through the proxy.
+- The USD 1.00 ceiling is hard only while the proxy is the sole credentialed component **and** the
+  key limit is USD 1.00. With the key limit still at USD 5.00 the correct claim is "USD 0.84 by
+  construction, capped at USD 5.00 by the provider". Lowering the key limit is an approval item.
+- The proxy cannot prove the binary opens no second egress. Managed mode rejects a non-loopback
+  provider URL (source-verified) and the proxy is the only component holding the key, so no bypass
+  path is known; running the container with no default route would make it structural.
 
 ## 7. What this proposal does not claim
 

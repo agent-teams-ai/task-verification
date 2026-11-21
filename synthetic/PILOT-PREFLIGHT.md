@@ -510,4 +510,43 @@ record: `EXECUTION-MANIFEST-v1.json` (status `PREPARED_NOT_EXECUTED`).
 `READY_FOR_MAINTAINER_COMPARATOR_APPROVAL` — technical preparation complete; execution waits on comparator
 approval, budget approval, and confirmation that the compromised key was revoked.
 
+---
+
+# Offline budget and proxy safety audit — 2026-11-21
+
+Offline only. **No inference request was sent and no provider was contacted.** Spend: USD 0.00.
+
+## What the audit changed
+
+The first proxy draft enforced only a request count and charged a floor when usage was missing. It is
+now fail-closed: max-cost reservation before forwarding, atomic against concurrency; pinned model,
+tier and effort; explicit non-inference classification; halt on missing usage, non-2xx, timeout or
+transport error; and no credential or header in the ledger.
+
+## `--max-tokens-budget` semantics (source-verified)
+
+It compares `TotalTokensUsed()` — **combined input + output** — before each review round, and a group
+over budget gets one final round (`skipped round N … used X exceeds budget Y`). So it can overshoot by
+one round and is **a brake, not a hard bound**; the proxy reservation is the bound. Cache read/write
+counters sit outside the compared metric.
+
+## Correction workflow
+
+The six correction OCR requests and one criteria request route through the same proxy. **Freebuff's own
+coding-agent inference is excluded from the budget and not authorized** — it cannot be measured here.
+The correction is manual; the reviewer report and the human decision checkpoint are unchanged.
+
+## Results
+
+| Check | Result |
+| --- | --- |
+| `proxy-audit.test.mjs` (15 offline tests, local stub upstream) | **15/15 pass** |
+| `proxy-selftest.mjs` (offline smoke) | **PASS** |
+| Manifest totals | 6 stages, 21 requests, 420,000 / 84,000 tokens, USD 0.84 worst case |
+| Frozen fixture | unchanged (all four digests, both trees, 2 commits, Candidate B absent) |
+
+The USD 1.00 ceiling is hard only while the proxy is the sole credentialed component **and** the key
+limit is USD 1.00. At the current USD 5.00 key limit the accurate claim is "USD 0.84 by construction,
+capped at USD 5.00 by the provider". Lowering the key limit is an approval item.
+
 

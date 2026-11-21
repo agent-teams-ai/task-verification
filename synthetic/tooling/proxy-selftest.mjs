@@ -68,7 +68,9 @@ const lines = fs
   .map((line) => JSON.parse(line));
 
 const accepted = lines.filter((line) => line.status === 200);
-const refused = lines.filter((line) => line.refused === 'request_cap');
+const refused = lines.filter(
+  (line) => line.decision === 'refused' && line.code === 'request_cap'
+);
 
 assert.equal(accepted.length, 3, 'exactly three requests may reach the upstream');
 assert.equal(refused.length, 1, 'the fourth request must be refused before forwarding');
