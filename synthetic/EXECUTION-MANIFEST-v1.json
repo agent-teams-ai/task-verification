@@ -82,7 +82,8 @@
       "mechanism": "atomic reservation of the maximum permitted request cost (20000 in + 4000 out) before forwarding; reservation released to reported usage on completion",
       "reservationIsNotAnEstimate": true,
       "aggregateRule": "chargedInput + reservedInput + newReservation <= stage input cap (same for output)",
-      "inputGuard": "coarse chars/4 estimate refuses an obviously oversized body at 413; never used as a charged amount",
+      "inputGuard": "serialized body bytes <= 20000. Every token covers at least one byte, so bodyBytes <= 20000 proves tokenCount <= 20000. This is a provable bound, not an estimate; chars/4 exists only as an offline convenience and must not be used for a live run.",
+      "inputBoundConsequence": "a byte bound is roughly 4x tighter than a 20,000-token ceiling",
       "outputCeiling": "max_output_tokens injected as 4000 when absent; a caller-declared value above 4000 is refused at 413, never clamped",
       "policyPin": "model, service_tier and reasoning.effort are pinned; any other value is refused at 400 with no forward"
     },
@@ -169,13 +170,16 @@
     "The proxy cannot prove the pinned binary never opens a second egress. Managed mode rejects a non-loopback provider URL and the proxy is the only credentialed component, so no path is known; a container with no default route would make this structural.",
     "Request count is exact; token cost is exact only where the provider reports usage. When usage is absent the run halts rather than estimating.",
     "The in-binary --max-tokens-budget can overshoot by one round, so it is a brake, not the bound.",
-    "A proxy defect could still leave the provider bill above USD 1.00 unless the key limit is lowered to USD 1.00."
+    "A proxy defect could still leave the provider bill above USD 1.00 unless the key limit is lowered to USD 1.00.",
+    "The provable input bound is 20,000 bytes. This fixture's theoretical maximal single prompt (all tracked files 12,793 + requirements 1,766 + background at its 8,000-char cap) is 22,559 bytes, so a maximal prompt would be refused and the run would halt safely. Exact token-level enforcement at the approved 20,000-token width needs a tokenizer.",
+    "The M2 Profile A adapter already caps rendered reviewer input at 8,000 characters before dispatch, so ordinary requests are expected to fit well inside the byte bound."
   ],
   "approvalRequiredBeforeExecution": [
     "old OpenRouter credential revoked by the maintainer",
     "replacement credential visible in the actual Agent process",
     "fixed OCR comparator approved (model substitution acknowledged)",
     "revised 21-request / USD 0.84 budget approved",
-    "key limit lowered to USD 1.00 (condition for the hard ceiling claim)"
+    "key limit lowered to USD 1.00 (condition for the hard ceiling claim)",
+    "input-ceiling width: accept the provable 20,000-byte bound, or approve a tokenizer dependency for exact 20,000-token enforcement"
   ]
 }

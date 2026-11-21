@@ -171,6 +171,23 @@ spend. The correction is therefore performed **manually by the operator**, after
 and criteria stages re-run under their caps. The reviewer report and the recorded human decision
 checkpoint are unchanged. No new orchestration is introduced.
 
+### 6.1.1 The input ceiling is enforced in bytes, and why
+
+A token count cannot be known before dispatch without a tokenizer, so a chars/4 figure is not a
+limit. The proxy therefore bounds the **serialized body at 20,000 bytes**. Because every token spans
+at least one byte, `bodyBytes <= 20000` proves `tokens <= 20000`: the approved ceiling is enforced
+strictly, never exceeded.
+
+The cost of that proof is width. A byte bound is roughly four times tighter than a token bound, and
+this fixture's theoretical maximal single prompt — all tracked files (12,793 B) plus the requirements
+(1,766 B) plus background at its 8,000-character cap — is **22,559 bytes**. A maximal prompt would be
+refused at `413` and the run would halt safely rather than overspend. Ordinary requests should fit:
+the M2 Profile A adapter already rejects rendered reviewer input above 8,000 characters before
+dispatch.
+
+Two ways to widen it, both needing approval: add a tokenizer for exact token accounting, or raise the
+per-request ceiling. Neither is assumed here.
+
 ### 6.2 Limits of the guarantee
 
 - Request count is exact. Token cost is exact only where the provider reports usage; when it does

@@ -68,6 +68,14 @@ const MAX_OUTPUT_TOKENS = num(args['max-output-tokens'], 24_000);
 const REQ_INPUT_CEILING = num(args['request-input-tokens'], 20_000);
 const REQ_OUTPUT_CEILING = num(args['request-output-tokens'], 4_000);
 const REQUEST_TIMEOUT_MS = num(args['request-timeout-ms'], 150_000);
+// 'bytes' is the only provable mode: every token covers at least one byte, so
+// bodyBytes <= 20000 implies tokenCount <= 20000. 'estimate' is chars/4 and is
+// NOT a hard bound; it exists for offline fixtures only.
+const INPUT_ENFORCEMENT = typeof args['input-enforcement'] === 'string' ? args['input-enforcement'] : 'bytes';
+if (INPUT_ENFORCEMENT !== 'bytes' && INPUT_ENFORCEMENT !== 'estimate') {
+  process.stderr.write('proxy: --input-enforcement must be bytes or estimate\n');
+  process.exit(2);
+}
 
 const PINNED_MODEL = typeof args.model === 'string' ? args.model : 'openai/gpt-6.1-terra';
 const PINNED_TIER = typeof args['service-tier'] === 'string' ? args['service-tier'] : 'default';
@@ -177,6 +185,7 @@ const server = http.createServer(async (req, res) => {
     parsed = null;
   }
   const text = raw.toString('utf8');
+  const inputBytes = raw.length;
   const estIn = estimateTokens(text);
 
   // Policy pinning: a substituted model, tier or effort is refused, not billed.
@@ -209,9 +218,13 @@ const server = http.createServer(async (req, res) => {
     });
     return;
   }
-  if (estIn > REQ_INPUT_CEILING) {
+  const overInput =
+    INPUT_ENFORCEMENT === 'bytes' ? inputBytes > REQ_INPUT_CEILING : estIn > REQ_INPUT_CEILING;
+  if (overInput) {
     state.requests += 1;
     refuse(res, 413, 'proxy_input_ceiling_exceeded', {
+      enforcement: INPUT_ENFORCEMENT,
+      inputBytes,
       estimatedInputTokens: estIn,
       ceiling: REQ_INPUT_CEILING,
     });
@@ -255,11 +268,19 @@ const server = http.createServer(async (req, res) => {
     state.reservedInput -= reservedIn;
     state.reservedOutput -= reservedOut;
     const usagePresent = usage !== null && usage !== undefined;
-    const chargedIn = usagePresent ? Math.max(Number(usage.input_tokens ?? 0), estIn) : reservedIn;
+    // Reported usage is authoritative. When it is absent the reservation is
+    // kept, and because the byte bound proves tokens <= ceiling the reservation
+    // is a true upper bound rather than a guess.
+    const chargedIn = usagePresent ? Number(usage.input_tokens ?? reservedIn) : reservedIn;
     const chargedOut = usagePresent ? Number(usage.output_tokens ?? reservedOut) : reservedOut;
     state.chargedInput += chargedIn;
     state.chargedOutput += chargedOut;
-    if (ambiguous || !usagePresent) {
+    // A reported value above the ceiling means the pre-forward guard was
+    // incomplete for this request: charge the truth and stop.
+    const ceilingBreached =
+      chargedIn > REQ_INPUT_CEILING || chargedOut > REQ_OUTPUT_CEILING;
+    if (ceilingBreached) state.halted = 'ceiling_breached_by_reported_usage';
+    else if (ambiguous || !usagePresent) {
       state.halted = ambiguous ? 'ambiguous_upstream_outcome' : 'usage_unreliable';
     }
     record({
@@ -269,6 +290,8 @@ const server = http.createServer(async (req, res) => {
       model,
       requestedServiceTier: tier,
       requestedEffort: effort,
+      inputBytes,
+      inputEnforcement: INPUT_ENFORCEMENT,
       inputTokensEstimate: estIn,
       injectedMaxOutputTokens: injectedOutput,
       status,
@@ -348,7 +371,7 @@ server.listen(PORT, '127.0.0.1', () => {
   process.stdout.write(`proxy listening on http://127.0.0.1:${address.port}\n`);
   process.stdout.write(
     `proxy stage=${STAGE} requests=${MAX_REQUESTS} tokens=${MAX_INPUT_TOKENS}/${MAX_OUTPUT_TOKENS} ` +
-      `per-request=${REQ_INPUT_CEILING}/${REQ_OUTPUT_CEILING} model=${PINNED_MODEL} ` +
-      `tier=${PINNED_TIER} effort=${PINNED_EFFORT} ledger=${LEDGER ?? '<disabled>'}\n`
+      `per-request=${REQ_INPUT_CEILING}/${REQ_OUTPUT_CEILING} input-enforcement=${INPUT_ENFORCEMENT} ` +
+      `model=${PINNED_MODEL} tier=${PINNED_TIER} effort=${PINNED_EFFORT} ledger=${LEDGER ?? '<disabled>'}\n`
   );
 });

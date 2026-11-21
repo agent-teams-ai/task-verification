@@ -385,3 +385,43 @@ test('per-stage budgets are independent and labelled', async () => {
   assert.equal(lines.filter((l) => l.stage === 'initial-ocr').length, 3);
   assert.equal(lines.filter((l) => l.stage === 'recheck-ocr').length, 3);
 });
+
+test('the input ceiling is enforced on bytes, so the token bound is provable', async () => {
+  const stub = await startStub((_req, res) => {
+    res.writeHead(200, { 'content-type': 'application/json' });
+    res.end(JSON.stringify({ usage: { input_tokens: 10, output_tokens: 5 } }));
+  });
+  // ~25,000 bytes but only ~6,250 by the chars/4 estimate: an estimate-based
+  // guard would forward this, a byte-based bound refuses it.
+  const body = { model: MODEL, input: 'a'.repeat(25_000) };
+  const strict = await startProxy(upstreamArgs(stub.port, ['--max-requests', '4']));
+  const est = await startProxy(
+    upstreamArgs(stub.port, ['--max-requests', '4', '--input-enforcement', 'estimate'])
+  );
+  const strictResponse = await post(strict.port, body);
+  const estResponse = await post(est.port, body);
+  strict.close();
+  est.close();
+  stub.close();
+  assert.equal(strictResponse.status, 413, 'bytes mode must refuse 25,000 bytes');
+  assert.equal(estResponse.status, 200, 'estimate mode would have forwarded it — hence the byte default');
+});
+
+test('reported usage above the per-request ceiling halts the run', async () => {
+  const stub = await startStub((_req, res) => {
+    res.writeHead(200, { 'content-type': 'application/json' });
+    res.end(JSON.stringify({ usage: { input_tokens: 25000, output_tokens: 9000 } }));
+  });
+  const proxy = await startProxy(upstreamArgs(stub.port, ['--max-requests', '6']));
+  const first = await post(proxy.port, okUsage());
+  const second = await post(proxy.port, okUsage(2));
+  const ledger = proxy.read();
+  proxy.close();
+  stub.close();
+  assert.equal(first.status, 200);
+  assert.equal(second.status, 402, 'a ceiling breach must stop further execution');
+  const forwarded = ledger.filter((l) => l.decision === 'forwarded');
+  assert.equal(forwarded[0].chargedInputTokens, 25000, 'the truth is charged, not the reservation');
+  assert.equal(forwarded[0].chargedOutputTokens, 9000);
+  assert.equal(forwarded[0].halted, 'ceiling_breached_by_reported_usage');
+});
