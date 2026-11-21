@@ -134,3 +134,144 @@ No retry, replay or ambiguous request occurred, because no request was sent.
    `custom_providers` block, with a local recording proxy supplying per-request usage for accounting.
 
 Until both exist, Phases 2 and 5–7 stay unstarted and the pilot makes no comparative claim.
+
+---
+
+# Phase C1-R — environment inheritance and OCR readiness recovery — 2026-11-21
+
+Status: **recovery executed; live inference still not authorized by the gates below.**
+
+## 1. Environment inheritance — root cause, resolved
+
+The tool shell is a descendant of the app's own runtime, not a separate container, remote shell or
+detached worker. Observed chain (child → root), same timestamp for the whole chain:
+
+| PID | Process | Started | Note |
+| --- | --- | --- | --- |
+| 9100 | `bash.exe` | 17:39:20 | the command for this phase |
+| 22164 | `bun.exe` | 17:37:33 | app runtime: `…\@codebufffreebuff-desktop\resources\bun\bun.exe` |
+| 21128 | `Freebuff.exe` | 17:37:33 | single app instance, argument = this workspace path |
+| 19008 | `powershell.exe` | 17:37:15 | the launching shell |
+| 2036 | `explorer.exe` | 14:14:28 | desktop session |
+
+Consequences:
+
+- Tool commands inherit the environment **captured when `Freebuff.exe` started**. A variable exported
+  after that moment cannot reach them, and re-running the app while an instance is already up reuses
+  the old environment.
+- Inheritance is therefore proven, not assumed: this session's app was started from a PowerShell
+  process (`19008`) that already held the variables, and all four are present in the tool process.
+- The earlier failure is consistent with the app having been started before the variables existed
+  (no surviving process remains from that instance, so the old environment cannot be re-read; the
+  conclusion is drawn from the observed mechanism, not from that dead process).
+
+Presence in the tool process (booleans only, values never printed): `OPENROUTER_API_KEY` true,
+`OPENROUTER_BASE_URL` true, `OPENAI_API_KEY` true, `OPENAI_BASE_URL` true. The two `OPENAI_*`
+variables duplicate the same value and the same URL.
+
+**Correction to the section above.** The earlier `setx` recommendation is withdrawn. Process-scoped
+variables in the launching shell are sufficient, and `setx` would persist the key at User scope for
+an operation that needs it for one bounded run.
+
+## 2. Verified launch procedure
+
+In one PowerShell window, with the app fully quit first (not minimized to the tray):
+
+```powershell
+$env:OPENROUTER_API_KEY  = '<key>'
+$env:OPENROUTER_BASE_URL = 'https://openrouter.ai/api/v1'
+& "$env:LOCALAPPDATA\Programs\@codebufffreebuff-desktop\Freebuff.exe"
+```
+
+Then confirm presence by booleans only. Do **not** set `OPENAI_API_KEY` / `OPENAI_BASE_URL` (see §8).
+
+## 3. OpenRouter authentication and catalog (non-inference)
+
+| Check | Result |
+| --- | --- |
+| `GET /api/v1/key` | `200`; valid key, not free tier; expires `2026-11-25T08:09:16Z` |
+| Key limit | USD 5.00, remaining 4.973486 |
+| Workspace budget (effective) | limit USD 10.00, spend 7.803423, **remaining 2.196577** |
+| `GET /api/v1/models/openai/gpt-6.1-terra/endpoints` | `200`; exact approved slug present |
+| `POST /api/v1/responses` with `{}` | `400 invalid_prompt "No input provided"` — route exists, no model invoked |
+
+Endpoint pricing for `openai/gpt-6.1-terra` (per 1M tokens):
+
+| Provider | Tag | Tier | Input | Output |
+| --- | --- | --- | --- | --- |
+| OpenAI | `openai/flex` | flex | 0.50 | 2.50 |
+| Azure | `azure` | standard | 1.00 | 5.00 |
+| OpenAI | `openai` | standard | 1.00 | 5.00 |
+| OpenAI | `openai/fast` | priority | 2.00 | 10.00 |
+
+Supported parameters include `reasoning`, `reasoning_effort`, `max_tokens`, `verbosity`. Standard is
+the default tier and flex is used only when requested, so `service_tier: "default"` pins the 1.00/5.00
+row the ceiling was computed from. A flex route would halve the price and is excluded by the brief.
+
+## 4. Linux OCR runtime
+
+Docker Desktop 4.91.0, engine 29.8.0, `os=linux arch=x86_64`, context `desktop-linux`. Local image
+`m2-ocr-rr7:local` starts and reports `Linux x86_64`. WSL2 lists only the `docker-desktop` distro
+(stopped); no separate distro is required because the engine itself runs Linux containers.
+
+## 5. rr.7 asset identity (unchanged)
+
+`80,513,021` bytes, SHA-256 `2f290fb4…4aaa29`, ELF x86-64; reports
+`open-code-review 1.13.1-rr.7 linux/amd64`. WP7 model-free suite re-run in the container with
+`--network none` and a read-only checkout: **16/16 pass**.
+
+## 6. Ordinary OCR configuration — still not recovered
+
+Established: the comparator is **Profile A as ordinary OCR** (configured rule set, native findings,
+zero-model deterministic baseline), and the rule document shape is
+`{ merge_system_rule: true, include: [...], rules: [{ id, content }] }` with the pinned
+`--rule` / `--background` interface.
+
+Not established: the live OCR model slug and serving provider; the production managed rule text
+(`buildOcrControlledRuleText` lives in `777genius/review-router`, not in this repository); the prompt
+and background text; publication/filtering policy; and any retained native, normalized or skipped
+output from the historical rr.4 review. No `~/.opencodereview/config.json` exists. The only model this
+repository has ever pointed the binary at is the loopback fake (`rr7-fake-model`), which is not a live
+comparator.
+
+## 7. Request-accounting finding (blocks the current ceiling)
+
+One rr.7 managed review is not one HTTP request: the binary issues a file-grouping call, main-turn
+calls, a filtering round and a follow-up turn. Measured here: **4 requests** for the M2 finding case
+(asserted by `tests/rr7/wp7-rr7.test.ts`) and **5** in the release qualification. A refusal is retried
+by the binary's own main-turn loop. The brief's `≤2` initial OCR and `≤2` recheck OCR therefore cannot
+hold for a live OCR comparator; the 8-request ceiling needs re-approval, or to be defined per
+invocation rather than per HTTP request.
+
+## 8. Model-free suites and credential presence
+
+`tests/wp7.ts` asserts that no provider credential is set; with `OPENAI_API_KEY` present it fails
+(`OPENAI_API_KEY must not be set`, verified with a dummy value in the container), and
+`scripts/qualify-sdk.mjs` / `scripts/qualify-profile-b.mjs` exit `2` by the same guard. Only
+`OPENROUTER_*` should be set, and `OPENAI_*` removed for model-free runs.
+
+## 9. Zero inference, zero spend
+
+Requests made: `/key` (twice), `/models`, `/models/openai/gpt-6.1-terra/endpoints`, and one empty-body
+`POST /responses` validation probe. Key usage before and after is identical at `0.026513769`
+(delta `0.000000000`). Every pilot ceiling is unspent.
+
+## 10. Readiness matrix
+
+| Gate | State | Evidence |
+| --- | --- | --- |
+| Key visible in the actual Agent tool process | **PASS** | booleans true; ancestry chain (§1) |
+| Exact model `openai/gpt-6.1-terra` available | **PASS** | endpoints `200`, exact id |
+| Responses route + medium reasoning | **PASS** | route `400 invalid_prompt`; `reasoning_effort` supported |
+| Explicit base URL (no implicit fallback) | **PASS** | `OPENROUTER_BASE_URL` set; binary config carries the URL |
+| Linux/amd64 OCR runtime ready | **PASS** | engine `linux/x86_64`; container run 16/16 |
+| Pinned rr.7 identity | **PASS** | size, SHA-256, `--version` |
+| Ordinary OCR comparator model + rules frozen | **FAIL** | §6 — no live model, rule text or prior output |
+| Request ceiling fits the OCR path | **FAIL** | §7 — 4–5 HTTP requests per review vs `≤2` |
+| Request counts observable | **PARTIAL** | harness counts exactly; live counting needs a proxy or key-usage delta |
+| USD 1.00 ceiling enforceable | **PARTIAL** | pricing confirmed; enforcement needs a per-request cap or key-limit change (approval required) |
+| Both paths receive the original requirements | **PARTIAL** | frozen in `inputs/REVIEWER-INPUT-v1.md`; same boundary verified model-free, not live |
+| No evaluator material in reviewer context | **PARTIAL** | evaluator outside `repo/`; canary test passes model-free, not live |
+
+Verdict: **BLOCKED_WITH_EXACT_REMAINING_CAUSE** — the missing M4 live OCR model and rule policy, and
+the OCR request allowance in the brief.
