@@ -1,0 +1,21 @@
+{
+  "provider": "reviewrouter",
+  "telemetry": {
+    "enabled": false
+  },
+  "custom_providers": {
+    "reviewrouter": {
+      "protocol": "openai-responses",
+      "url": "http://127.0.0.1:8787",
+      "api_key": "Bearer loopback-proxy-no-credential",
+      "model": "openai/gpt-6.1-terra",
+      "timeout_sec": 150,
+      "extra_body": {
+        "service_tier": "default",
+        "reasoning": {
+          "effort": "medium"
+        }
+      }
+    }
+  }
+}

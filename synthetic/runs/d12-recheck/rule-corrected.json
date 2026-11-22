@@ -1,0 +1,34 @@
+{
+  "reviewrouter_managed_paths": [
+    "README.md",
+    "src/records.ts",
+    "src/router.ts",
+    "tests/records.test.ts"
+  ],
+  "rules": [
+    {
+      "path": "README.md",
+      "rule": "ReviewRouter managed additive policy (reviewrouter-managed-v1).\nReport only issues material to this change: introduced or aggravated by the base-to-head diff.\nFor every finding describe the causal base-to-head change that creates or worsens the issue.\nAllowed finding scope is the reviewed changed paths assigned to this run.\nWrite finding titles and messages in the repository language.",
+      "merge_system_rule": true,
+      "reviewrouter_exact_path": true
+    },
+    {
+      "path": "src/records.ts",
+      "rule": "ReviewRouter managed additive policy (reviewrouter-managed-v1).\nReport only issues material to this change: introduced or aggravated by the base-to-head diff.\nFor every finding describe the causal base-to-head change that creates or worsens the issue.\nAllowed finding scope is the reviewed changed paths assigned to this run.\nWrite finding titles and messages in the repository language.",
+      "merge_system_rule": true,
+      "reviewrouter_exact_path": true
+    },
+    {
+      "path": "src/router.ts",
+      "rule": "ReviewRouter managed additive policy (reviewrouter-managed-v1).\nReport only issues material to this change: introduced or aggravated by the base-to-head diff.\nFor every finding describe the causal base-to-head change that creates or worsens the issue.\nAllowed finding scope is the reviewed changed paths assigned to this run.\nWrite finding titles and messages in the repository language.",
+      "merge_system_rule": true,
+      "reviewrouter_exact_path": true
+    },
+    {
+      "path": "tests/records.test.ts",
+      "rule": "ReviewRouter managed additive policy (reviewrouter-managed-v1).\nReport only issues material to this change: introduced or aggravated by the base-to-head diff.\nFor every finding describe the causal base-to-head change that creates or worsens the issue.\nAllowed finding scope is the reviewed changed paths assigned to this run.\nWrite finding titles and messages in the repository language.",
+      "merge_system_rule": true,
+      "reviewrouter_exact_path": true
+    }
+  ]
+}

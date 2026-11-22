@@ -1,0 +1,6 @@
+{
+  "README.md": "| Method | Path      | Description                                              |",
+  "src/records.ts": "import { toUtcIsoString } from \"./format.ts\";",
+  "src/router.ts": "import { listRecords, parseListQuery, QueryError } from \"./records.ts\";",
+  "tests/records.test.ts": "import assert from \"node:assert/strict\";"
+}

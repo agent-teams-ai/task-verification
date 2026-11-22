@@ -1,0 +1,417 @@
+{
+  "schema": "d12.r1-contract-probe/v1",
+  "operator": "model-free; fixture handle() called directly; no model, provider or network",
+  "fixture": {
+    "reviewedTree": "D:/Project/agent-teams-ai-task-verification-m2-synthetic/synthetic/repo",
+    "candidateA": "23864e3c877f2b34bbbdd90c4527ef46eb19cbd9",
+    "route": "GET /records",
+    "frozenRequirements": "synthetic/requirements/RECORD-API-v1.md",
+    "requirementsSha256": "ca868a3fcc2a9100eabda736c48a8e107125a1f5a8477eede3665be96bde727f"
+  },
+  "obligationText": {
+    "R1": "The API must list records with the requested filters and pagination.",
+    "statedBounds": "none in the frozen requirement",
+    "documentedByCandidate": "limit defaults to 20 and may not exceed 100; offset defaults to 0",
+    "stated400Obligation": "none in the frozen requirement"
+  },
+  "cases": [
+    {
+      "name": "no parameters",
+      "query": {},
+      "authority": "frozen R1 (list) + documented defaults",
+      "status": 200,
+      "contentType": "application/json; charset=utf-8",
+      "limit": 20,
+      "offset": 0,
+      "total": 6,
+      "itemIds": [
+        "rec-1",
+        "rec-2",
+        "rec-3",
+        "rec-4",
+        "rec-5",
+        "rec-6"
+      ],
+      "field": null,
+      "error": null
+    },
+    {
+      "name": "empty limit=",
+      "query": {
+        "limit": ""
+      },
+      "authority": "not specified by the frozen contract",
+      "status": 200,
+      "contentType": "application/json; charset=utf-8",
+      "limit": 20,
+      "offset": 0,
+      "total": 6,
+      "itemIds": [
+        "rec-1",
+        "rec-2",
+        "rec-3",
+        "rec-4",
+        "rec-5",
+        "rec-6"
+      ],
+      "field": null,
+      "error": null
+    },
+    {
+      "name": "empty offset=",
+      "query": {
+        "offset": ""
+      },
+      "authority": "not specified by the frozen contract",
+      "status": 200,
+      "contentType": "application/json; charset=utf-8",
+      "limit": 20,
+      "offset": 0,
+      "total": 6,
+      "itemIds": [
+        "rec-1",
+        "rec-2",
+        "rec-3",
+        "rec-4",
+        "rec-5",
+        "rec-6"
+      ],
+      "field": null,
+      "error": null
+    },
+    {
+      "name": "empty limit= and offset=",
+      "query": {
+        "limit": "",
+        "offset": ""
+      },
+      "authority": "not specified by the frozen contract",
+      "status": 200,
+      "contentType": "application/json; charset=utf-8",
+      "limit": 20,
+      "offset": 0,
+      "total": 6,
+      "itemIds": [
+        "rec-1",
+        "rec-2",
+        "rec-3",
+        "rec-4",
+        "rec-5",
+        "rec-6"
+      ],
+      "field": null,
+      "error": null
+    },
+    {
+      "name": "empty status=",
+      "query": {
+        "status": ""
+      },
+      "authority": "not specified by the frozen contract",
+      "status": 200,
+      "contentType": "application/json; charset=utf-8",
+      "limit": 20,
+      "offset": 0,
+      "total": 6,
+      "itemIds": [
+        "rec-1",
+        "rec-2",
+        "rec-3",
+        "rec-4",
+        "rec-5",
+        "rec-6"
+      ],
+      "field": null,
+      "error": null
+    },
+    {
+      "name": "status=active",
+      "query": {
+        "status": "active"
+      },
+      "authority": "frozen R1 (requested filters)",
+      "status": 200,
+      "contentType": "application/json; charset=utf-8",
+      "limit": 20,
+      "offset": 0,
+      "total": 4,
+      "itemIds": [
+        "rec-1",
+        "rec-2",
+        "rec-5",
+        "rec-6"
+      ],
+      "field": null,
+      "error": null
+    },
+    {
+      "name": "nameContains trimmed and case-insensitive",
+      "query": {
+        "nameContains": "  ACCESS REVIEW "
+      },
+      "authority": "frozen R1 (requested filters)",
+      "status": 200,
+      "contentType": "application/json; charset=utf-8",
+      "limit": 20,
+      "offset": 0,
+      "total": 2,
+      "itemIds": [
+        "rec-1",
+        "rec-5"
+      ],
+      "field": null,
+      "error": null
+    },
+    {
+      "name": "limit=1",
+      "query": {
+        "limit": "1"
+      },
+      "authority": "frozen R1 (pagination)",
+      "status": 200,
+      "contentType": "application/json; charset=utf-8",
+      "limit": 1,
+      "offset": 0,
+      "total": 6,
+      "itemIds": [
+        "rec-1"
+      ],
+      "field": null,
+      "error": null
+    },
+    {
+      "name": "documented maximum limit=100",
+      "query": {
+        "limit": "100"
+      },
+      "authority": "candidate README (documented bound)",
+      "status": 200,
+      "contentType": "application/json; charset=utf-8",
+      "limit": 100,
+      "offset": 0,
+      "total": 6,
+      "itemIds": [
+        "rec-1",
+        "rec-2",
+        "rec-3",
+        "rec-4",
+        "rec-5",
+        "rec-6"
+      ],
+      "field": null,
+      "error": null
+    },
+    {
+      "name": "limit just above documented maximum (101)",
+      "query": {
+        "limit": "101"
+      },
+      "authority": "candidate README (documented bound)",
+      "status": 400,
+      "contentType": "application/json; charset=utf-8",
+      "limit": null,
+      "offset": null,
+      "total": null,
+      "itemIds": null,
+      "field": "limit",
+      "error": "limit must be between 1 and 100"
+    },
+    {
+      "name": "limit=0",
+      "query": {
+        "limit": "0"
+      },
+      "authority": "candidate implementation (minimum bound)",
+      "status": 400,
+      "contentType": "application/json; charset=utf-8",
+      "limit": null,
+      "offset": null,
+      "total": null,
+      "itemIds": null,
+      "field": "limit",
+      "error": "limit must be between 1 and 100"
+    },
+    {
+      "name": "limit=abc",
+      "query": {
+        "limit": "abc"
+      },
+      "authority": "candidate implementation (malformed)",
+      "status": 400,
+      "contentType": "application/json; charset=utf-8",
+      "limit": null,
+      "offset": null,
+      "total": null,
+      "itemIds": null,
+      "field": "limit",
+      "error": "limit must be a non-negative integer"
+    },
+    {
+      "name": "limit=-1",
+      "query": {
+        "limit": "-1"
+      },
+      "authority": "candidate implementation (malformed)",
+      "status": 400,
+      "contentType": "application/json; charset=utf-8",
+      "limit": null,
+      "offset": null,
+      "total": null,
+      "itemIds": null,
+      "field": "limit",
+      "error": "limit must be a non-negative integer"
+    },
+    {
+      "name": "limit=1.5",
+      "query": {
+        "limit": "1.5"
+      },
+      "authority": "candidate implementation (malformed)",
+      "status": 400,
+      "contentType": "application/json; charset=utf-8",
+      "limit": null,
+      "offset": null,
+      "total": null,
+      "itemIds": null,
+      "field": "limit",
+      "error": "limit must be a non-negative integer"
+    },
+    {
+      "name": "offset=0",
+      "query": {
+        "offset": "0"
+      },
+      "authority": "frozen R1 (pagination)",
+      "status": 200,
+      "contentType": "application/json; charset=utf-8",
+      "limit": 20,
+      "offset": 0,
+      "total": 6,
+      "itemIds": [
+        "rec-1",
+        "rec-2",
+        "rec-3",
+        "rec-4",
+        "rec-5",
+        "rec-6"
+      ],
+      "field": null,
+      "error": null
+    },
+    {
+      "name": "offset=5",
+      "query": {
+        "offset": "5"
+      },
+      "authority": "frozen R1 (pagination)",
+      "status": 200,
+      "contentType": "application/json; charset=utf-8",
+      "limit": 20,
+      "offset": 5,
+      "total": 6,
+      "itemIds": [
+        "rec-6"
+      ],
+      "field": null,
+      "error": null
+    },
+    {
+      "name": "offset beyond the filtered set",
+      "query": {
+        "offset": "99"
+      },
+      "authority": "frozen R1 (pagination past the end)",
+      "status": 200,
+      "contentType": "application/json; charset=utf-8",
+      "limit": 20,
+      "offset": 99,
+      "total": 6,
+      "itemIds": [],
+      "field": null,
+      "error": null
+    },
+    {
+      "name": "offset=max safe integer",
+      "query": {
+        "offset": "9007199254740991"
+      },
+      "authority": "candidate implementation (upper bound)",
+      "status": 200,
+      "contentType": "application/json; charset=utf-8",
+      "limit": 20,
+      "offset": 9007199254740991,
+      "total": 6,
+      "itemIds": [],
+      "field": null,
+      "error": null
+    },
+    {
+      "name": "offset=abc",
+      "query": {
+        "offset": "abc"
+      },
+      "authority": "candidate implementation (malformed)",
+      "status": 400,
+      "contentType": "application/json; charset=utf-8",
+      "limit": null,
+      "offset": null,
+      "total": null,
+      "itemIds": null,
+      "field": "offset",
+      "error": "offset must be a non-negative integer"
+    },
+    {
+      "name": "status=deleted",
+      "query": {
+        "status": "deleted"
+      },
+      "authority": "candidate implementation (unknown enum)",
+      "status": 400,
+      "contentType": "application/json; charset=utf-8",
+      "limit": null,
+      "offset": null,
+      "total": null,
+      "itemIds": null,
+      "field": "status",
+      "error": "status must be active or archived"
+    },
+    {
+      "name": "status=active&limit=2&offset=1",
+      "query": {
+        "status": "active",
+        "limit": "2",
+        "offset": "1"
+      },
+      "authority": "frozen R1 (filters plus pagination together)",
+      "status": 200,
+      "contentType": "application/json; charset=utf-8",
+      "limit": 2,
+      "offset": 1,
+      "total": 4,
+      "itemIds": [
+        "rec-2",
+        "rec-5"
+      ],
+      "field": null,
+      "error": null
+    },
+    {
+      "name": "limit=2&offset=5",
+      "query": {
+        "limit": "2",
+        "offset": "5"
+      },
+      "authority": "frozen R1 (last partial page)",
+      "status": 200,
+      "contentType": "application/json; charset=utf-8",
+      "limit": 2,
+      "offset": 5,
+      "total": 6,
+      "itemIds": [
+        "rec-6"
+      ],
+      "field": null,
+      "error": null
+    }
+  ]
+}

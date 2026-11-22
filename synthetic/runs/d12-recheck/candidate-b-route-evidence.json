@@ -1,0 +1,79 @@
+{
+  "schema": "d12.candidate-b-route-evidence/v1",
+  "operator": "model-free; public handle() route; no model, provider or network",
+  "candidateA": "23864e3c877f2b34bbbdd90c4527ef46eb19cbd9",
+  "candidateB": "980a14cb5ac95cc917acf033dd74dc70e1a246f5",
+  "candidateBTree": "f431920921d726f5fad6b6c6619eee0934023ae2",
+  "diffStat": "README.md                    |  4 ++\n src/records.ts               | 23 +++++++++++\n src/router.ts                | 21 +++++++++-\n tests/records-export.test.ts | 98 ++++++++++++++++++++++++++++++++++++++++++++\n 4 files changed, 145 insertions(+), 1 deletion(-)",
+  "A": {
+    "plain": {
+      "status": 404,
+      "contentType": "application/json; charset=utf-8",
+      "body": "{\"error\":\"not found\"}"
+    },
+    "status-filter": {
+      "status": 404,
+      "contentType": "application/json; charset=utf-8",
+      "body": "{\"error\":\"not found\"}"
+    },
+    "empty-result": {
+      "status": 404,
+      "contentType": "application/json; charset=utf-8",
+      "body": "{\"error\":\"not found\"}"
+    },
+    "bad-status": {
+      "status": 404,
+      "contentType": "application/json; charset=utf-8",
+      "body": "{\"error\":\"not found\"}"
+    },
+    "listing": {
+      "status": 200,
+      "contentType": "application/json; charset=utf-8",
+      "body": "{\"items\":[{\"id\":\"rec-3\",\"name\":\"Incident 2026-011\",\"status\":\"archived\",\"createdAt\":\"2026-02-05T00:30:00.000Z\"},{\"id\":\"rec-4\",\"name\":\"Retention schedule\",\"status\":\"archived\",\"createdAt\":\"2026-02-06T14:59:59.000Z\"}],\"total\":2,\"limit\":20,\"offset\":0}"
+    }
+  },
+  "B": {
+    "plain": {
+      "status": 200,
+      "contentType": "text/csv; charset=utf-8",
+      "body": "id,name,status,createdAt\nrec-1,Quarterly access review,active,2026-02-03T02:05:06.000Z\nrec-2,Vendor security packet,active,2026-02-04T15:00:00.000Z\nrec-3,Incident 2026-011,archived,2026-02-05T00:30:00.000Z\nrec-4,Retention schedule,archived,2026-02-06T14:59:59.000Z\nrec-5,\"Access review, follow-up\",active,2026-02-07T11:00:00.000Z\nrec-6,\"Audit \"\"export\"\" sample\",active,2026-02-08T06:15:00.000Z\n"
+    },
+    "status-filter": {
+      "status": 200,
+      "contentType": "text/csv; charset=utf-8",
+      "body": "id,name,status,createdAt\nrec-3,Incident 2026-011,archived,2026-02-05T00:30:00.000Z\nrec-4,Retention schedule,archived,2026-02-06T14:59:59.000Z\n"
+    },
+    "empty-result": {
+      "status": 200,
+      "contentType": "text/csv; charset=utf-8",
+      "body": "id,name,status,createdAt\n"
+    },
+    "bad-status": {
+      "status": 400,
+      "contentType": "application/json; charset=utf-8",
+      "body": "{\"error\":\"status must be active or archived\",\"field\":\"status\"}"
+    },
+    "listing": {
+      "status": 200,
+      "contentType": "application/json; charset=utf-8",
+      "body": "{\"items\":[{\"id\":\"rec-3\",\"name\":\"Incident 2026-011\",\"status\":\"archived\",\"createdAt\":\"2026-02-05T00:30:00.000Z\"},{\"id\":\"rec-4\",\"name\":\"Retention schedule\",\"status\":\"archived\",\"createdAt\":\"2026-02-06T14:59:59.000Z\"}],\"total\":2,\"limit\":20,\"offset\":0}"
+    }
+  },
+  "behavioralAssertions": {
+    "a_routeAbsent": true,
+    "b_routePresent": true,
+    "b_contentType": true,
+    "b_headerRow": true,
+    "b_rowsMatchListing": true,
+    "b_filteredRows": [
+      "rec-3",
+      "rec-4"
+    ],
+    "listingFilteredIds": [
+      "rec-3",
+      "rec-4"
+    ],
+    "b_emptyResultIsHeaderOnly": true,
+    "b_badStatusRefused": true
+  }
+}

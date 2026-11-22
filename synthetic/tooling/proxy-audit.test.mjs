@@ -520,34 +520,52 @@ test('the revised 64 KiB bound admits exactly 65,536 bytes and refuses 65,537', 
   );
 });
 
-test('the complete initial+recheck plan stays inside the approved aggregate ceiling', () => {
-  // Pricing used by the enforcement arithmetic: USD 1.00/M input, USD 5.00/M output.
-  const inputUsdPerToken = 1.0 / 1_000_000;
+test('the corrected A-to-B recheck plan stays inside the remaining approved budget', () => {
+  // Conservative pricing for admission arithmetic: every input token is charged
+  // at the dearest observed input rate (a prompt-cache write, USD 1.25/M), never
+  // at the cache-blind USD 1.00/M rate and never at a cache-read discount; every
+  // output token, including billed reasoning output, at USD 5.00/M.
+  const inputUsdPerToken = 1.25 / 1_000_000;
   const outputUsdPerToken = 5.0 / 1_000_000;
   const stage = (inputTokens, outputTokens) => inputTokens * inputUsdPerToken + outputTokens * outputUsdPerToken;
 
-  // Stage args shared by run-ocr.sh (initial and recheck) and the criteria path.
-  const OCR_STAGE = { maxInputTokens: 200_000, maxOutputTokens: 40_000 };
+  // Stage args used by the corrected regression runs (A and B) and by the criteria recheck.
+  const OCR_STAGE = { maxInputTokens: 180_000, maxOutputTokens: 24_000 };
   const CRITERIA_STAGE = { maxInputTokens: 20_000, maxOutputTokens: 4_000 };
-  const ALREADY_SPENT_USD = 0.00827925;
+  // Provider-authoritative spend already incurred; the ceiling covers the whole experiment.
+  const SPENT_USD = 0.09085455;
+  const CEILING_USD = 1.0;
+  const REMAINING_USD = Number((CEILING_USD - SPENT_USD).toFixed(8));
+  // Largest usage the qualified candidate was actually measured to report on this fixture.
+  const OBSERVED_INITIAL = { inputTokens: 70_346, outputTokens: 3_116 };
 
   const perRequestReservation = stage(REVISED_INPUT_CEILING, REVISED_OUTPUT_CEILING);
   const ocrStageWorstCase = stage(OCR_STAGE.maxInputTokens, OCR_STAGE.maxOutputTokens);
   const criteriaWorstCase = stage(CRITERIA_STAGE.maxInputTokens, CRITERIA_STAGE.maxOutputTokens);
-  const totalWorstCase =
-    ALREADY_SPENT_USD + ocrStageWorstCase * 2 + criteriaWorstCase;
+  const totalWorstCase = ocrStageWorstCase * 2 + criteriaWorstCase;
 
-  assert.equal(Number(perRequestReservation.toFixed(6)), 0.085536);
-  assert.equal(Number(ocrStageWorstCase.toFixed(6)), 0.4);
-  assert.equal(Number(totalWorstCase.toFixed(8)), 0.84827925);
-  assert.ok(totalWorstCase <= 1.0, `worst case ${totalWorstCase} must fit the USD 1.00 ceiling`);
-  // The reservation must be a true upper bound, not an estimate: the byte bound
-  // proves tokens <= ceiling for every forwarded request.
+  assert.equal(Number(perRequestReservation.toFixed(6)), 0.10192);
+  assert.equal(Number(ocrStageWorstCase.toFixed(6)), 0.345);
+  assert.equal(Number(criteriaWorstCase.toFixed(6)), 0.045);
+  assert.equal(Number(totalWorstCase.toFixed(6)), 0.735);
+  assert.equal(REMAINING_USD, 0.90914545);
   assert.ok(
-    OCR_STAGE.maxInputTokens / REVISED_INPUT_CEILING >= 3,
-    'the stage must admit at least three maximum-size requests without a token refusal'
+    totalWorstCase <= REMAINING_USD,
+    `worst case ${totalWorstCase} must fit the remaining ${REMAINING_USD}`
   );
-  // A per-request ceiling above the stage aggregate would make the first
-  // admission consume the whole stage budget, so the two must stay ordered.
+
+  // The cache-blind estimate used in the initial report understates the input side
+  // by 25%; the reservation must be the conservative one, not that estimate.
+  const cacheBlind = REVISED_INPUT_CEILING * (1.0 / 1_000_000) + REVISED_OUTPUT_CEILING * outputUsdPerToken;
+  assert.ok(perRequestReservation > cacheBlind);
+
+  // The byte bound proves tokens <= ceiling for every forwarded request, so the
+  // per-request reservation is a true upper bound. The stage must still admit at
+  // least two maximum-size requests before any token refusal, and it must cover
+  // the usage the candidate was measured to report.
+  assert.ok(REVISED_INPUT_CEILING * 2 <= OCR_STAGE.maxInputTokens);
   assert.ok(REVISED_INPUT_CEILING < OCR_STAGE.maxInputTokens);
+  assert.ok(OBSERVED_INITIAL.inputTokens < OCR_STAGE.maxInputTokens);
+  assert.ok(OBSERVED_INITIAL.outputTokens < OCR_STAGE.maxOutputTokens);
+  assert.ok(REVISED_OUTPUT_CEILING < OCR_STAGE.maxOutputTokens);
 });

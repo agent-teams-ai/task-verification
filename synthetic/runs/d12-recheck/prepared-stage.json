@@ -1,0 +1,60 @@
+{
+  "schema": "d12.corrected-stage/v1",
+  "generatedAt": "2026-11-22T08:57:41.121Z",
+  "changeFromFrozenStage": [
+    "rule document now uses reviewrouter_managed_paths + rules[].path/rule with merge_system_rule and reviewrouter_exact_path",
+    "OCR stage caps reduced to 180,000 input / 24,000 output tokens so two OCR stages plus the criteria stage fit the remaining budget at conservative prices"
+  ],
+  "unchanged": {
+    "policyTextSha256": "32c49219ac909d625860640baaf8dd32926b23e039301c0d33939b2bbacaaa50",
+    "policyTextBytes": 387,
+    "assignedPaths": [
+      "README.md",
+      "src/records.ts",
+      "src/router.ts",
+      "tests/records.test.ts"
+    ],
+    "backgroundTemplate": "identical; only the head identity differs for Candidate B",
+    "backgroundASha256": "8a8a62ff9a99bb6daab25a1bbf86a86a1e3264d387ce8bc4195c7b9056702e7a",
+    "backgroundBSha256": "3a30c39547061f016c62d8f9093147b02d26ec545a9731df60638b1afcc87fee",
+    "managedConfigSha256": "2f1ef31e5ad9ce5ff5ce139aea20517ca223120c64fc0cbbf1c91382353ff2bf",
+    "requirementsSha256": "ca868a3fcc2a9100eabda736c48a8e107125a1f5a8477eede3665be96bde727f",
+    "model": "openai/gpt-6.1-terra",
+    "reasoningEffort": "medium",
+    "serviceTier": "default",
+    "filtering": "unchanged (no --no-filter)",
+    "requestByteCeiling": 65536,
+    "requestOutputCeiling": 4000
+  },
+  "candidates": {
+    "base": "ce99b0d65d645124413a746ecb137b5497aad80f",
+    "candidateA": "23864e3c877f2b34bbbdd90c4527ef46eb19cbd9",
+    "candidateB": "980a14cb5ac95cc917acf033dd74dc70e1a246f5"
+  },
+  "budget": {
+    "ceilingUsd": 1,
+    "spentUsd": 0.09085455,
+    "remainingUsd": 0.90914545,
+    "prices": {
+      "inputUncachedPerM": 1,
+      "inputCacheWritePerM": 1.25,
+      "inputCacheReadPerM": 0.05,
+      "outputPerM": 5
+    },
+    "reservationPricePerInputToken": 0.00000125,
+    "reservationPricePerOutputToken": 0.000005,
+    "perRequestReservationUsd": 0.10192,
+    "ocrStageWorstCaseUsd": 0.345,
+    "criteriaStageWorstCaseUsd": 0.045,
+    "plannedTotalUsd": 0.735,
+    "fits": true,
+    "ocrCaps": {
+      "maxInputTokens": 180000,
+      "maxOutputTokens": 24000
+    },
+    "criteriaCaps": {
+      "maxInputTokens": 20000,
+      "maxOutputTokens": 4000
+    }
+  }
+}

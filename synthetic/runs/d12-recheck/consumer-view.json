@@ -1,0 +1,177 @@
+{
+  "schema": "d12.consumer-view/v1",
+  "operator": "deterministic offline reconstruction; pinned ReviewRouter consumer modules; no model, provider or network",
+  "consumerPin": {
+    "repository": "777genius/review-router",
+    "commit": "7a079c382d8e98b426ee90a6b3764be2a21b4c49",
+    "modules": [
+      "ocr-review-outcome-contract.ts",
+      "ocr-review-normalization.ts"
+    ],
+    "sha256": {
+      "outcomeContract": "b927b7ac10dc305f417cba1ec4230b8da3f6796d8ee2df7054d4bf08336c84b7",
+      "normalization": "0dd1b7a792139c71141ccc742747390f6583e49dda5eb9a42059f4e52ed01818"
+    }
+  },
+  "sourceResult": "runs/d12-initial-rr1/ocr-result-live.json",
+  "assignedPaths": [
+    "README.md",
+    "src/records.ts",
+    "src/router.ts",
+    "tests/records.test.ts"
+  ],
+  "contract": {
+    "accepted": true
+  },
+  "A_nativePostFilter": [
+    {
+      "path": "tests/records.test.ts",
+      "startLine": 11,
+      "endLine": 11,
+      "severity": "low",
+      "category": "maintainability",
+      "contentFirstLine": "Returning `any` disables type checking for every response assertion in this suite. Use typed helpers for list and error responses (or return `unknown` and valid"
+    },
+    {
+      "path": "tests/records.test.ts",
+      "startLine": 64,
+      "endLine": 68,
+      "severity": "low",
+      "category": "test",
+      "contentFirstLine": "The rejection tests never exercise `offset` or the upper limit bound, so removing those validations would leave the suite passing despite breaking the 400 contr"
+    },
+    {
+      "path": "src/records.ts",
+      "startLine": 46,
+      "endLine": 46,
+      "severity": "medium",
+      "category": "bug",
+      "contentFirstLine": "Explicitly empty pagination values such as `limit=` and `offset=` are silently treated as omitted, despite the stated contract that unusable values return 400. "
+    },
+    {
+      "path": "src/router.ts",
+      "startLine": 28,
+      "endLine": 28,
+      "severity": "high",
+      "category": "bug",
+      "contentFirstLine": "The required CSV export is not exposed by this router, so callers cannot export the filtered records at all. Add an export endpoint that applies the same filter"
+    }
+  ],
+  "B_acceptedByNormalizer": [
+    {
+      "file": "tests/records.test.ts",
+      "startLine": 11,
+      "line": 11,
+      "endLine": 11,
+      "severity": "minor",
+      "title": "Returning any disables type checking for every response assertion in this suite. Use typed helpers for list and error responses (or return unknown and validate it) so mistakes in the asserted payload shape are caught.",
+      "category": "maintainability"
+    },
+    {
+      "file": "tests/records.test.ts",
+      "startLine": 64,
+      "line": 64,
+      "endLine": 68,
+      "severity": "minor",
+      "title": "The rejection tests never exercise offset or the upper limit bound, so removing those validations would leave the suite passing despite breaking the 400 contract. Add cases for invalid offsets (for example, a negative or non-integer value) and a limit above 100, asserting both status and field.",
+      "category": "test"
+    },
+    {
+      "file": "src/records.ts",
+      "startLine": 46,
+      "line": 46,
+      "endLine": 46,
+      "severity": "minor",
+      "title": "Explicitly empty pagination values such as limit= and offset= are silently treated as omitted, despite the stated contract that unusable values return 400. The status check below also accepts status=. Default only absent parameters and reject explicitly empty values with the corresponding field.",
+      "category": "bug"
+    },
+    {
+      "file": "src/router.ts",
+      "startLine": 28,
+      "line": 28,
+      "endLine": 28,
+      "severity": "major",
+      "title": "The required CSV export is not exposed by this router, so callers cannot export the filtered records at all. Add an export endpoint that applies the same filters as the listing, formats timestamps via the shared formatter, and emits headers and escaped rows using the CSV helper.",
+      "category": "bug"
+    }
+  ],
+  "C_inlinePlaceable": [
+    {
+      "file": "tests/records.test.ts",
+      "line": 11,
+      "startLine": 11,
+      "endLine": 11,
+      "severity": "minor",
+      "title": "Returning any disables type checking for every response assertion in this suite. Use typed helpers for list and error responses (or return unknown and validate it) so mistakes in the asserted payload shape are caught."
+    },
+    {
+      "file": "tests/records.test.ts",
+      "line": 64,
+      "startLine": 64,
+      "endLine": 68,
+      "severity": "minor",
+      "title": "The rejection tests never exercise offset or the upper limit bound, so removing those validations would leave the suite passing despite breaking the 400 contract. Add cases for invalid offsets (for example, a negative or non-integer value) and a limit above 100, asserting both status and field."
+    },
+    {
+      "file": "src/records.ts",
+      "line": 46,
+      "startLine": 46,
+      "endLine": 46,
+      "severity": "minor",
+      "title": "Explicitly empty pagination values such as limit= and offset= are silently treated as omitted, despite the stated contract that unusable values return 400. The status check below also accepts status=. Default only absent parameters and reject explicitly empty values with the corresponding field."
+    },
+    {
+      "file": "src/router.ts",
+      "line": 28,
+      "startLine": 28,
+      "endLine": 28,
+      "severity": "major",
+      "title": "The required CSV export is not exposed by this router, so callers cannot export the filtered records at all. Add an export endpoint that applies the same filters as the listing, formats timestamps via the shared formatter, and emits headers and escaped rows using the CSV helper."
+    }
+  ],
+  "D_skippedOrDowngraded": {
+    "skipped": [],
+    "reasons": [],
+    "fileLevelOnly": [],
+    "severityDowngrades": [
+      {
+        "file": "tests/records.test.ts",
+        "title": "Returning any disables type checking for every response assertion in this suite. Use typed helpers for list and error responses (or return unknown and validate it) so mistakes in the asserted payload shape are caught.",
+        "native": "low",
+        "consumer": "minor"
+      },
+      {
+        "file": "tests/records.test.ts",
+        "title": "The rejection tests never exercise offset or the upper limit bound, so removing those validations would leave the suite passing despite breaking the 400 contract. Add cases for invalid offsets (for example, a negative or non-integer value) and a limit above 100, asserting both status and field.",
+        "native": "low",
+        "consumer": "minor"
+      },
+      {
+        "file": "src/records.ts",
+        "title": "Explicitly empty pagination values such as limit= and offset= are silently treated as omitted, despite the stated contract that unusable values return 400. The status check below also accepts status=. Default only absent parameters and reject explicitly empty values with the corresponding field.",
+        "native": "medium",
+        "consumer": "minor"
+      },
+      {
+        "file": "src/router.ts",
+        "title": "The required CSV export is not exposed by this router, so callers cannot export the filtered records at all. Add an export endpoint that applies the same filters as the listing, formats timestamps via the shared formatter, and emits headers and escaped rows using the CSV helper.",
+        "native": "high",
+        "consumer": "major"
+      }
+    ]
+  },
+  "lowSeverityOnTestFile": [
+    {
+      "file": "tests/records.test.ts",
+      "line": 11,
+      "severity": "minor",
+      "title": "Returning any disables type checking for every response assertion in this suite. Use typed helpers for list and error responses (or return unknown and validate it) so mistakes in the asserted payload shape are caught."
+    },
+    {
+      "file": "tests/records.test.ts",
+      "line": 64,
+      "severity": "minor",
+      "title": "The rejection tests never exercise offset or the upper limit bound, so removing those validations would leave the suite passing despite breaking the 400 contract. Add cases for invalid offsets (for example, a negative or non-integer value) and a limit above 100, asserting both status and field."
+    }
+  ]
+}
