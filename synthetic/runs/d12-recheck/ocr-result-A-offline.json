@@ -1,0 +1,413 @@
+{
+  "status": "failed",
+  "llm": {
+    "provider": "reviewrouter",
+    "model": "openai/gpt-6.1-terra"
+  },
+  "message": "Review failed: 0 finding(s); 4 of 4 selected item(s) failed.",
+  "summary": {
+    "files_reviewed": 4,
+    "comments": 0,
+    "total_tokens": 0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "elapsed": "1s"
+  },
+  "tool_calls": {
+    "total": 0,
+    "by_tool": {},
+    "failure": 0,
+    "failure_by_tool": {},
+    "failure_details": []
+  },
+  "comments": null,
+  "groups": [
+    {
+      "label": "README.md",
+      "files": [
+        "README.md"
+      ]
+    },
+    {
+      "label": "src/records.ts",
+      "files": [
+        "src/records.ts"
+      ]
+    },
+    {
+      "label": "src/router.ts",
+      "files": [
+        "src/router.ts"
+      ]
+    },
+    {
+      "label": "tests/records.test.ts",
+      "files": [
+        "tests/records.test.ts"
+      ]
+    }
+  ],
+  "session_id": "1209fb64-d2ac-4fa2-8e00-0d4d67bf3db2",
+  "manifest": {
+    "schema_version": "ocr.run-manifest/v1",
+    "run_id": "1209fb64-d2ac-4fa2-8e00-0d4d67bf3db2",
+    "operation": "review",
+    "terminal_state": "failed",
+    "repository": {},
+    "input": {
+      "mode": "range",
+      "requested_from": "ce99b0d65d645124413a746ecb137b5497aad80f",
+      "requested_head": "23864e3c877f2b34bbbdd90c4527ef46eb19cbd9",
+      "resolved_base": "ce99b0d65d645124413a746ecb137b5497aad80f",
+      "resolved_head": "23864e3c877f2b34bbbdd90c4527ef46eb19cbd9",
+      "exact_range": "ce99b0d65d645124413a746ecb137b5497aad80f..23864e3c877f2b34bbbdd90c4527ef46eb19cbd9",
+      "source_artifact_sha256": "4298d4f0ca4bbe21dffa08f24064c0be18e7b72098c9cc465726e39fe2f52f12"
+    },
+    "execution": {
+      "ocr_version": "1.14.0-rr.1",
+      "provider": "reviewrouter",
+      "model": "openai/gpt-6.1-terra",
+      "configured_concurrency": 1,
+      "max_tool_request_times": 100,
+      "rule_config_sha256": "3924ceb11c05a6173d812224bfd8b3e68924c3a7cb603b3b23f39ae6082d3d98",
+      "runtime_config_sha256": "518f1fe68649447d463390f693afb20478d16aa19605a18f63b391bbf50d7c9f"
+    },
+    "coverage": {
+      "selected": [
+        {
+          "item_id": "5513e08b2a7a2bd1474a6452d9bc1b53c9b16406f75a10e4eaf4d17e219a038c",
+          "path": "README.md",
+          "fingerprint": "25d48868c30bee31cae2bb90e18dd541147c0d61aeb8a213a82edffb1ea3f198"
+        },
+        {
+          "item_id": "6551ea9fec5ec6d29d45193da6c1e5862595efe4f44050346367e40902bd987d",
+          "path": "tests/records.test.ts",
+          "fingerprint": "604fb5705df6fd37a253ed8a711f86a25ba03e044928bd25bd5ae3e6d87ecc58"
+        },
+        {
+          "item_id": "83ba5f038ce1c26cc41912587652419964cbc134e47f8b95bb511054c03a69d3",
+          "path": "src/router.ts",
+          "fingerprint": "6f843bbf3f6c6a00ac4f3825c55ad314051e26737390c974af664789007690b8"
+        },
+        {
+          "item_id": "eb7466b9086335572f74896295eb6fe855f6cce57366f906bd841eddbda49787",
+          "path": "src/records.ts",
+          "fingerprint": "92a7983f4ead0d3e964c8a531e6d4f091666aeece431531c1dc1b97fa3e1e849"
+        }
+      ],
+      "completed": [],
+      "reused": [],
+      "failed": [
+        {
+          "item_id": "5513e08b2a7a2bd1474a6452d9bc1b53c9b16406f75a10e4eaf4d17e219a038c",
+          "path": "README.md",
+          "fingerprint": "25d48868c30bee31cae2bb90e18dd541147c0d61aeb8a213a82edffb1ea3f198",
+          "classification": "provider",
+          "reason": "provider or subtask request failed"
+        },
+        {
+          "item_id": "6551ea9fec5ec6d29d45193da6c1e5862595efe4f44050346367e40902bd987d",
+          "path": "tests/records.test.ts",
+          "fingerprint": "604fb5705df6fd37a253ed8a711f86a25ba03e044928bd25bd5ae3e6d87ecc58",
+          "classification": "provider",
+          "reason": "provider or subtask request failed"
+        },
+        {
+          "item_id": "83ba5f038ce1c26cc41912587652419964cbc134e47f8b95bb511054c03a69d3",
+          "path": "src/router.ts",
+          "fingerprint": "6f843bbf3f6c6a00ac4f3825c55ad314051e26737390c974af664789007690b8",
+          "classification": "provider",
+          "reason": "provider or subtask request failed"
+        },
+        {
+          "item_id": "eb7466b9086335572f74896295eb6fe855f6cce57366f906bd841eddbda49787",
+          "path": "src/records.ts",
+          "fingerprint": "92a7983f4ead0d3e964c8a531e6d4f091666aeece431531c1dc1b97fa3e1e849",
+          "classification": "provider",
+          "reason": "provider or subtask request failed"
+        }
+      ],
+      "waived": [],
+      "excluded": []
+    },
+    "elapsed_ms": 987
+  },
+  "reviewrouter_outcome": {
+    "schema_version": "reviewrouter.ocr-outcome/v1",
+    "run_stop_cause": null,
+    "grouping": {
+      "state": "failed",
+      "reason": "fallback"
+    },
+    "groups": [
+      {
+        "paths": [
+          "README.md"
+        ],
+        "main_completed": false,
+        "stop_cause": "provider_error",
+        "rounds": {
+          "configured": 2,
+          "started": 1,
+          "completed": 0
+        },
+        "phases": {
+          "plan": {
+            "state": "not_applicable",
+            "reason": "threshold"
+          },
+          "compression": {
+            "state": "not_applicable",
+            "reason": "no_zone"
+          },
+          "relocation": {
+            "state": "not_applicable",
+            "reason": "no_candidates"
+          },
+          "filter": {
+            "state": "cancelled",
+            "reason": "not_dispatched"
+          }
+        },
+        "filter_decision_valid": null
+      },
+      {
+        "paths": [
+          "src/records.ts"
+        ],
+        "main_completed": false,
+        "stop_cause": "provider_error",
+        "rounds": {
+          "configured": 2,
+          "started": 1,
+          "completed": 0
+        },
+        "phases": {
+          "plan": {
+            "state": "failed",
+            "reason": "error"
+          },
+          "compression": {
+            "state": "not_applicable",
+            "reason": "no_zone"
+          },
+          "relocation": {
+            "state": "not_applicable",
+            "reason": "no_candidates"
+          },
+          "filter": {
+            "state": "cancelled",
+            "reason": "not_dispatched"
+          }
+        },
+        "filter_decision_valid": null
+      },
+      {
+        "paths": [
+          "src/router.ts"
+        ],
+        "main_completed": false,
+        "stop_cause": "provider_error",
+        "rounds": {
+          "configured": 2,
+          "started": 1,
+          "completed": 0
+        },
+        "phases": {
+          "plan": {
+            "state": "not_applicable",
+            "reason": "threshold"
+          },
+          "compression": {
+            "state": "not_applicable",
+            "reason": "no_zone"
+          },
+          "relocation": {
+            "state": "not_applicable",
+            "reason": "no_candidates"
+          },
+          "filter": {
+            "state": "cancelled",
+            "reason": "not_dispatched"
+          }
+        },
+        "filter_decision_valid": null
+      },
+      {
+        "paths": [
+          "tests/records.test.ts"
+        ],
+        "main_completed": false,
+        "stop_cause": "provider_error",
+        "rounds": {
+          "configured": 2,
+          "started": 1,
+          "completed": 0
+        },
+        "phases": {
+          "plan": {
+            "state": "failed",
+            "reason": "error"
+          },
+          "compression": {
+            "state": "not_applicable",
+            "reason": "no_zone"
+          },
+          "relocation": {
+            "state": "not_applicable",
+            "reason": "no_candidates"
+          },
+          "filter": {
+            "state": "cancelled",
+            "reason": "not_dispatched"
+          }
+        },
+        "filter_decision_valid": null
+      }
+    ]
+  },
+  "retry_report": {
+    "schema_version": "ocr.llm-retry-report/v1",
+    "total_requests": 7,
+    "retried_requests": 0,
+    "total_retries": 0,
+    "recovered_requests": 0,
+    "failed_requests": 7,
+    "cancelled_requests": 0,
+    "requests": [
+      {
+        "logical_request_id": "2adc18d404e0dc4fe2c028549f669825243052b23923859b61d2172f3bc0138f",
+        "provider": "reviewrouter",
+        "model": "openai/gpt-6.1-terra",
+        "file_path": "__grouping__",
+        "task_type": "grouping_task",
+        "request_no": 1,
+        "outcome": "failed",
+        "attempts": [
+          {
+            "attempt": 1,
+            "outcome": "error",
+            "error_class": "provider",
+            "failure_phase": "stream",
+            "status_code": 200,
+            "duration_to_headers_ms": 104
+          }
+        ]
+      },
+      {
+        "logical_request_id": "3f169c761381ec0b51884be97fcdc05f580de210571a2d9ba1ae8cd80a322b9c",
+        "provider": "reviewrouter",
+        "model": "openai/gpt-6.1-terra",
+        "file_path": "tests/records.test.ts",
+        "task_type": "main_task",
+        "request_no": 1,
+        "outcome": "failed",
+        "attempts": [
+          {
+            "attempt": 1,
+            "outcome": "error",
+            "error_class": "provider",
+            "failure_phase": "stream",
+            "status_code": 200,
+            "duration_to_headers_ms": 2
+          }
+        ]
+      },
+      {
+        "logical_request_id": "a4d12b2266885c603545d47460e3551ac466e2ebd3def012d97007b943c4831c",
+        "provider": "reviewrouter",
+        "model": "openai/gpt-6.1-terra",
+        "file_path": "tests/records.test.ts",
+        "task_type": "plan_task",
+        "request_no": 1,
+        "outcome": "failed",
+        "attempts": [
+          {
+            "attempt": 1,
+            "outcome": "error",
+            "error_class": "provider",
+            "failure_phase": "stream",
+            "status_code": 200,
+            "duration_to_headers_ms": 5
+          }
+        ]
+      },
+      {
+        "logical_request_id": "c8f05fc68fbb68a260e66c245721d4f522cf2e790aa1e23e15dba5cf673438d3",
+        "provider": "reviewrouter",
+        "model": "openai/gpt-6.1-terra",
+        "file_path": "src/router.ts",
+        "task_type": "main_task",
+        "request_no": 1,
+        "outcome": "failed",
+        "attempts": [
+          {
+            "attempt": 1,
+            "outcome": "error",
+            "error_class": "provider",
+            "failure_phase": "stream",
+            "status_code": 200,
+            "duration_to_headers_ms": 3
+          }
+        ]
+      },
+      {
+        "logical_request_id": "ca74a458321d15d55d5d0bc40d2b8db993a76825d42e8bae983ac174a28d783d",
+        "provider": "reviewrouter",
+        "model": "openai/gpt-6.1-terra",
+        "file_path": "src/records.ts",
+        "task_type": "plan_task",
+        "request_no": 1,
+        "outcome": "failed",
+        "attempts": [
+          {
+            "attempt": 1,
+            "outcome": "error",
+            "error_class": "provider",
+            "failure_phase": "stream",
+            "status_code": 200,
+            "duration_to_headers_ms": 6
+          }
+        ]
+      },
+      {
+        "logical_request_id": "e546d9e4abca1bd5543a57fe6c6eacc74772581ef20fc4a663c3889495e2eb6b",
+        "provider": "reviewrouter",
+        "model": "openai/gpt-6.1-terra",
+        "file_path": "src/records.ts",
+        "task_type": "main_task",
+        "request_no": 1,
+        "outcome": "failed",
+        "attempts": [
+          {
+            "attempt": 1,
+            "outcome": "error",
+            "error_class": "provider",
+            "failure_phase": "stream",
+            "status_code": 200,
+            "duration_to_headers_ms": 2
+          }
+        ]
+      },
+      {
+        "logical_request_id": "ee6300adcfbb42784ca24feeb7dfde1287339ad75eda64831a58b1ea423dada7",
+        "provider": "reviewrouter",
+        "model": "openai/gpt-6.1-terra",
+        "file_path": "README.md",
+        "task_type": "main_task",
+        "request_no": 1,
+        "outcome": "failed",
+        "attempts": [
+          {
+            "attempt": 1,
+            "outcome": "error",
+            "error_class": "provider",
+            "failure_phase": "stream",
+            "status_code": 200,
+            "duration_to_headers_ms": 4
+          }
+        ]
+      }
+    ]
+  }
+}

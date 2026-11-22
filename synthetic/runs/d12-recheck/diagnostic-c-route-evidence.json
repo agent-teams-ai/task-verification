@@ -1,0 +1,89 @@
+{
+  "schema": "d12.diagnostic-c-route-evidence/v1",
+  "operator": "model-free; public handle() route; no model, provider or network",
+  "control": {
+    "candidate": "B",
+    "sha": "980a14cb5ac95cc917acf033dd74dc70e1a246f5"
+  },
+  "diagnostic": {
+    "candidate": "C",
+    "sha": "ec3240d74dc0a7114364b4204cc78f26100f3f8e",
+    "parentOfC": "980a14cb5ac95cc917acf033dd74dc70e1a246f5"
+  },
+  "defect": "GET /records.csv validates the caller's query, then exports parseListQuery({})",
+  "B": {
+    "csv_plain": {
+      "status": 200,
+      "contentType": "text/csv; charset=utf-8",
+      "body": "id,name,status,createdAt\nrec-1,Quarterly access review,active,2026-02-03T02:05:06.000Z\nrec-2,Vendor security packet,active,2026-02-04T15:00:00.000Z\nrec-3,Incident 2026-011,archived,2026-02-05T00:30:00.000Z\nrec-4,Retention schedule,archived,2026-02-06T14:59:59.000Z\nrec-5,\"Access review, follow-up\",active,2026-02-07T11:00:00.000Z\nrec-6,\"Audit \"\"export\"\" sample\",active,2026-02-08T06:15:00.000Z\n"
+    },
+    "csv_status_filter": {
+      "status": 200,
+      "contentType": "text/csv; charset=utf-8",
+      "body": "id,name,status,createdAt\nrec-3,Incident 2026-011,archived,2026-02-05T00:30:00.000Z\nrec-4,Retention schedule,archived,2026-02-06T14:59:59.000Z\n"
+    },
+    "csv_name_filter": {
+      "status": 200,
+      "contentType": "text/csv; charset=utf-8",
+      "body": "id,name,status,createdAt\nrec-1,Quarterly access review,active,2026-02-03T02:05:06.000Z\nrec-2,Vendor security packet,active,2026-02-04T15:00:00.000Z\nrec-5,\"Access review, follow-up\",active,2026-02-07T11:00:00.000Z\nrec-6,\"Audit \"\"export\"\" sample\",active,2026-02-08T06:15:00.000Z\n"
+    },
+    "csv_empty": {
+      "status": 200,
+      "contentType": "text/csv; charset=utf-8",
+      "body": "id,name,status,createdAt\n"
+    },
+    "csv_bad_status": {
+      "status": 400,
+      "contentType": "application/json; charset=utf-8",
+      "body": "{\"error\":\"status must be active or archived\",\"field\":\"status\"}"
+    },
+    "listing_status_filter": {
+      "status": 200,
+      "contentType": "application/json; charset=utf-8",
+      "body": "{\"items\":[{\"id\":\"rec-3\",\"name\":\"Incident 2026-011\",\"status\":\"archived\",\"createdAt\":\"2026-02-05T00:30:00.000Z\"},{\"id\":\"rec-4\",\"name\":\"Retention schedule\",\"status\":\"archived\",\"createdAt\":\"2026-02-06T14:59:59.000Z\"}],\"total\":2,\"limit\":20,\"offset\":0}"
+    }
+  },
+  "C": {
+    "csv_plain": {
+      "status": 200,
+      "contentType": "text/csv; charset=utf-8",
+      "body": "id,name,status,createdAt\nrec-1,Quarterly access review,active,2026-02-03T02:05:06.000Z\nrec-2,Vendor security packet,active,2026-02-04T15:00:00.000Z\nrec-3,Incident 2026-011,archived,2026-02-05T00:30:00.000Z\nrec-4,Retention schedule,archived,2026-02-06T14:59:59.000Z\nrec-5,\"Access review, follow-up\",active,2026-02-07T11:00:00.000Z\nrec-6,\"Audit \"\"export\"\" sample\",active,2026-02-08T06:15:00.000Z\n"
+    },
+    "csv_status_filter": {
+      "status": 200,
+      "contentType": "text/csv; charset=utf-8",
+      "body": "id,name,status,createdAt\nrec-1,Quarterly access review,active,2026-02-03T02:05:06.000Z\nrec-2,Vendor security packet,active,2026-02-04T15:00:00.000Z\nrec-3,Incident 2026-011,archived,2026-02-05T00:30:00.000Z\nrec-4,Retention schedule,archived,2026-02-06T14:59:59.000Z\nrec-5,\"Access review, follow-up\",active,2026-02-07T11:00:00.000Z\nrec-6,\"Audit \"\"export\"\" sample\",active,2026-02-08T06:15:00.000Z\n"
+    },
+    "csv_name_filter": {
+      "status": 200,
+      "contentType": "text/csv; charset=utf-8",
+      "body": "id,name,status,createdAt\nrec-1,Quarterly access review,active,2026-02-03T02:05:06.000Z\nrec-2,Vendor security packet,active,2026-02-04T15:00:00.000Z\nrec-3,Incident 2026-011,archived,2026-02-05T00:30:00.000Z\nrec-4,Retention schedule,archived,2026-02-06T14:59:59.000Z\nrec-5,\"Access review, follow-up\",active,2026-02-07T11:00:00.000Z\nrec-6,\"Audit \"\"export\"\" sample\",active,2026-02-08T06:15:00.000Z\n"
+    },
+    "csv_empty": {
+      "status": 200,
+      "contentType": "text/csv; charset=utf-8",
+      "body": "id,name,status,createdAt\nrec-1,Quarterly access review,active,2026-02-03T02:05:06.000Z\nrec-2,Vendor security packet,active,2026-02-04T15:00:00.000Z\nrec-3,Incident 2026-011,archived,2026-02-05T00:30:00.000Z\nrec-4,Retention schedule,archived,2026-02-06T14:59:59.000Z\nrec-5,\"Access review, follow-up\",active,2026-02-07T11:00:00.000Z\nrec-6,\"Audit \"\"export\"\" sample\",active,2026-02-08T06:15:00.000Z\n"
+    },
+    "csv_bad_status": {
+      "status": 400,
+      "contentType": "application/json; charset=utf-8",
+      "body": "{\"error\":\"status must be active or archived\",\"field\":\"status\"}"
+    },
+    "listing_status_filter": {
+      "status": 200,
+      "contentType": "application/json; charset=utf-8",
+      "body": "{\"items\":[{\"id\":\"rec-3\",\"name\":\"Incident 2026-011\",\"status\":\"archived\",\"createdAt\":\"2026-02-05T00:30:00.000Z\"},{\"id\":\"rec-4\",\"name\":\"Retention schedule\",\"status\":\"archived\",\"createdAt\":\"2026-02-06T14:59:59.000Z\"}],\"total\":2,\"limit\":20,\"offset\":0}"
+    }
+  },
+  "behavioralAssertions": {
+    "b_filtersApplied": true,
+    "c_routePresent": true,
+    "c_contentTypeCorrect": true,
+    "c_headerCorrect": true,
+    "c_validationStillWorks": true,
+    "c_filtersDropped": true,
+    "c_exportedRowCountWithFilter": 6,
+    "c_listingFilteredCount": 2,
+    "c_emptyFilterDropProof": 6
+  }
+}

@@ -21,8 +21,8 @@ import { pathToFileURL } from "node:url";
 
 const require = createRequire(import.meta.url);
 const LABEL = (process.argv[2] ?? "").toUpperCase();
-if (!["A", "B"].includes(LABEL)) {
-  console.error("usage: node criteria.mjs A|B");
+if (!["A", "B", "C"].includes(LABEL)) {
+  console.error("usage: node criteria.mjs A|B|C   (C also needs C_SHA)");
   process.exit(2);
 }
 
@@ -33,8 +33,21 @@ const PROXY = path.join(SYN, "tooling", "openrouter-bounded-proxy.mjs");
 const repo = path.join(SYN, "repo");
 const PORT = 8788;
 const MODEL = "openai/gpt-6.1-terra";
+// Conjunctive caps, overridable so a candidate's larger evidence bundle can be
+// admitted and recorded honestly. 'bytes' enforcement: bodyBytes <= cap proves
+// inputTokens <= cap, because every token covers at least one byte.
+const MAX_IN = Number(process.env.CRITERIA_MAX_INPUT_TOKENS ?? 20000);
+const MAX_OUT = Number(process.env.CRITERIA_MAX_OUTPUT_TOKENS ?? 4000);
 const BASE = "ce99b0d65d645124413a746ecb137b5497aad80f";
-const HEADS = { A: "23864e3c877f2b34bbbdd90c4527ef46eb19cbd9", B: execFileSync("git", ["-C", repo, "rev-parse", "HEAD"], { encoding: "utf8" }).trim() };
+const HEADS = {
+  A: "23864e3c877f2b34bbbdd90c4527ef46eb19cbd9",
+  B: execFileSync("git", ["-C", repo, "rev-parse", "HEAD"], { encoding: "utf8" }).trim(),
+  C: (process.env.C_SHA ?? "").trim(),
+};
+if (LABEL === "C" && !/^[0-9a-f]{40}$/.test(HEADS.C)) {
+  console.error("FATAL: C_SHA must be the full 40-character commit id of the diagnostic variant");
+  process.exit(2);
+}
 const HEAD = HEADS[LABEL];
 
 if (!process.env.OPENROUTER_API_KEY || !process.env.OPENROUTER_BASE_URL) {
@@ -133,10 +146,10 @@ const proxy = spawn(
     "--stage", `d12-recheck-criteria-${LABEL}`,
     "--port", String(PORT),
     "--max-requests", "1",
-    "--max-input-tokens", "20000",
-    "--max-output-tokens", "4000",
-    "--request-input-tokens", "20000",
-    "--request-output-tokens", "4000",
+    "--max-input-tokens", String(MAX_IN),
+    "--max-output-tokens", String(MAX_OUT),
+    "--request-input-tokens", String(MAX_IN),
+    "--request-output-tokens", String(MAX_OUT),
     "--request-timeout-ms", "150000",
     "--model", MODEL,
     "--service-tier", "default",
@@ -227,7 +240,7 @@ try {
     input,
     output: { mode: "json_schema", schema, strict: true },
     effort: "medium",
-    maxOutputTokens: 4000,
+    maxOutputTokens: MAX_OUT,
     deadline: new Date(Date.now() + 240_000),
     decode: (value) => {
       const v = value;
@@ -277,7 +290,7 @@ try {
       observedFromProxy: forwarded.map((l) => ({ status: l.status, model: l.observedModel, provider: l.observedProvider })),
     },
     providerKeyUsage: { before, after, delta: before !== "unavailable" && after !== "unavailable" ? Number((Number(after) - Number(before)).toFixed(8)) : "unavailable" },
-    proxyArgs: { maxRequests: 1, maxInputTokens: 20000, maxOutputTokens: 4000, requestInputCeilingBytes: 20000 },
+    proxyArgs: { maxRequests: 1, maxInputTokens: MAX_IN, maxOutputTokens: MAX_OUT, requestInputCeilingBytes: MAX_IN },
   };
 
   fs.writeFileSync(path.join(dir, `criteria-assessment-${LABEL}.json`), `${JSON.stringify(evidence, null, 2)}\n`);

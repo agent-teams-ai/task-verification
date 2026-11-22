@@ -1,0 +1,109 @@
+{
+  "schema": "d12.consumer-view/v1",
+  "operator": "deterministic offline reconstruction; pinned ReviewRouter consumer modules; no model, provider or network",
+  "consumerPin": {
+    "repository": "777genius/review-router",
+    "commit": "7a079c382d8e98b426ee90a6b3764be2a21b4c49",
+    "modules": [
+      "ocr-review-outcome-contract.ts",
+      "ocr-review-normalization.ts"
+    ],
+    "sha256": {
+      "outcomeContract": "b927b7ac10dc305f417cba1ec4230b8da3f6796d8ee2df7054d4bf08336c84b7",
+      "normalization": "0dd1b7a792139c71141ccc742747390f6583e49dda5eb9a42059f4e52ed01818"
+    }
+  },
+  "sourceResult": "runs/d12-recheck/ocr-result-A-live.json",
+  "assignedPaths": [
+    "README.md",
+    "src/records.ts",
+    "src/router.ts",
+    "tests/records.test.ts"
+  ],
+  "contract": {
+    "accepted": true
+  },
+  "A_nativePostFilter": [
+    {
+      "path": "tests/records.test.ts",
+      "startLine": 11,
+      "endLine": 13,
+      "severity": "low",
+      "category": "maintainability",
+      "contentFirstLine": "The new helper returns an unexplained `any`, so TypeScript cannot check the payload accesses in these tests. Give it a typed result (for example, separate listi"
+    },
+    {
+      "path": "src/router.ts",
+      "startLine": 28,
+      "endLine": 30,
+      "severity": "high",
+      "category": "bug",
+      "contentFirstLine": "The new filtered listing only exposes JSON, with no way to export those filtered records as CSV. The existing CSV helper does not provide a route, so callers ca"
+    }
+  ],
+  "B_acceptedByNormalizer": [
+    {
+      "file": "tests/records.test.ts",
+      "startLine": 11,
+      "line": 11,
+      "endLine": 13,
+      "severity": "minor",
+      "title": "The new helper returns an unexplained any, so TypeScript cannot check the payload accesses in these tests. Give it a typed result (for example, separate listing and error response helpers) or parse as unknown and validate the shape.",
+      "category": "maintainability"
+    },
+    {
+      "file": "src/router.ts",
+      "startLine": 28,
+      "line": 28,
+      "endLine": 30,
+      "severity": "major",
+      "title": "The new filtered listing only exposes JSON, with no way to export those filtered records as CSV. The existing CSV helper does not provide a route, so callers cannot exercise the required export capability for either filter. Add a CSV endpoint or response mode that shares the listing's filters, uses the CSV helper for headers and fields, and exports the full filtered set rather than just one page.",
+      "category": "bug"
+    }
+  ],
+  "C_inlinePlaceable": [
+    {
+      "file": "tests/records.test.ts",
+      "line": 11,
+      "startLine": 11,
+      "endLine": 13,
+      "severity": "minor",
+      "title": "The new helper returns an unexplained any, so TypeScript cannot check the payload accesses in these tests. Give it a typed result (for example, separate listing and error response helpers) or parse as unknown and validate the shape."
+    },
+    {
+      "file": "src/router.ts",
+      "line": 28,
+      "startLine": 28,
+      "endLine": 30,
+      "severity": "major",
+      "title": "The new filtered listing only exposes JSON, with no way to export those filtered records as CSV. The existing CSV helper does not provide a route, so callers cannot exercise the required export capability for either filter. Add a CSV endpoint or response mode that shares the listing's filters, uses the CSV helper for headers and fields, and exports the full filtered set rather than just one page."
+    }
+  ],
+  "D_skippedOrDowngraded": {
+    "skipped": [],
+    "reasons": [],
+    "fileLevelOnly": [],
+    "severityDowngrades": [
+      {
+        "file": "tests/records.test.ts",
+        "title": "The new helper returns an unexplained any, so TypeScript cannot check the payload accesses in these tests. Give it a typed result (for example, separate listing and error response helpers) or parse as unknown and validate the shape.",
+        "native": "low",
+        "consumer": "minor"
+      },
+      {
+        "file": "src/router.ts",
+        "title": "The new filtered listing only exposes JSON, with no way to export those filtered records as CSV. The existing CSV helper does not provide a route, so callers cannot exercise the required export capability for either filter. Add a CSV endpoint or response mode that shares the listing's filters, uses the CSV helper for headers and fields, and exports the full filtered set rather than just one page.",
+        "native": "high",
+        "consumer": "major"
+      }
+    ]
+  },
+  "lowSeverityOnTestFile": [
+    {
+      "file": "tests/records.test.ts",
+      "line": 11,
+      "severity": "minor",
+      "title": "The new helper returns an unexplained any, so TypeScript cannot check the payload accesses in these tests. Give it a typed result (for example, separate listing and error response helpers) or parse as unknown and validate the shape."
+    }
+  ]
+}

@@ -1,0 +1,163 @@
+{
+  "schema": "d12.corrected-ocr-stage/v1",
+  "label": "A",
+  "mode": "live",
+  "comparator": "QUALIFIED 1.14.0-rr.1 DEVELOPMENT OCR CANDIDATE",
+  "ruleDocumentSha256": "b3f14056c29c3587b03be3880abc063caec6d1e12f4a2f4964c5e8b6e4a6b0a5",
+  "backgroundSha256": "8a8a62ff9a99bb6daab25a1bbf86a86a1e3264d387ce8bc4195c7b9056702e7a",
+  "exitCode": 0,
+  "requests": {
+    "forwarded": 10,
+    "refused": 0
+  },
+  "refusals": [],
+  "inputBytes": [
+    1502,
+    25844,
+    30376,
+    51011,
+    58037,
+    64768,
+    18603,
+    30271,
+    38957,
+    44556
+  ],
+  "maxInputBytes": 64768,
+  "ceilings": {
+    "requestInputBytes": 65536,
+    "stageInputTokens": 180000,
+    "stageOutputTokens": 24000,
+    "requestOutputTokens": 4000
+  },
+  "requested": {
+    "model": "openai/gpt-6.1-terra",
+    "serviceTier": "default",
+    "effort": "medium"
+  },
+  "observed": [
+    {
+      "status": 200,
+      "model": "openai/gpt-6.1-terra",
+      "provider": null,
+      "usagePresent": true
+    },
+    {
+      "status": 200,
+      "model": "openai/gpt-6.1-terra",
+      "provider": null,
+      "usagePresent": true
+    },
+    {
+      "status": 200,
+      "model": "openai/gpt-6.1-terra",
+      "provider": null,
+      "usagePresent": true
+    },
+    {
+      "status": 200,
+      "model": "openai/gpt-6.1-terra",
+      "provider": null,
+      "usagePresent": true
+    },
+    {
+      "status": 200,
+      "model": "openai/gpt-6.1-terra",
+      "provider": null,
+      "usagePresent": true
+    },
+    {
+      "status": 200,
+      "model": "openai/gpt-6.1-terra",
+      "provider": null,
+      "usagePresent": true
+    },
+    {
+      "status": 200,
+      "model": "openai/gpt-6.1-terra",
+      "provider": null,
+      "usagePresent": true
+    },
+    {
+      "status": 200,
+      "model": "openai/gpt-6.1-terra",
+      "provider": null,
+      "usagePresent": true
+    },
+    {
+      "status": 200,
+      "model": "openai/gpt-6.1-terra",
+      "provider": null,
+      "usagePresent": true
+    },
+    {
+      "status": 200,
+      "model": "openai/gpt-6.1-terra",
+      "provider": null,
+      "usagePresent": true
+    }
+  ],
+  "usage": {
+    "inputTokens": 76591,
+    "outputTokens": 2729
+  },
+  "chargedUsdConservative": 0.10938375,
+  "stageWorstCaseUsd": 0.345,
+  "providerKeyUsage": {
+    "before": "0.09085455",
+    "after": "0.12072745",
+    "delta": 0.0298729
+  },
+  "halted": null,
+  "result": {
+    "status": "complete",
+    "terminal": "complete",
+    "comments": 2,
+    "outcome": {
+      "schema_version": "reviewrouter.ocr-outcome/v1",
+      "run_stop_cause": null,
+      "grouping": {
+        "state": "completed",
+        "reason": null
+      },
+      "groups": [
+        {
+          "paths": [
+            "README.md",
+            "src/records.ts",
+            "src/router.ts",
+            "tests/records.test.ts"
+          ],
+          "main_completed": true,
+          "stop_cause": null,
+          "rounds": {
+            "configured": 2,
+            "started": 2,
+            "completed": 2
+          },
+          "phases": {
+            "plan": {
+              "state": "completed",
+              "reason": null
+            },
+            "compression": {
+              "state": "not_applicable",
+              "reason": "no_zone"
+            },
+            "relocation": {
+              "state": "not_applicable",
+              "reason": "no_candidates"
+            },
+            "filter": {
+              "state": "completed",
+              "reason": null
+            }
+          },
+          "filter_decision_valid": true
+        }
+      ]
+    }
+  },
+  "resultPath": "ocr-result-A-live.json",
+  "ledger": "/run/ledger-ocr-A-live.jsonl"
+}

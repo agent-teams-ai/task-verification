@@ -1,0 +1,236 @@
+{
+  "status": "failed",
+  "llm": {
+    "provider": "reviewrouter",
+    "model": "openai/gpt-6.1-terra"
+  },
+  "message": "Review failed: 2 finding(s); 4 of 4 selected item(s) failed.",
+  "summary": {
+    "files_reviewed": 4,
+    "comments": 2,
+    "total_tokens": 40997,
+    "input_tokens": 38314,
+    "output_tokens": 2683,
+    "cache_read_tokens": 19649,
+    "elapsed": "43s"
+  },
+  "tool_calls": {
+    "total": 16,
+    "by_tool": {
+      "code_comment": 1,
+      "code_search": 1,
+      "file_find": 2,
+      "file_read": 12
+    },
+    "failure": 1,
+    "failure_by_tool": {
+      "file_read": 1
+    },
+    "failure_details": [
+      {
+        "tool_call_number": 14,
+        "tool_name": "file_read",
+        "file_path": "README.md,src/records.ts,src/router.ts,tests/records.test.ts",
+        "arguments": "{\"file_path\": \"tests/records-export.test.ts\", \"side\": \"old\"}",
+        "error": "SIDE: old\nREVISION: ce99b0d65d645124413a746ecb137b5497aad80f\nfile \"tests/records-export.test.ts\" not found: git show ce99b0d65d645124413a746ecb137b5497aad80f:tests/records-export.test.ts: exit status 128: fatal: path 'tests/records-export.test.ts' exists on disk, but not in 'ce99b0d65d645124413a746ecb137b5497aad80f'\n"
+      }
+    ]
+  },
+  "comments": [
+    {
+      "path": "src/records.ts",
+      "content": "The new module imports `escapeCsvField` but never uses it directly; `toCsvRow` already calls it for each field. Remove the unused import to avoid a dead binding and failures if unused-import checks are enabled.",
+      "suggestion_code": "import { toCsvRow } from \"./csv.ts\";",
+      "existing_code": "import { escapeCsvField, toCsvRow } from \"./csv.ts\";",
+      "start_line": 1,
+      "end_line": 1,
+      "category": "maintainability",
+      "severity": "low"
+    },
+    {
+      "path": "tests/records.test.ts",
+      "content": "The new helper returns `any` without an explanation, so the listing and error response assertions lose type checking. Give the parsed result an explicit response type (or use a typed generic) so incorrect field accesses are caught.",
+      "existing_code": "function body(response: { body: string }): any {\n  return JSON.parse(response.body);\n}",
+      "start_line": 11,
+      "end_line": 13,
+      "category": "maintainability",
+      "severity": "low"
+    }
+  ],
+  "groups": [
+    {
+      "label": "Records feature, routing, tests, and documentation",
+      "files": [
+        "README.md",
+        "src/records.ts",
+        "src/router.ts",
+        "tests/records.test.ts"
+      ]
+    }
+  ],
+  "session_id": "68e3966d-6da1-4de2-b367-ddb67baad05b",
+  "manifest": {
+    "schema_version": "ocr.run-manifest/v1",
+    "run_id": "68e3966d-6da1-4de2-b367-ddb67baad05b",
+    "operation": "review",
+    "terminal_state": "failed",
+    "repository": {},
+    "input": {
+      "mode": "range",
+      "requested_from": "ce99b0d65d645124413a746ecb137b5497aad80f",
+      "requested_head": "980a14cb5ac95cc917acf033dd74dc70e1a246f5",
+      "resolved_base": "ce99b0d65d645124413a746ecb137b5497aad80f",
+      "resolved_head": "980a14cb5ac95cc917acf033dd74dc70e1a246f5",
+      "exact_range": "ce99b0d65d645124413a746ecb137b5497aad80f..980a14cb5ac95cc917acf033dd74dc70e1a246f5",
+      "source_artifact_sha256": "d08df5bebcda5fbe716855be22ecd1754da457b80e9c60a5d70a5e9e716d42ff"
+    },
+    "execution": {
+      "ocr_version": "1.14.0-rr.1",
+      "provider": "reviewrouter",
+      "model": "openai/gpt-6.1-terra",
+      "configured_concurrency": 1,
+      "max_tool_request_times": 100,
+      "rule_config_sha256": "3924ceb11c05a6173d812224bfd8b3e68924c3a7cb603b3b23f39ae6082d3d98",
+      "runtime_config_sha256": "518f1fe68649447d463390f693afb20478d16aa19605a18f63b391bbf50d7c9f"
+    },
+    "coverage": {
+      "selected": [
+        {
+          "item_id": "5513e08b2a7a2bd1474a6452d9bc1b53c9b16406f75a10e4eaf4d17e219a038c",
+          "path": "README.md",
+          "fingerprint": "846f5c18b9733564ab90740e48ca1916ce8e7172fedce1e2f2eb35c4f46ad26a"
+        },
+        {
+          "item_id": "6551ea9fec5ec6d29d45193da6c1e5862595efe4f44050346367e40902bd987d",
+          "path": "tests/records.test.ts",
+          "fingerprint": "604fb5705df6fd37a253ed8a711f86a25ba03e044928bd25bd5ae3e6d87ecc58"
+        },
+        {
+          "item_id": "83ba5f038ce1c26cc41912587652419964cbc134e47f8b95bb511054c03a69d3",
+          "path": "src/router.ts",
+          "fingerprint": "36bb7c37c5324f3e99292327891ff396277ec799d11bc93ce8f5306ab00c5a22"
+        },
+        {
+          "item_id": "eb7466b9086335572f74896295eb6fe855f6cce57366f906bd841eddbda49787",
+          "path": "src/records.ts",
+          "fingerprint": "a432ba4cf1d62ce36abd0b57c3ee648d1eb5ed85a5b3625357a4c5af367716ec"
+        }
+      ],
+      "completed": [],
+      "reused": [],
+      "failed": [
+        {
+          "item_id": "5513e08b2a7a2bd1474a6452d9bc1b53c9b16406f75a10e4eaf4d17e219a038c",
+          "path": "README.md",
+          "fingerprint": "846f5c18b9733564ab90740e48ca1916ce8e7172fedce1e2f2eb35c4f46ad26a",
+          "classification": "provider",
+          "reason": "provider or subtask request failed"
+        },
+        {
+          "item_id": "6551ea9fec5ec6d29d45193da6c1e5862595efe4f44050346367e40902bd987d",
+          "path": "tests/records.test.ts",
+          "fingerprint": "604fb5705df6fd37a253ed8a711f86a25ba03e044928bd25bd5ae3e6d87ecc58",
+          "classification": "provider",
+          "reason": "provider or subtask request failed"
+        },
+        {
+          "item_id": "83ba5f038ce1c26cc41912587652419964cbc134e47f8b95bb511054c03a69d3",
+          "path": "src/router.ts",
+          "fingerprint": "36bb7c37c5324f3e99292327891ff396277ec799d11bc93ce8f5306ab00c5a22",
+          "classification": "provider",
+          "reason": "provider or subtask request failed"
+        },
+        {
+          "item_id": "eb7466b9086335572f74896295eb6fe855f6cce57366f906bd841eddbda49787",
+          "path": "src/records.ts",
+          "fingerprint": "a432ba4cf1d62ce36abd0b57c3ee648d1eb5ed85a5b3625357a4c5af367716ec",
+          "classification": "provider",
+          "reason": "provider or subtask request failed"
+        }
+      ],
+      "waived": [],
+      "excluded": [
+        {
+          "item_id": "8d5e15561eb584001f8011fdd12f793f6a86309d4b5f903a6a2c61cf436f5d52",
+          "path": "tests/records-export.test.ts",
+          "exclude_reason": "user_exclude"
+        }
+      ]
+    },
+    "elapsed_ms": 42883
+  },
+  "reviewrouter_outcome": {
+    "schema_version": "reviewrouter.ocr-outcome/v1",
+    "run_stop_cause": null,
+    "grouping": {
+      "state": "completed",
+      "reason": null
+    },
+    "groups": [
+      {
+        "paths": [
+          "README.md",
+          "src/records.ts",
+          "src/router.ts",
+          "tests/records.test.ts"
+        ],
+        "main_completed": false,
+        "stop_cause": "provider_error",
+        "rounds": {
+          "configured": 2,
+          "started": 1,
+          "completed": 0
+        },
+        "phases": {
+          "plan": {
+            "state": "completed",
+            "reason": null
+          },
+          "compression": {
+            "state": "not_applicable",
+            "reason": "no_zone"
+          },
+          "relocation": {
+            "state": "not_applicable",
+            "reason": "no_candidates"
+          },
+          "filter": {
+            "state": "cancelled",
+            "reason": "not_dispatched"
+          }
+        },
+        "filter_decision_valid": null
+      }
+    ]
+  },
+  "retry_report": {
+    "schema_version": "ocr.llm-retry-report/v1",
+    "total_requests": 6,
+    "retried_requests": 0,
+    "total_retries": 0,
+    "recovered_requests": 0,
+    "failed_requests": 1,
+    "cancelled_requests": 0,
+    "requests": [
+      {
+        "logical_request_id": "ee442082e5c84842346f86047d2b16fac885fa45ce2e111403016f086a465301",
+        "provider": "reviewrouter",
+        "model": "openai/gpt-6.1-terra",
+        "file_path": "README.md,src/records.ts,src/router.ts,tests/records.test.ts",
+        "task_type": "main_task",
+        "request_no": 4,
+        "outcome": "failed",
+        "attempts": [
+          {
+            "attempt": 1,
+            "outcome": "error",
+            "error_class": "provider",
+            "failure_phase": "http",
+            "status_code": 413,
+            "duration_to_headers_ms": 3
+          }
+        ]
+      }
+    ]
+  }
+}

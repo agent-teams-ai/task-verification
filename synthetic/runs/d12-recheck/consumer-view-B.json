@@ -1,0 +1,152 @@
+{
+  "schema": "d12.consumer-view/v1",
+  "operator": "deterministic offline reconstruction; pinned ReviewRouter consumer modules; no model, provider or network",
+  "consumerPin": {
+    "repository": "777genius/review-router",
+    "commit": "7a079c382d8e98b426ee90a6b3764be2a21b4c49",
+    "modules": [
+      "ocr-review-outcome-contract.ts",
+      "ocr-review-normalization.ts"
+    ],
+    "sha256": {
+      "outcomeContract": "b927b7ac10dc305f417cba1ec4230b8da3f6796d8ee2df7054d4bf08336c84b7",
+      "normalization": "0dd1b7a792139c71141ccc742747390f6583e49dda5eb9a42059f4e52ed01818"
+    }
+  },
+  "sourceResult": "runs/d12-recheck/ocr-result-B-live-revised.json",
+  "assignedPaths": [
+    "README.md",
+    "src/records.ts",
+    "src/router.ts",
+    "tests/records.test.ts"
+  ],
+  "contract": {
+    "accepted": true
+  },
+  "A_nativePostFilter": [
+    {
+      "path": "tests/records.test.ts",
+      "startLine": 42,
+      "endLine": 43,
+      "severity": "low",
+      "category": "test",
+      "contentFirstLine": "The new pagination tests cover only the listing, while the existing CSV tests never send a valid non-default `limit` or `offset`. A regression that accidentally"
+    },
+    {
+      "path": "tests/records.test.ts",
+      "startLine": 11,
+      "endLine": 13,
+      "severity": "low",
+      "category": "maintainability",
+      "contentFirstLine": "This new helper returns `any`, so TypeScript cannot check the response properties used throughout these tests. Return a typed payload (or `unknown` with validat"
+    },
+    {
+      "path": "tests/records.test.ts",
+      "startLine": 64,
+      "endLine": 68,
+      "severity": "low",
+      "category": "test",
+      "contentFirstLine": "The new listing rejection tests do not exercise an invalid `offset`, although `/records` promises a 400 with the offending field. The existing invalid-offset te"
+    }
+  ],
+  "B_acceptedByNormalizer": [
+    {
+      "file": "tests/records.test.ts",
+      "startLine": 42,
+      "line": 42,
+      "endLine": 43,
+      "severity": "minor",
+      "title": "The new pagination tests cover only the listing, while the existing CSV tests never send a valid non-default limit or offset. A regression that accidentally paginates the export would therefore pass: all six seed records fit in the default page. Add an export assertion with a small limit and nonzero offset that still expects the whole filtered set.",
+      "category": "test"
+    },
+    {
+      "file": "tests/records.test.ts",
+      "startLine": 11,
+      "line": 11,
+      "endLine": 13,
+      "severity": "minor",
+      "title": "This new helper returns any, so TypeScript cannot check the response properties used throughout these tests. Return a typed payload (or unknown with validation) instead, so incorrect field names and types are caught by type checking.",
+      "category": "maintainability"
+    },
+    {
+      "file": "tests/records.test.ts",
+      "startLine": 64,
+      "line": 64,
+      "endLine": 68,
+      "severity": "minor",
+      "title": "The new listing rejection tests do not exercise an invalid offset, although /records promises a 400 with the offending field. The existing invalid-offset test only calls /records.csv, so a listing-specific regression in query handling could pass. Add /records cases for a negative or non-integer offset and an offset above Number.MAX_SAFE_INTEGER.",
+      "category": "test"
+    }
+  ],
+  "C_inlinePlaceable": [
+    {
+      "file": "tests/records.test.ts",
+      "line": 42,
+      "startLine": 42,
+      "endLine": 43,
+      "severity": "minor",
+      "title": "The new pagination tests cover only the listing, while the existing CSV tests never send a valid non-default limit or offset. A regression that accidentally paginates the export would therefore pass: all six seed records fit in the default page. Add an export assertion with a small limit and nonzero offset that still expects the whole filtered set."
+    },
+    {
+      "file": "tests/records.test.ts",
+      "line": 11,
+      "startLine": 11,
+      "endLine": 13,
+      "severity": "minor",
+      "title": "This new helper returns any, so TypeScript cannot check the response properties used throughout these tests. Return a typed payload (or unknown with validation) instead, so incorrect field names and types are caught by type checking."
+    },
+    {
+      "file": "tests/records.test.ts",
+      "line": 64,
+      "startLine": 64,
+      "endLine": 68,
+      "severity": "minor",
+      "title": "The new listing rejection tests do not exercise an invalid offset, although /records promises a 400 with the offending field. The existing invalid-offset test only calls /records.csv, so a listing-specific regression in query handling could pass. Add /records cases for a negative or non-integer offset and an offset above Number.MAX_SAFE_INTEGER."
+    }
+  ],
+  "D_skippedOrDowngraded": {
+    "skipped": [],
+    "reasons": [],
+    "fileLevelOnly": [],
+    "severityDowngrades": [
+      {
+        "file": "tests/records.test.ts",
+        "title": "The new pagination tests cover only the listing, while the existing CSV tests never send a valid non-default limit or offset. A regression that accidentally paginates the export would therefore pass: all six seed records fit in the default page. Add an export assertion with a small limit and nonzero offset that still expects the whole filtered set.",
+        "native": "low",
+        "consumer": "minor"
+      },
+      {
+        "file": "tests/records.test.ts",
+        "title": "This new helper returns any, so TypeScript cannot check the response properties used throughout these tests. Return a typed payload (or unknown with validation) instead, so incorrect field names and types are caught by type checking.",
+        "native": "low",
+        "consumer": "minor"
+      },
+      {
+        "file": "tests/records.test.ts",
+        "title": "The new listing rejection tests do not exercise an invalid offset, although /records promises a 400 with the offending field. The existing invalid-offset test only calls /records.csv, so a listing-specific regression in query handling could pass. Add /records cases for a negative or non-integer offset and an offset above Number.MAX_SAFE_INTEGER.",
+        "native": "low",
+        "consumer": "minor"
+      }
+    ]
+  },
+  "lowSeverityOnTestFile": [
+    {
+      "file": "tests/records.test.ts",
+      "line": 42,
+      "severity": "minor",
+      "title": "The new pagination tests cover only the listing, while the existing CSV tests never send a valid non-default limit or offset. A regression that accidentally paginates the export would therefore pass: all six seed records fit in the default page. Add an export assertion with a small limit and nonzero offset that still expects the whole filtered set."
+    },
+    {
+      "file": "tests/records.test.ts",
+      "line": 11,
+      "severity": "minor",
+      "title": "This new helper returns any, so TypeScript cannot check the response properties used throughout these tests. Return a typed payload (or unknown with validation) instead, so incorrect field names and types are caught by type checking."
+    },
+    {
+      "file": "tests/records.test.ts",
+      "line": 64,
+      "severity": "minor",
+      "title": "The new listing rejection tests do not exercise an invalid offset, although /records promises a 400 with the offending field. The existing invalid-offset test only calls /records.csv, so a listing-specific regression in query handling could pass. Add /records cases for a negative or non-integer offset and an offset above Number.MAX_SAFE_INTEGER."
+    }
+  ]
+}

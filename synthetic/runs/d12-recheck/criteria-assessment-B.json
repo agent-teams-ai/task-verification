@@ -1,0 +1,167 @@
+{
+  "schema": "d12.criteria-assessment/v1",
+  "label": "B",
+  "generatedAt": "2026-11-22T10:35:50.678Z",
+  "sdk": {
+    "package": "@agent-teams/account-gateway",
+    "version": "0.1.0",
+    "entry": "@agent-teams/account-gateway/llm -> createLlmClient()",
+    "distPath": "D:/Project/agent-teams-ai-task-verification-m2/.isolation-tmp/d12/sdk-src/packages/account-gateway/dist/llm/index.js",
+    "mode": "caller-supplied control + execution ports (SDK encodes, streams and decodes)"
+  },
+  "inputProfile": {
+    "changedPaths": [
+      "README.md",
+      "src/records.ts",
+      "src/router.ts",
+      "tests/records-export.test.ts",
+      "tests/records.test.ts"
+    ],
+    "unchangedPaths": [
+      "package.json",
+      "src/csv.ts",
+      "src/format.ts",
+      "src/store.ts",
+      "tests/csv.test.ts",
+      "tests/format.test.ts",
+      "tests/store.test.ts",
+      "tsconfig.json"
+    ],
+    "instructionsSha256": "1c30edd0f0eecb14e15b7f66e364478400f0fe1fe83a50821ff8e43c07b5422d",
+    "inputSha256": "c3a57dfc287efbf72a575660b09775d797aa988356b39f4deefba622ba3cca36",
+    "head": "980a14cb5ac95cc917acf033dd74dc70e1a246f5"
+  },
+  "requested": {
+    "model": "openai/gpt-6.1-terra",
+    "serviceTier": "default",
+    "effort": "medium",
+    "maxOutputTokens": 4000,
+    "outputMode": "json_schema",
+    "stream": true,
+    "store": false
+  },
+  "result": {
+    "ok": true,
+    "usage": {
+      "inputTokens": 5869,
+      "outputTokens": 603,
+      "cachedInputTokens": 0,
+      "reasoningTokens": 89
+    },
+    "receipt": {
+      "executionRef": "exec_d12-recheck-criteria-B-a1-p",
+      "requestRef": "d12-recheck-criteria-B-a1-r",
+      "accountRef": "openrouter-primary",
+      "authorizationEpoch": 1,
+      "taskId": "d12-recheck-criteria-B",
+      "attempt": 1,
+      "profileId": "synthetic-d12-criteria",
+      "model": "openai/gpt-6.1-terra",
+      "observedModel": "openai/gpt-6.1-terra",
+      "responseId": "gen-1795343745-QRTXhWITrcLbtdN8D2En",
+      "requestSha256": "9d9fb756684b65f48f796a5f86ad2221df93153f9ab950301d2f554465a5b70c",
+      "outputSha256": "545286746e5bc772502fb954cc06167198a26ad6818c190e3f8631ecbd01d78f"
+    },
+    "cleanup": "closed",
+    "value": {
+      "assessments": [
+        {
+          "requirementId": "R1",
+          "status": "satisfied",
+          "evidence": [
+            {
+              "path": "src/router.ts",
+              "reference": "handle: GET /records"
+            },
+            {
+              "path": "src/records.ts",
+              "reference": "parseListQuery, matches, listRecords"
+            },
+            {
+              "path": "tests/records.test.ts",
+              "reference": "status, nameContains, pagination and total tests"
+            }
+          ],
+          "explanation": "The route parses the supported filters and pagination parameters, filters the store, and returns the requested page with the pre-pagination total.",
+          "correction": "No correction needed."
+        },
+        {
+          "requirementId": "R2",
+          "status": "satisfied",
+          "evidence": [
+            {
+              "path": "src/records.ts",
+              "reference": "listRecords and exportRecordsCsv call toUtcIsoString"
+            },
+            {
+              "path": "src/format.ts",
+              "reference": "toUtcIsoString"
+            },
+            {
+              "path": "src/router.ts",
+              "reference": "handle: GET /records and GET /records.csv"
+            }
+          ],
+          "explanation": "Both service responses format record timestamps with the shared helper, which converts valid timestamps to UTC ISO-8601.",
+          "correction": "No correction needed."
+        },
+        {
+          "requirementId": "R3",
+          "status": "satisfied",
+          "evidence": [
+            {
+              "path": "src/router.ts",
+              "reference": "handle: GET /records.csv and csv"
+            },
+            {
+              "path": "src/records.ts",
+              "reference": "matches, CSV_COLUMNS and exportRecordsCsv"
+            },
+            {
+              "path": "src/csv.ts",
+              "reference": "toCsvRow and escapeCsvField"
+            },
+            {
+              "path": "tests/records-export.test.ts",
+              "reference": "CSV headers, filters and escaping tests"
+            }
+          ],
+          "explanation": "The CSV route uses the same filter predicate as listing, exports the whole filtered set, and builds the header and rows through the shared CSV helper.",
+          "correction": "No correction needed."
+        }
+      ]
+    }
+  },
+  "rawText": "{\n  \"assessments\": [\n    {\n      \"requirementId\": \"R1\",\n      \"status\": \"satisfied\",\n      \"evidence\": [\n        {\n          \"path\": \"src/router.ts\",\n          \"reference\": \"handle: GET /records\"\n        },\n        {\n          \"path\": \"src/records.ts\",\n          \"reference\": \"parseListQuery, matches, listRecords\"\n        },\n        {\n          \"path\": \"tests/records.test.ts\",\n          \"reference\": \"status, nameContains, pagination and total tests\"\n        }\n      ],\n      \"explanation\": \"The route parses the supported filters and pagination parameters, filters the store, and returns the requested page with the pre-pagination total.\",\n      \"correction\": \"No correction needed.\"\n    },\n    {\n      \"requirementId\": \"R2\",\n      \"status\": \"satisfied\",\n      \"evidence\": [\n        {\n          \"path\": \"src/records.ts\",\n          \"reference\": \"listRecords and exportRecordsCsv call toUtcIsoString\"\n        },\n        {\n          \"path\": \"src/format.ts\",\n          \"reference\": \"toUtcIsoString\"\n        },\n        {\n          \"path\": \"src/router.ts\",\n          \"reference\": \"handle: GET /records and GET /records.csv\"\n        }\n      ],\n      \"explanation\": \"Both service responses format record timestamps with the shared helper, which converts valid timestamps to UTC ISO-8601.\",\n      \"correction\": \"No correction needed.\"\n    },\n    {\n      \"requirementId\": \"R3\",\n      \"status\": \"satisfied\",\n      \"evidence\": [\n        {\n          \"path\": \"src/router.ts\",\n          \"reference\": \"handle: GET /records.csv and csv\"\n        },\n        {\n          \"path\": \"src/records.ts\",\n          \"reference\": \"matches, CSV_COLUMNS and exportRecordsCsv\"\n        },\n        {\n          \"path\": \"src/csv.ts\",\n          \"reference\": \"toCsvRow and escapeCsvField\"\n        },\n        {\n          \"path\": \"tests/records-export.test.ts\",\n          \"reference\": \"CSV headers, filters and escaping tests\"\n        }\n      ],\n      \"explanation\": \"The CSV route uses the same filter predicate as listing, exports the whole filtered set, and builds the header and rows through the shared CSV helper.\",\n      \"correction\": \"No correction needed.\"\n    }\n  ]\n}",
+  "execution": {
+    "elapsedMs": 8048,
+    "inputBytes": [
+      24239
+    ],
+    "forwardedRequests": 1,
+    "refusals": [],
+    "charged": {
+      "inputTokens": 5869,
+      "outputTokens": 603,
+      "usdConservative": 0.01035125
+    },
+    "observedFromProxy": [
+      {
+        "status": 200,
+        "model": "openai/gpt-6.1-terra",
+        "provider": null
+      }
+    ]
+  },
+  "providerKeyUsage": {
+    "before": "0.2766579",
+    "after": "0.29549555",
+    "delta": 0.01883765
+  },
+  "proxyArgs": {
+    "maxRequests": 1,
+    "maxInputTokens": 40960,
+    "maxOutputTokens": 4000,
+    "requestInputCeilingBytes": 40960
+  }
+}

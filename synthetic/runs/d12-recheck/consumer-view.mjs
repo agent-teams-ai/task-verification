@@ -20,7 +20,8 @@ const syn = path.resolve(dir, "../..");
 const repo = path.join(syn, "repo");
 const VENDOR = "D:/Project/agent-teams-ai-task-verification-m2/vendor/review-router/7a079c382d8e98b426ee90a6b3764be2a21b4c49/src/review-orchestration/infrastructure";
 const BASE = "ce99b0d65d645124413a746ecb137b5497aad80f";
-const HEAD = "23864e3c877f2b34bbbdd90c4527ef46eb19cbd9";
+const HEAD = process.env.HEAD ?? "23864e3c877f2b34bbbdd90c4527ef46eb19cbd9";
+const SUFFIX = process.env.SUFFIX ?? "";
 
 const { parseOcrNativeReviewResult } = await import(pathToFileURL(path.join(VENDOR, "ocr-review-outcome-contract.ts")).href);
 const { normalizeOcrFindings } = await import(pathToFileURL(path.join(VENDOR, "ocr-review-normalization.ts")).href);
@@ -115,5 +116,5 @@ const record = {
         .map((f) => ({ file: f.file, line: f.line, severity: f.severity, title: f.title }))
     : null,
 };
-fs.writeFileSync(path.join(dir, "consumer-view.json"), `${JSON.stringify(record, null, 2)}\n`);
+fs.writeFileSync(path.join(dir, `consumer-view${SUFFIX}.json`), `${JSON.stringify(record, null, 2)}\n`);
 console.log(JSON.stringify(record, null, 2));

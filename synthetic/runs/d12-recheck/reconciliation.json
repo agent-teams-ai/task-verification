@@ -1,0 +1,183 @@
+{
+  "schema": "d12.usage-reconciliation/v1",
+  "operator": "model-free; reads retained ledgers and assessment records only",
+  "prices": {
+    "inputPerM": 1,
+    "cacheReadPerM": 0.05,
+    "cacheWritePerM": 1.25,
+    "outputPerM": 5,
+    "longPromptOverridePerM": {
+      "input": 2,
+      "output": 7.5
+    }
+  },
+  "ceilingUsd": 1,
+  "providerAuthoritative": {
+    "baselineBeforeRecheck": 0.09085455,
+    "finalUsage": 0.30584605,
+    "keyLimitUsd": 5,
+    "keyLimitRemainingUsd": 4.69415395,
+    "note": "Baseline is the reported authoritative spend before the recheck. The final value is the provider /key usage read after the last request; provider settlement lags, so per-call before/after deltas can be incomplete."
+  },
+  "stages": [
+    {
+      "name": "initial-ocr-attempt1",
+      "kind": "ocr",
+      "note": "frozen initial attempt; refused at the then-current byte ceiling and re-run with a verified revised bound",
+      "forwarded": 3,
+      "refused": 1,
+      "refusedCodes": [
+        "proxy_input_ceiling_exceeded"
+      ],
+      "inputTokens": 12491,
+      "outputTokens": 1222,
+      "conservativeUsd": 0.02172375,
+      "maxInputBytes": 29450
+    },
+    {
+      "name": "initial-ocr",
+      "kind": "ocr",
+      "note": "frozen initial OCR that produced the original findings (delivered rule document did not carry the policy)",
+      "forwarded": 10,
+      "refused": 0,
+      "refusedCodes": [],
+      "inputTokens": 70346,
+      "outputTokens": 3116,
+      "conservativeUsd": 0.1035125,
+      "maxInputBytes": 62517
+    },
+    {
+      "name": "initial-criteria",
+      "kind": "criteria",
+      "note": "frozen independent Criteria Assessment Profile B on Candidate A",
+      "forwarded": 1,
+      "refused": 0,
+      "refusedCodes": [],
+      "inputTokens": 4312,
+      "outputTokens": 578,
+      "conservativeUsd": 0.00828,
+      "maxInputBytes": 18194,
+      "verdicts": [
+        "R1:satisfied",
+        "R2:satisfied",
+        "R3:violated"
+      ]
+    },
+    {
+      "name": "recheck-ocr-A",
+      "kind": "ocr",
+      "note": "corrected-development-regression: corrected rule delivery, Candidate A",
+      "forwarded": 10,
+      "refused": 0,
+      "refusedCodes": [],
+      "inputTokens": 76591,
+      "outputTokens": 2729,
+      "conservativeUsd": 0.10938375,
+      "maxInputBytes": 64768
+    },
+    {
+      "name": "recheck-ocr-B-attempt1",
+      "kind": "ocr",
+      "note": "Candidate B; refused mid-run at the frozen 65,536-byte request bound; incomplete, not used as evidence",
+      "forwarded": 6,
+      "refused": 1,
+      "refusedCodes": [
+        "proxy_input_ceiling_exceeded"
+      ],
+      "inputTokens": 47553,
+      "outputTokens": 2751,
+      "conservativeUsd": 0.07319625,
+      "maxInputBytes": 62743
+    },
+    {
+      "name": "recheck-ocr-B-attempt2",
+      "kind": "ocr",
+      "note": "Candidate B; refused again at the frozen bound; incomplete, not used as evidence",
+      "forwarded": 5,
+      "refused": 1,
+      "refusedCodes": [
+        "proxy_input_ceiling_exceeded"
+      ],
+      "inputTokens": 38314,
+      "outputTokens": 2683,
+      "conservativeUsd": 0.0613075,
+      "maxInputBytes": 63956
+    },
+    {
+      "name": "recheck-ocr-B-revised",
+      "kind": "ocr",
+      "note": "Candidate B; verified revised bound 131,072 B / 262,144-24,000 stage tokens; complete",
+      "forwarded": 13,
+      "refused": 0,
+      "refusedCodes": [],
+      "inputTokens": 113172,
+      "outputTokens": 3904,
+      "conservativeUsd": 0.160985,
+      "maxInputBytes": 74631
+    },
+    {
+      "name": "recheck-criteria-B",
+      "kind": "criteria",
+      "note": "independent Criteria Assessment Profile B re-run on Candidate B",
+      "forwarded": 1,
+      "refused": 0,
+      "refusedCodes": [],
+      "inputTokens": 5869,
+      "outputTokens": 603,
+      "conservativeUsd": 0.01035125,
+      "maxInputBytes": 24239,
+      "providerDelta": 0.01883765,
+      "verdicts": [
+        "R1:satisfied",
+        "R2:satisfied",
+        "R3:satisfied"
+      ]
+    },
+    {
+      "name": "diagnostic-criteria-C",
+      "kind": "criteria",
+      "note": "Diagnostic A: disconnected-behaviour variant C, same Profile B input profile",
+      "forwarded": 1,
+      "refused": 0,
+      "refusedCodes": [],
+      "inputTokens": 5900,
+      "outputTokens": 635,
+      "conservativeUsd": 0.01055,
+      "maxInputBytes": 24389,
+      "providerDelta": 0,
+      "verdicts": [
+        "R1:satisfied",
+        "R2:satisfied",
+        "R3:violated"
+      ]
+    }
+  ],
+  "offlinePreflights": [
+    {
+      "name": "initial-offline-preflight",
+      "requests": 7,
+      "billable": false
+    },
+    {
+      "name": "recheck-A-offline-preflight",
+      "requests": 7,
+      "billable": false
+    }
+  ],
+  "totals": {
+    "forwarded": 50,
+    "refused": 3,
+    "inputTokens": 374548,
+    "outputTokens": 18221,
+    "conservativeUsd": 0.55929
+  },
+  "remaining": {
+    "conservativeUsd": 0.44071,
+    "providerAuthoritativeUsd": 0.69415395
+  },
+  "requestCount": {
+    "providerForwarded": 50,
+    "providerRefused": 3,
+    "offlineModelFree": 14
+  }
+}

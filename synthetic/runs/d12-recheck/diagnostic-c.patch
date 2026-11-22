@@ -1,0 +1,16 @@
+diff --git a/src/router.ts b/src/router.ts
+index 5a42ff2..8f7616d 100644
+--- a/src/router.ts
++++ b/src/router.ts
+@@ -46,7 +46,10 @@ export function handle(request: Request): Response {
+ 
+   if (request.method === "GET" && request.path === "/records.csv") {
+     try {
+-      return csv(200, exportRecordsCsv(parseListQuery(request.query)));
++      // Validate the caller's query first so malformed parameters are rejected
++      // exactly like the listing route.
++      parseListQuery(request.query);
++      return csv(200, exportRecordsCsv(parseListQuery({})));
+     } catch (error) {
+       if (error instanceof QueryError) {
+         return json(400, { error: error.message, field: error.field });

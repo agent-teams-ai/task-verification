@@ -1,0 +1,134 @@
+{
+  "schema": "d12.corrected-ocr-stage/v1",
+  "label": "B",
+  "mode": "live",
+  "comparator": "QUALIFIED 1.14.0-rr.1 DEVELOPMENT OCR CANDIDATE",
+  "ruleDocumentSha256": "b3f14056c29c3587b03be3880abc063caec6d1e12f4a2f4964c5e8b6e4a6b0a5",
+  "backgroundSha256": "3a30c39547061f016c62d8f9093147b02d26ec545a9731df60638b1afcc87fee",
+  "exitCode": 1,
+  "requests": {
+    "forwarded": 5,
+    "refused": 1
+  },
+  "refusals": [
+    {
+      "code": "proxy_input_ceiling_exceeded",
+      "inputBytes": 69877,
+      "ceiling": 65536
+    }
+  ],
+  "inputBytes": [
+    1503,
+    27762,
+    32542,
+    48820,
+    63956
+  ],
+  "maxInputBytes": 63956,
+  "ceilings": {
+    "requestInputBytes": 65536,
+    "stageInputTokens": 180000,
+    "stageOutputTokens": 24000,
+    "requestOutputTokens": 4000
+  },
+  "requested": {
+    "model": "openai/gpt-6.1-terra",
+    "serviceTier": "default",
+    "effort": "medium"
+  },
+  "observed": [
+    {
+      "status": 200,
+      "model": "openai/gpt-6.1-terra",
+      "provider": null,
+      "usagePresent": true
+    },
+    {
+      "status": 200,
+      "model": "openai/gpt-6.1-terra",
+      "provider": null,
+      "usagePresent": true
+    },
+    {
+      "status": 200,
+      "model": "openai/gpt-6.1-terra",
+      "provider": null,
+      "usagePresent": true
+    },
+    {
+      "status": 200,
+      "model": "openai/gpt-6.1-terra",
+      "provider": null,
+      "usagePresent": true
+    },
+    {
+      "status": 200,
+      "model": "openai/gpt-6.1-terra",
+      "provider": null,
+      "usagePresent": true
+    }
+  ],
+  "usage": {
+    "inputTokens": 38314,
+    "outputTokens": 2683
+  },
+  "chargedUsdConservative": 0.0613075,
+  "stageWorstCaseUsd": 0.345,
+  "providerKeyUsage": {
+    "before": "0.1800612",
+    "after": "0.18415375",
+    "delta": 0.00409255
+  },
+  "halted": null,
+  "result": {
+    "status": "failed",
+    "terminal": "failed",
+    "comments": 2,
+    "outcome": {
+      "schema_version": "reviewrouter.ocr-outcome/v1",
+      "run_stop_cause": null,
+      "grouping": {
+        "state": "completed",
+        "reason": null
+      },
+      "groups": [
+        {
+          "paths": [
+            "README.md",
+            "src/records.ts",
+            "src/router.ts",
+            "tests/records.test.ts"
+          ],
+          "main_completed": false,
+          "stop_cause": "provider_error",
+          "rounds": {
+            "configured": 2,
+            "started": 1,
+            "completed": 0
+          },
+          "phases": {
+            "plan": {
+              "state": "completed",
+              "reason": null
+            },
+            "compression": {
+              "state": "not_applicable",
+              "reason": "no_zone"
+            },
+            "relocation": {
+              "state": "not_applicable",
+              "reason": "no_candidates"
+            },
+            "filter": {
+              "state": "cancelled",
+              "reason": "not_dispatched"
+            }
+          },
+          "filter_decision_valid": null
+        }
+      ]
+    }
+  },
+  "resultPath": "ocr-result-B-live.json",
+  "ledger": "/run/ledger-ocr-B-live.jsonl"
+}
