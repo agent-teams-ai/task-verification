@@ -1,19 +1,15 @@
 {
   "schema": "d12.freeze/v1",
-  "frozenAt": "2026-11-22T10:40:31.743Z",
-  "rule": "reports and reviewer outputs frozen before any hidden-evaluator material was consulted",
+  "frozenAt": "2026-11-22T10:41:13.756Z",
+  "rule": "reports and reviewer outputs frozen before any hidden-evaluator material was consulted; this manifest excludes itself",
   "hiddenEvaluatorConsulted": false,
-  "experimentalHead": "f77e8002572cb5d343b42da4bcf0e0ef85b82859",
+  "experimentalHead": "896c4d420712e766cdc40c1803072ef8f994d327",
   "candidates": {
     "A": "23864e3c877f2b34bbbdd90c4527ef46eb19cbd9",
     "B": "980a14cb5ac95cc917acf033dd74dc70e1a246f5",
     "C": "ec3240d74dc0a7114364b4204cc78f26100f3f8e"
   },
   "files": {
-    "FREEZE.json": {
-      "bytes": 9328,
-      "sha256": "db30eb2ea19ec9d7bfd563fec528bd4eeaff47f61282d403e724da1a10664643"
-    },
     "REPORT-d12-decision.md": {
       "bytes": 22160,
       "sha256": "612b8ed5014f9e7fcadbc1464424608b5c30ddf45131a3b7b2b8200256aa7093"
