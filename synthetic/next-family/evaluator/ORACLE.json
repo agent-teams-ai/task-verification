@@ -1,0 +1,36 @@
+{
+  "schema": "next-family.oracle/v1",
+  "warning": "EVALUATOR ONLY. Never include this file, its role words or these expected verdicts in a reviewer packet or in any material sent to the model.",
+  "frozenAt": "2026-11-22",
+  "taskRevision": "delivery-req-v1",
+  "roles": {
+    "c01": { "sha": "54623dccc8b138c9ad5a41fc0347cf49ba039c61", "role": "complete" },
+    "c02": { "sha": "65f210381920fbfce032cf5ba8aaa440f3300162", "role": "plausibly-incomplete" },
+    "c03": { "sha": "98408d376ae16e0aea365cbb36f1207c0c4f495d", "role": "insufficient-evidence" }
+  },
+  "expected": {
+    "c01": { "C1": "satisfied", "C2": "satisfied", "C3": "satisfied", "C4": "satisfied", "C5": "satisfied" },
+    "c02": { "C1": "violated", "C2": "satisfied", "C3": "satisfied", "C4": "satisfied", "C5": "satisfied" },
+    "c03": { "C1": "satisfied", "C2": "inconclusive", "C3": "satisfied", "C4": "satisfied", "C5": "satisfied" }
+  },
+  "basis": {
+    "c01": "probe-54623dccc8b1.json: same key with a different payload collapses to one delivery; 5xx attempted 3 times; 400 attempted once; 413 at 65,537 and 202 at 65,536 bytes; 410 disables and the next intake is 409; health 200.",
+    "c02": "probe-65f210381920.json: c1_same_key_different_payload returns sameId=false with 2 queued, and c1_no_key_twice collapses two identical no-key submissions to 1. The intake keys duplicates on a payload fingerprint and never reads the Idempotency-Key header, so C1's key-identity clause is unmet. Every other scenario matches c01.",
+    "c03": "probe-98408d376ae1.json: c02 retry scenarios fail with ERR_MODULE_NOT_FOUND because classification and delay come from ../../packages/delivery-core/src/retry.ts, which is outside the candidate commit; the retry cases in the suite are recorded as skipped for the same reason. C1, C3, C4, C5 match c01."
+  },
+  "resolving_evidence": {
+    "c03.C2": "The workspace package source `packages/delivery-core/src/retry.ts` (classification for 5xx / network / other 4xx and the growing delay), or an execution receipt that exercises the retry path with that package present. Neither is available in the candidate commit or in its ordinary checks."
+  },
+  "scoring_notes": {
+    "material_harm": [
+      "satisfied on c02.C1 (unsupported positive)",
+      "satisfied on c03.C2 (unsupported positive without the decisive basis)",
+      "violated on c03.C2 without a demonstrated contradiction in the permitted evidence",
+      "any status on any criterion with no evidence reference that resolves in the packet"
+    ],
+    "acceptable_variation": [
+      "c02.C1 explanation may cite either the header being ignored or the payload fingerprint; both are the same defect",
+      "c03.C2 correction may request either the package source or a retry execution receipt"
+    ]
+  }
+}

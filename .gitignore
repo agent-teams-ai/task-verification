@@ -12,5 +12,6 @@ dist/
 # M2-A generated evidence (regenerated deterministically; results documented in docs/)
 .oracle-receipts/
 
-# Experiment branch: the synthetic fixture repository is its own Git repository.
+# Experiment branch: the synthetic fixture repositories are their own Git repositories.
 /synthetic/repo/
+/synthetic/next-family/repo/

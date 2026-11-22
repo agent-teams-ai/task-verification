@@ -1,0 +1,2 @@
+proxy listening on http://127.0.0.1:8788
+proxy stage=d12-recheck-criteria-C requests=1 tokens=40960/4000 per-request=40960/4000 input-enforcement=bytes model=openai/gpt-6.1-terra tier=default effort=medium ledger=D:\Project\agent-teams-ai-task-verification-m2-synthetic\synthetic\runs\d12-recheck\ledger-criteria-C.jsonl

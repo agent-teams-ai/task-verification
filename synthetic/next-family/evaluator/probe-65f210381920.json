@@ -1,0 +1,86 @@
+{
+  "checkout": "D:\\Project\\agent-teams-ai-task-verification-m2\\.isolation-tmp\\d3\\wt\\q",
+  "scenarios": {
+    "c1_same_key_same_payload": {
+      "ok": true,
+      "observed": {
+        "sameId": true,
+        "duplicate": true,
+        "queued": 1
+      }
+    },
+    "c1_same_key_different_payload": {
+      "ok": true,
+      "observed": {
+        "sameId": false,
+        "queued": 2
+      }
+    },
+    "c1_no_key_twice": {
+      "ok": true,
+      "observed": {
+        "queued": 1
+      }
+    },
+    "c2_persistent_5xx": {
+      "ok": true,
+      "observed": {
+        "targetCalls": 3,
+        "attempts": 3,
+        "state": "failed"
+      }
+    },
+    "c2_400_is_final": {
+      "ok": true,
+      "observed": {
+        "targetCalls": 1,
+        "state": "failed"
+      }
+    },
+    "c2_network_error_then_ok": {
+      "ok": true,
+      "observed": {
+        "targetCalls": 2,
+        "state": "delivered"
+      }
+    },
+    "c3_over_limit": {
+      "ok": true,
+      "observed": {
+        "status": 413,
+        "queued": 0
+      }
+    },
+    "c3_at_limit": {
+      "ok": true,
+      "observed": {
+        "status": 202,
+        "queued": 1
+      }
+    },
+    "c4_410_disables": {
+      "ok": true,
+      "observed": {
+        "subscriptionStatus": "disabled",
+        "state": "failed",
+        "attempts": 1
+      }
+    },
+    "c4_disabled_intake": {
+      "ok": true,
+      "observed": {
+        "status": 409,
+        "queued": 0
+      }
+    },
+    "c5_health": {
+      "ok": true,
+      "observed": {
+        "status": 200,
+        "body": {
+          "status": "ok"
+        }
+      }
+    }
+  }
+}

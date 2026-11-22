@@ -1,0 +1,6 @@
+[ocr] --background-file content is 2605 characters, exceeding the recommended 2000 (continuing but review quality might be impacted)
+[ocr]   ✘ file_read failed: SIDE: old
+REVISION: ce99b0d65d645124413a746ecb137b5497aad80f
+file "tests/records-export.test.ts" not found: git show ce99b0d65d645124413a746ecb137b5497aad80f:tests/records-export.test.ts: exit status 128: fatal: path 'tests/records-export.test.ts' exists on disk, but not in 'ce99b0d65d645124413a746ecb137b5497aad80f'
+
+[ocr] Results written to /run/ocr-result-B-live-revised.json

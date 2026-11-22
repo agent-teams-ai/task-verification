@@ -1,0 +1,48 @@
+[ocr] --background-file content is 2605 characters, exceeding the recommended 2000 (continuing but review quality might be impacted)
+[ocr]   ✘ file_read failed: SIDE: old
+REVISION: ce99b0d65d645124413a746ecb137b5497aad80f
+file "tests/records-export.test.ts" not found: git show ce99b0d65d645124413a746ecb137b5497aad80f:tests/records-export.test.ts: exit status 128: fatal: path 'tests/records-export.test.ts' exists on disk, but not in 'ce99b0d65d645124413a746ecb137b5497aad80f'
+
+[ocr] Results written to /run/ocr-result-B-live.json
+{
+  "status": "failed",
+  "llm": {
+    "provider": "reviewrouter",
+    "model": "openai/gpt-6.1-terra"
+  },
+  "summary": {
+    "files_reviewed": 4,
+    "comments": 0,
+    "total_tokens": 40997,
+    "input_tokens": 38314,
+    "output_tokens": 2683,
+    "cache_read_tokens": 19649,
+    "elapsed": "43s"
+  },
+  "tool_calls": {
+    "total": 16,
+    "by_tool": {
+      "code_comment": 1,
+      "code_search": 1,
+      "file_find": 2,
+      "file_read": 12
+    },
+    "failure": 1,
+    "failure_by_tool": {
+      "file_read": 1
+    },
+    "failure_details": [
+      {
+        "tool_call_number": 14,
+        "tool_name": "file_read",
+        "file_path": "README.md,src/records.ts,src/router.ts,tests/records.test.ts",
+        "arguments": "{\"file_path\": \"tests/records-export.test.ts\", \"side\": \"old\"}",
+        "error": "SIDE: old\nREVISION: ce99b0d65d645124413a746ecb137b5497aad80f\nfile \"tests/records-export.test.ts\" not found: git show ce99b0d65d645124413a746ecb137b5497aad80f:tests/records-export.test.ts: exit status 128: fatal: path 'tests/records-export.test.ts' exists on disk, but not in 'ce99b0d65d645124413a746ecb137b5497aad80f'\n"
+      }
+    ]
+  },
+  "comments": null,
+  "session_id": "68e3966d-6da1-4de2-b367-ddb67baad05b"
+}
+[ocr] Session: 68e3966d-6da1-4de2-b367-ddb67baad05b (retry with: --resume 68e3966d-6da1-4de2-b367-ddb67baad05b)
+Error: review failed: 4 of 4 selected item(s) failed
