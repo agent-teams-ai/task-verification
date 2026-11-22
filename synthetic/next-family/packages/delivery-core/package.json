@@ -1,0 +1,10 @@
+{
+  "name": "@fixture/delivery-core",
+  "version": "0.3.0",
+  "private": true,
+  "type": "module",
+  "description": "Shared delivery workspace package: retry classification and backoff for notification delivery.",
+  "exports": {
+    "./retry": "./src/retry.ts"
+  }
+}

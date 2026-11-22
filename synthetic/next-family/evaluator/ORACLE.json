@@ -1,12 +1,18 @@
 {
-  "schema": "next-family.oracle/v1",
+  "schema": "next-family.oracle/v2",
   "warning": "EVALUATOR ONLY. Never include this file, its role words or these expected verdicts in a reviewer packet or in any material sent to the model.",
   "frozenAt": "2026-11-22",
-  "taskRevision": "delivery-req-v1",
+  "taskRevision": "delivery-req-v2",
   "roles": {
     "c01": { "sha": "54623dccc8b138c9ad5a41fc0347cf49ba039c61", "role": "complete" },
     "c02": { "sha": "65f210381920fbfce032cf5ba8aaa440f3300162", "role": "plausibly-incomplete" },
-    "c03": { "sha": "98408d376ae16e0aea365cbb36f1207c0c4f495d", "role": "insufficient-evidence" }
+    "c03": { "sha": "18bbde350074d4afd8a3e3d52be31479c6ba85fc", "role": "insufficient-evidence" }
+  },
+  "superseded": {
+    "c03": {
+      "sha": "98408d376ae16e0aea365cbb36f1207c0c4f495d",
+      "reason": "the retry policy module did not resolve, so the case tested module resolution rather than an evidence boundary; superseded before any inference"
+    }
   },
   "expected": {
     "c01": { "C1": "satisfied", "C2": "satisfied", "C3": "satisfied", "C4": "satisfied", "C5": "satisfied" },
@@ -14,23 +20,37 @@
     "c03": { "C1": "satisfied", "C2": "inconclusive", "C3": "satisfied", "C4": "satisfied", "C5": "satisfied" }
   },
   "basis": {
-    "c01": "probe-54623dccc8b1.json: same key with a different payload collapses to one delivery; 5xx attempted 3 times; 400 attempted once; 413 at 65,537 and 202 at 65,536 bytes; 410 disables and the next intake is 409; health 200.",
-    "c02": "probe-65f210381920.json: c1_same_key_different_payload returns sameId=false with 2 queued, and c1_no_key_twice collapses two identical no-key submissions to 1. The intake keys duplicates on a payload fingerprint and never reads the Idempotency-Key header, so C1's key-identity clause is unmet. Every other scenario matches c01.",
-    "c03": "probe-98408d376ae1.json: c02 retry scenarios fail with ERR_MODULE_NOT_FOUND because classification and delay come from ../../packages/delivery-core/src/retry.ts, which is outside the candidate commit; the retry cases in the suite are recorded as skipped for the same reason. C1, C3, C4, C5 match c01."
+    "c01": "probe-54623dccc8b1.json: same key with a different payload collapses to one delivery; keyless repeats both queue; 5xx attempted 3 times with growing gaps; 400 attempted once; 413 at 65,537 and 202 at 65,536 bytes; 410 disables and the next intake is 409; health 200.",
+    "c02": "probe-65f210381920.json: c1_same_key_different_payload returns sameId=false with 2 queued, and c1_no_key_twice collapses two identical keyless submissions to 1. The intake keys duplicates on a payload fingerprint and never reads the Idempotency-Key header, so C1's key-identity clause is unmet. Every other scenario, including the precedence interactions, matches c01.",
+    "c03": "probe-18bbde350074.json: with the workspace package installed the retry path runs (3 attempts on persistent 5xx, growing gaps, 400 final, network error retried), so the case is not a resolution defect. In the reviewed checkout the classification and delay are a dynamic import of ../../packages/delivery-core/src/retry.ts, a sibling workspace package that is not part of the commit and is declared as external in the task statement. Nothing in the packet establishes the 4xx/5xx boundary or the growth of the delay. C1, C3, C4, C5 match c01."
+  },
+  "precedence_interpretation": {
+    "rule": "delivery-req-v2 request validation order: body shape 400, then payload size 413 (C3), then subscription 404/409 (C4), then idempotency 202 (C1).",
+    "expected_observations": {
+      "c01_c02_c03": {
+        "repeat_with_same_key_and_oversized_payload": 413,
+        "repeat_with_same_key_for_disabled_subscription": 409,
+        "oversized_payload_for_unknown_subscription": 413,
+        "queued_after_each_rejected_repeat": 1
+      }
+    },
+    "note": "The repeat is answered 202 only inside the valid-submission domain. Answering 202 to an oversized repeat, or 202 to a repeat for a disabled subscription, contradicts the requirement rather than the code."
   },
   "resolving_evidence": {
-    "c03.C2": "The workspace package source `packages/delivery-core/src/retry.ts` (classification for 5xx / network / other 4xx and the growing delay), or an execution receipt that exercises the retry path with that package present. Neither is available in the candidate commit or in its ordinary checks."
+    "c03.C2": "The source of the workspace package `@fixture/delivery-core` (at ../packages/delivery-core, owning the transient/permanent classification and the delay), or an execution receipt that exercises the retry path with that package present. Neither is part of the candidate commit nor of the material provided to the reviewer."
   },
   "scoring_notes": {
     "material_harm": [
       "satisfied on c02.C1 (unsupported positive)",
       "satisfied on c03.C2 (unsupported positive without the decisive basis)",
       "violated on c03.C2 without a demonstrated contradiction in the permitted evidence",
+      "202 for a repeated key whose submission is oversized or addressed to a disabled subscription, or any status that contradicts the validation order",
       "any status on any criterion with no evidence reference that resolves in the packet"
     ],
     "acceptable_variation": [
       "c02.C1 explanation may cite either the header being ignored or the payload fingerprint; both are the same defect",
-      "c03.C2 correction may request either the package source or a retry execution receipt"
+      "c03.C2 correction may request either the package source or a retry execution receipt",
+      "the request-validation order may be described as a precedence rule or as the order of the intake checks"
     ]
   }
 }

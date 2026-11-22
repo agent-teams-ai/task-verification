@@ -1,0 +1,69 @@
+{
+  "schema": "next-family.checks/v2",
+  "generatedAt": "2026-11-22T21:12:29.114Z",
+  "candidates": {
+    "c01": {
+      "head": "54623dccc8b138c9ad5a41fc0347cf49ba039c61",
+      "packet": {
+        "bytes": 23220,
+        "sha256": "2c607491fd99d9aa12595e511d8196eb510dcf0bfa18b5c56d502d6a04f40f43"
+      },
+      "suite": {
+        "status": 0,
+        "counts": {
+          "tests": 17,
+          "pass": 17,
+          "fail": 0,
+          "skipped": 0
+        },
+        "receipt": "raw-54623dccc8b1.txt"
+      },
+      "probe": {
+        "receipt": "probe-54623dccc8b1.json",
+        "sha256": "1890f608a25a225261783ad3f347294fb6abfd8b125bc143dd5b171d587ecf9e"
+      }
+    },
+    "c02": {
+      "head": "65f210381920fbfce032cf5ba8aaa440f3300162",
+      "packet": {
+        "bytes": 23093,
+        "sha256": "d38c0af7cc82077a4d2787f7c5e02ca490b2235ef195a0c7b232c1d488093bfc"
+      },
+      "suite": {
+        "status": 0,
+        "counts": {
+          "tests": 16,
+          "pass": 16,
+          "fail": 0,
+          "skipped": 0
+        },
+        "receipt": "raw-65f210381920.txt"
+      },
+      "probe": {
+        "receipt": "probe-65f210381920.json",
+        "sha256": "0ab8ed88f8cb0dc3d45f57551b8688e6540603f55236e6612af6681df5796cd9"
+      }
+    },
+    "c03": {
+      "head": "18bbde350074d4afd8a3e3d52be31479c6ba85fc",
+      "packet": {
+        "bytes": 23743,
+        "sha256": "89e4be23879acb67e337ab08407cdc17ab83fa34bc31ce92cbcb2424f92d8641"
+      },
+      "suite": {
+        "status": 0,
+        "counts": {
+          "tests": 17,
+          "pass": 17,
+          "fail": 0,
+          "skipped": 0
+        },
+        "receipt": "raw-18bbde350074.txt"
+      },
+      "probe": {
+        "receipt": "probe-18bbde350074.json",
+        "sha256": "f7680880ca98930b3b6d69de6fc4bca3c054ad31a8e64bab352fac647b73fd10"
+      }
+    }
+  }
+}

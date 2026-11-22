@@ -1,97 +1,245 @@
-// Criteria Assessment for the next-family batch, through the pinned Gateway SDK `/llm` path.
+// Criteria Assessment for the next-family batch, through the pinned Gateway SDK
+// `/llm` path and the bounded proxy.
 //
-//   node criteria-next.mjs c01
+//   node synthetic/next-family/criteria-next.mjs c01 --dry-run
+//   node synthetic/next-family/criteria-next.mjs c01
+//   node synthetic/next-family/criteria-next.mjs c02 --stage criteria-correction --corrects <attemptId>
 //
-// The same SDK entry (`createLlmClient()`), the same instructions text, the same JSON schema shape,
-// the same model, the same requested service tier and reasoning effort as the frozen D1/D2 profile.
-// The only differences are the requirement ids, the packet content and the head identity.
+// Corrections in D3-R1, each traceable to a maintainer finding:
 //
-// The input is the frozen packet produced by prepare.mjs; this script does not select files itself.
-// One attempt, no retry, no fallback. The bounded proxy holds the credential and enforces the
-// request, byte and token ceilings. Nothing here runs during offline preparation.
-import { execFileSync, spawn } from "node:child_process";
+// 1. The proxy is resolved module-relative from `lib/paths.mjs`, never from the
+//    working directory or a repository-root `tooling/` guess.
+// 2. The admitted body is the *serialized* SDK request, measured offline through
+//    `createLlmClient()` with a fake port; the byte ceiling and the token ceiling
+//    are separate numbers and both are passed to the proxy.
+// 3. Model, service tier, reasoning effort, output ceiling and provider identity
+//    are enforced at the proxy; a mismatch halts and the reply is withheld.
+// 4. Every attempt is a new append-only record with a unique id. Nothing is
+//    deleted, no ledger is truncated and no earlier output is overwritten; a
+//    duplicate run key is refused outright.
+// 5. The aggregate budget guard reserves the admitted maximum before forwarding
+//    and settles it against reported usage afterwards.
+//
+// The input is the frozen packet produced by prepare.mjs; this script selects no
+// files itself. One attempt, no retry, no fallback, no model or provider switch.
 import crypto from "node:crypto";
 import fs from "node:fs";
+import net from "node:net";
 import path from "node:path";
-import { createRequire } from "node:module";
 import { pathToFileURL } from "node:url";
 
-const require = createRequire(import.meta.url);
-const HERE = path.dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, "$1"));
-const SYN = path.resolve(HERE, "../..");
-const PROXY = path.join(SYN, "tooling", "openrouter-bounded-proxy.mjs");
-const SDK_DIST =
-  "D:/Project/agent-teams-ai-task-verification-m2/.isolation-tmp/d12/sdk-src/packages/account-gateway/dist/llm/index.js";
-const PORT = Number(process.env.CRITERIA_PORT ?? 8791);
-const MODEL = "openai/gpt-6.1-terra";
+import { FAMILY_ROOT, RESEARCH_ROOT, SDK_LLM_DIST, proxyPath } from "./lib/paths.mjs";
+import { INSTRUCTIONS, PROFILE, buildTask, loadFamily, loadPacket, profileDigest, sha256 } from "./lib/task.mjs";
+import { measureSerializedRequest } from "./lib/measure.mjs";
+import {
+  CRITERIA_REQUEST_MAX_USD,
+  INPUT_BODY_BYTES,
+  INPUT_TOKEN_CEILING,
+  MAX_OUTPUT_TOKENS,
+  criteriaProxyArgs,
+} from "./lib/limits.mjs";
+import { attemptDir, createAttempt, finishAttempt, findDuplicate, isTerminal, newAttemptId, runKey, writeRawResponse } from "./lib/attempt.mjs";
+import { reserve, settle, verifyHistorical, availableUsd, committedUsd, readState, totals } from "./lib/budget.mjs";
 
-const CRITERIA = ["C1", "C2", "C3", "C4", "C5"];
+const STAGES = new Set(["criteria", "criteria-correction"]);
 
-const MAX_IN = Number(process.env.CRITERIA_MAX_INPUT_TOKENS ?? 12000);
-const MAX_OUT = Number(process.env.CRITERIA_MAX_OUTPUT_TOKENS ?? 2000);
-
-const id = process.argv[2];
-const family = JSON.parse(fs.readFileSync(path.join(HERE, "family.json"), "utf8"));
-const head = family.candidates[id];
-if (!head) {
-  console.error(`usage: node criteria-next.mjs ${Object.keys(family.candidates).join("|")}`);
-  process.exit(2);
+function parseArgs(argv) {
+  const out = { positional: [] };
+  for (let i = 0; i < argv.length; i += 1) {
+    const token = argv[i];
+    if (!token.startsWith("--")) {
+      out.positional.push(token);
+      continue;
+    }
+    const key = token.slice(2);
+    const next = argv[i + 1];
+    if (next === undefined || next.startsWith("--")) out[key] = true;
+    else {
+      out[key] = next;
+      i += 1;
+    }
+  }
+  return out;
 }
 
-const short = head.slice(0, 12);
-const packetPath = path.join(HERE, "packets", `packet-${short}.md`);
-const packetManifest = JSON.parse(fs.readFileSync(path.join(HERE, "packets", `packet-${short}.json`), "utf8"));
-const input = fs.readFileSync(packetPath, "utf8");
-const sha256 = (v) => crypto.createHash("sha256").update(v).digest("hex");
-if (sha256(input) !== packetManifest.packet.sha256) {
-  console.error("FATAL: packet digest does not match its frozen manifest");
-  process.exit(2);
+const args = parseArgs(process.argv.slice(2));
+const candidateId = args.positional[0];
+const stageId = typeof args.stage === "string" ? args.stage : "criteria";
+const dryRun = Boolean(args["dry-run"]);
+
+const fail = (code, message, exitCode = 3) => {
+  process.stderr.write(`${code}: ${message}\n`);
+  process.exit(exitCode);
+};
+
+if (typeof candidateId !== "string") fail("usage", "node criteria-next.mjs <c01|c02|c03> [--stage criteria]", 2);
+if (!STAGES.has(stageId)) fail("usage", `--stage must be one of ${[...STAGES].join(", ")}`, 2);
+if (!fs.existsSync(SDK_LLM_DIST)) fail("sdk_missing", `the pinned SDK entry is absent: ${SDK_LLM_DIST}`);
+
+const family = loadFamily(FAMILY_ROOT);
+const packet = loadPacket(candidateId, family);
+const digest = profileDigest();
+const task = buildTask({
+  candidateId,
+  stageId: stageId === "criteria-correction" ? "criteria-correction" : "criteria",
+  packetText: packet.text,
+  maxOutputTokens: MAX_OUTPUT_TOKENS,
+});
+
+// ---- offline measurement of the exact serialized request --------------------
+const measured = await measureSerializedRequest(task);
+if (!measured.inputTextMatchesPacket) fail("packet_mismatch", "the serialized request does not carry the frozen packet verbatim");
+if (!measured.schemaMatchesFrozen) fail("schema_mismatch", "the serialized request does not carry the frozen schema");
+if (measured.bodyBytes > INPUT_BODY_BYTES) {
+  fail(
+    "input_ceiling_exceeded",
+    `serialized body is ${measured.bodyBytes} bytes, above the ${INPUT_BODY_BYTES}-byte admitted ceiling; the packet is not truncated and nothing is dispatched`,
+    4,
+  );
+}
+
+const key = runKey({
+  candidateId,
+  stageId,
+  packetSha256: packet.sha256,
+  profileDigest: digest,
+  bodySha256: measured.bodySha256,
+});
+const duplicate = findDuplicate(key);
+const history = verifyHistorical(RESEARCH_ROOT);
+const guardState = readState();
+const guardTotals = totals(guardState);
+
+const preview = {
+  schema: "next-family.criteria-admission/v1",
+  candidateId,
+  head: packet.head,
+  stageId,
+  profile: PROFILE,
+  profileDigest: digest,
+  runKey: key,
+  packet: { bytes: packet.bytes, sha256: packet.sha256 },
+  serializedBody: {
+    bytes: measured.bodyBytes,
+    sha256: measured.bodySha256,
+    instructionsBytes: measured.instructionsBytes,
+    schemaBytes: measured.schemaBytes,
+    envelopeBytes: measured.envelopeBytes,
+    escapingGrowthBytes: measured.escapingGrowthBytes,
+    maxOutputTokens: measured.addressed.max_output_tokens,
+    effort: measured.addressed.effort,
+    serviceTier: measured.addressed.service_tier,
+    stream: measured.addressed.stream,
+    store: measured.addressed.store,
+  },
+  ceilings: {
+    bodyBytes: INPUT_BODY_BYTES,
+    inputTokens: INPUT_TOKEN_CEILING,
+    outputTokens: MAX_OUTPUT_TOKENS,
+    requestMaxUsd: CRITERIA_REQUEST_MAX_USD,
+  },
+  budget: {
+    approvedCeilingUsd: 1.0,
+    historicalSettledUsd: history.conservative === null ? null : guardState.historical.settledUsd,
+    historicalConservativeUsd: history.conservative,
+    committedUsd: committedUsd(),
+    availableUsd: availableUsd(),
+    newStageTotals: guardTotals,
+  },
+  duplicate,
+  proxy: proxyPath(),
+};
+
+if (dryRun) {
+  process.stdout.write(`${JSON.stringify({ ...preview, dryRun: true, dispatched: false }, null, 2)}\n`);
+  process.exit(0);
+}
+
+if (duplicate !== null) {
+  fail("duplicate_execution", `${duplicate.attemptId} already ran this exact request (state ${duplicate.state}); use a new stage id for an authorized recheck`, 5);
+}
+
+if (stageId === "criteria-correction") {
+  const corrects = typeof args.corrects === "string" ? args.corrects : null;
+  if (corrects === null) fail("usage", "a correction requires --corrects <attemptId>", 2);
+  if (!isTerminal(corrects)) fail("correction_target", `${corrects} is not a finished attempt`, 5);
+  if (!corrects.includes(`-${candidateId}-`)) fail("correction_target", `${corrects} is not an attempt on ${candidateId}`, 5);
 }
 
 if (!process.env.OPENROUTER_API_KEY || !process.env.OPENROUTER_BASE_URL) {
-  console.error("FATAL: OPENROUTER_API_KEY and OPENROUTER_BASE_URL must be set in this shell");
-  process.exit(2);
+  fail(
+    "credentials_absent",
+    "OPENROUTER_API_KEY and OPENROUTER_BASE_URL must be set in this shell; nothing was dispatched and nothing was reserved",
+  );
 }
 
-// Frozen verbatim from the D1/D2 profile.
-const instructions =
-  "Assess each requirement in the frozen requirements document independently against the candidate " +
-  "implementation. Use all provided repository content, including unchanged helper modules, and reason " +
-  "about whether a caller can exercise each capability through the service. Do not infer missing " +
-  "functionality solely from its absence in the diff. For each requirement return satisfied, violated or " +
-  "inconclusive, with concrete evidence references (file and symbol or line), a short explanation, and " +
-  "either an actionable correction or the evidence that is missing.";
+// ---- append-only attempt, then admission ------------------------------------
+const attemptId = newAttemptId({ candidateId, stageId });
+const { dir } = createAttempt({
+  attemptId,
+  candidateId,
+  stageId,
+  key,
+  packet,
+  profileDigest: digest,
+  body: { bytes: measured.bodyBytes, sha256: measured.bodySha256 },
+  reservationUsd: CRITERIA_REQUEST_MAX_USD,
+  corrects: typeof args.corrects === "string" ? args.corrects : null,
+});
 
-const schema = {
-  type: "object",
-  additionalProperties: false,
-  required: ["assessments"],
-  properties: {
-    assessments: {
-      type: "array",
-      minItems: CRITERIA.length,
-      items: {
-        type: "object",
-        additionalProperties: false,
-        required: ["requirementId", "status", "evidence", "explanation", "correction"],
-        properties: {
-          requirementId: { type: "string", enum: CRITERIA },
-          status: { type: "string", enum: ["satisfied", "violated", "inconclusive"] },
-          evidence: {
-            type: "array",
-            items: {
-              type: "object",
-              additionalProperties: false,
-              required: ["path", "reference"],
-              properties: { path: { type: "string" }, reference: { type: "string" } },
-            },
-          },
-          explanation: { type: "string" },
-          correction: { type: "string" },
-        },
-      },
-    },
-  },
+const admission = reserve({
+  requestKey: key,
+  attemptId,
+  candidateId,
+  stageId,
+  maxUsd: CRITERIA_REQUEST_MAX_USD,
+  inputTokens: INPUT_TOKEN_CEILING,
+  outputTokens: MAX_OUTPUT_TOKENS,
+});
+if (!admission.admitted) {
+  finishAttempt(attemptId, {
+    state: "refused",
+    stopReason: admission.reason,
+    result: { admission },
+  });
+  fail("budget_refused", `${admission.reason}: ${JSON.stringify(admission.totals)}`, 5);
+}
+
+const ledgerPath = path.join(dir, "request", "ledger.jsonl");
+const freePort = async () => {
+  const server = net.createServer();
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const { port } = server.address();
+  await new Promise((resolve) => server.close(resolve));
+  return port;
+};
+const port = Number(process.env.CRITERIA_PORT ?? (await freePort()));
+const proxyUrl = `http://127.0.0.1:${port}/v1/responses`;
+if (!/^http:\/\/127\.0\.0\.1:\d+\/v1\/responses$/.test(proxyUrl)) fail("proxy_origin", `not a loopback proxy origin: ${proxyUrl}`);
+
+const proxy = (await import("node:child_process")).spawn(
+  process.execPath,
+  [proxyPath(), ...criteriaProxyArgs({ stageId, port, ledgerPath, model: PROFILE.model, serviceTier: PROFILE.serviceTier })],
+  { stdio: ["ignore", "pipe", "pipe"] },
+);
+let proxyOut = "";
+proxy.stdout.on("data", (chunk) => (proxyOut += chunk.toString("utf8")));
+proxy.stderr.on("data", (chunk) => (proxyOut += chunk.toString("utf8")));
+
+const waitReady = async () => {
+  for (let i = 0; i < 150; i += 1) {
+    const ok = await new Promise((resolve) => {
+      const socket = net.connect(port, "127.0.0.1");
+      socket.on("connect", () => {
+        socket.destroy();
+        resolve(true);
+      });
+      socket.on("error", () => resolve(false));
+    });
+    if (ok) return;
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  throw new Error("proxy did not become ready");
 };
 
 const keyUsage = async () => {
@@ -100,59 +248,22 @@ const keyUsage = async () => {
       headers: { authorization: `Bearer ${process.env.OPENROUTER_API_KEY}` },
     });
     const body = await res.json();
-    return String(body.data.usage);
+    return String(body?.data?.usage ?? "unavailable");
   } catch {
     return "unavailable";
   }
 };
 
-const runsDir = path.join(HERE, "runs");
-fs.mkdirSync(runsDir, { recursive: true });
-const ledger = path.join(runsDir, `ledger-criteria-${id}.jsonl`);
-fs.rmSync(ledger, { force: true });
-
-const proxy = spawn(
-  process.execPath,
-  [
-    PROXY,
-    "--stage", `next-family-criteria-${id}`,
-    "--port", String(PORT),
-    "--max-requests", "1",
-    "--max-input-tokens", String(MAX_IN),
-    "--max-output-tokens", String(MAX_OUT),
-    "--request-input-tokens", String(MAX_IN),
-    "--request-output-tokens", String(MAX_OUT),
-    "--request-timeout-ms", "150000",
-    "--model", MODEL,
-    "--service-tier", "default",
-    "--effort", "medium",
-    "--ledger", ledger,
-  ],
-  { stdio: ["ignore", "pipe", "pipe"] },
-);
-let proxyOut = "";
-proxy.stdout.on("data", (b) => (proxyOut += b.toString("utf8")));
-proxy.stderr.on("data", (b) => (proxyOut += b.toString("utf8")));
-
-const waitReady = async () => {
-  for (let i = 0; i < 100; i += 1) {
-    const ok = await new Promise((resolve) => {
-      const { connect } = require("node:net");
-      const s = connect(PORT, "127.0.0.1");
-      s.on("connect", () => { s.destroy(); resolve(true); });
-      s.on("error", () => resolve(false));
-    });
-    if (ok) return;
-    await new Promise((r) => setTimeout(r, 100));
-  }
-  throw new Error("proxy did not become ready");
-};
-
-const before = await keyUsage();
+let exitCode = 0;
+let stopReason = null;
+const startedAt = new Date().toISOString();
+let before = "unavailable";
+let after = "unavailable";
 
 try {
   await waitReady();
-  const { createLlmClient } = await import(pathToFileURL(SDK_DIST).href);
+  before = await keyUsage();
+  const { createLlmClient } = await import(pathToFileURL(SDK_LLM_DIST).href);
 
   const control = {
     async runAccess(intent) {
@@ -181,9 +292,16 @@ try {
     },
   };
 
+  let forwardedBodies = 0;
   const connectExecution = () => ({
     async request(executionRef, req, { signal } = {}) {
-      const res = await fetch(`http://127.0.0.1:${PORT}/v1/responses`, {
+      // The body handed to the port must be the measured body, byte for byte.
+      const bytes = Buffer.from(req.body);
+      if (bytes.length !== measured.bodyBytes || sha256(bytes) !== measured.bodySha256) {
+        throw new Error("serialized body changed after admission; refusing to forward");
+      }
+      forwardedBodies += 1;
+      const res = await fetch(proxyUrl, {
         method: "POST",
         body: req.body,
         headers: { "content-type": "application/json" },
@@ -194,85 +312,102 @@ try {
     async status(executionRef, requestId) {
       return { requestRef: requestId, effect: "completed", status: "completed" };
     },
-    async close(executionRef, input_) {
-      return { operationRef: input_.operationId, state: "applied" };
+    async close(executionRef, input) {
+      return { operationRef: input.operationId, state: "applied" };
     },
   });
 
   const client = createLlmClient({ control, connectExecution });
-
-  const task = {
-    taskId: `next-family-criteria-${id}`,
-    attempt: 1,
-    profileId: "next-family-criteria",
-    model: MODEL,
-    accountRefs: ["openrouter-primary"],
-    policy: { subjectRef: "synthetic-pilot", policyRevision: 1, bindingRevision: 1 },
-    instructions,
-    input,
-    output: { mode: "json_schema", schema, strict: true },
-    effort: "medium",
-    maxOutputTokens: MAX_OUT,
-    deadline: new Date(Date.now() + 240_000),
-    decode: (value) => {
-      const v = value;
-      if (!v || !Array.isArray(v.assessments)) throw new Error("assessments missing");
-      const ids = v.assessments.map((a) => a.requirementId);
-      for (const c of CRITERIA) if (!ids.includes(c)) throw new Error(`missing ${c}`);
-      if (new Set(ids).size !== ids.length) throw new Error("duplicate requirement id");
-      return v;
-    },
-  };
-
-  const started = Date.now();
   const result = await client.generate(task);
-  const elapsedMs = Date.now() - started;
-  const after = await keyUsage();
+  after = await keyUsage();
 
-  const ledgerLines = fs.existsSync(ledger)
-    ? fs.readFileSync(ledger, "utf8").trim().split("\n").filter(Boolean).map(JSON.parse)
+  const rawText = typeof result.text === "string" ? result.text : "";
+  if (rawText !== "") writeRawResponse(attemptId, rawText);
+
+  const ledgerLines = fs.existsSync(ledgerPath)
+    ? fs.readFileSync(ledgerPath, "utf8").trim().split("\n").filter(Boolean).map(JSON.parse)
     : [];
-  const forwarded = ledgerLines.filter((l) => l.decision === "forwarded");
-  const chargedIn = forwarded.reduce((s, l) => s + (l.chargedInputTokens || 0), 0);
-  const chargedOut = forwarded.reduce((s, l) => s + (l.chargedOutputTokens || 0), 0);
+  const forwarded = ledgerLines.filter((line) => line.decision === "forwarded");
+  const refusals = ledgerLines.filter((line) => line.decision === "refused");
+  const chargedIn = forwarded.reduce((sum, line) => sum + (line.chargedInputTokens ?? 0), 0);
+  const chargedOut = forwarded.reduce((sum, line) => sum + (line.chargedOutputTokens ?? 0), 0);
+  const usageReliable =
+    forwarded.length === 1 && forwarded[0].status === 200 && forwarded[0].usagePresent === true && forwarded[0].halted === null;
 
-  const evidence = {
-    schema: "next-family.criteria-assessment/v1",
-    candidate: id,
-    head,
-    generatedAt: new Date().toISOString(),
-    sdk: {
-      package: "@agent-teams/account-gateway",
-      version: "0.1.0",
-      entry: "@agent-teams/account-gateway/llm -> createLlmClient()",
-      mode: "caller-supplied control + execution ports (SDK encodes, streams and decodes)",
-    },
+  const settlement = settle({
+    requestKey: key,
+    chargedInputTokens: chargedIn,
+    chargedOutputTokens: chargedOut,
+    usageReliable,
+  });
+
+  const report = {
+    schema: "next-family.criteria-report/v1",
+    attemptId,
+    candidateId,
+    head: packet.head,
+    stageId,
+    startedAt,
+    endedAt: new Date().toISOString(),
+    profile: PROFILE,
+    profileDigest: digest,
     inputProfile: {
-      packet: packetManifest.packet,
-      rule: packetManifest.rule.revision,
-      instructionsSha256: sha256(instructions),
-      inputSha256: sha256(input),
+      packet: { path: packet.manifest.packet.path, bytes: packet.bytes, sha256: packet.sha256 },
+      rule: packet.manifest.rule.revision,
+      instructionsSha256: sha256(INSTRUCTIONS),
+      serializedBody: { bytes: measured.bodyBytes, sha256: measured.bodySha256 },
     },
-    requested: { model: MODEL, serviceTier: "default", effort: "medium", maxOutputTokens: MAX_OUT, outputMode: "json_schema", stream: true, store: false },
-    result: result.ok
+    ceilings: { bodyBytes: INPUT_BODY_BYTES, inputTokens: INPUT_TOKEN_CEILING, outputTokens: MAX_OUTPUT_TOKENS },
+    reservation: { maxUsd: CRITERIA_REQUEST_MAX_USD, admission },
+    outcome: result.ok
       ? { ok: true, usage: result.usage, receipt: result.receipt, cleanup: result.cleanup, value: result.value }
       : { ok: false, code: result.code, effect: result.effect, retry: result.retry, usage: result.usage, cleanup: result.cleanup },
-    rawText: result.ok ? result.text : null,
     execution: {
-      elapsedMs,
-      inputBytes: forwarded.map((l) => l.inputBytes),
+      forwardedBodies,
       forwardedRequests: forwarded.length,
-      refusals: ledgerLines.filter((l) => l.decision === "refused").map((l) => l.code),
-      charged: { inputTokens: chargedIn, outputTokens: chargedOut, usdConservative: Number(((chargedIn * 1.25) / 1e6 + (chargedOut * 5.0) / 1e6).toFixed(8)) },
-      observedFromProxy: forwarded.map((l) => ({ status: l.status, model: l.observedModel, provider: l.observedProvider })),
+      refusals: refusals.map((line) => line.code),
+      charged: { inputTokens: chargedIn, outputTokens: chargedOut },
+      settlement,
+      observed: forwarded.map((line) => ({
+        status: line.status,
+        model: line.observedModel,
+        provider: line.observedProvider,
+        identityVerified: line.identityVerified,
+        providerVerified: line.providerVerified,
+        halted: line.halted,
+      })),
     },
-    providerKeyUsage: { before, after, delta: before !== "unavailable" && after !== "unavailable" ? Number((Number(after) - Number(before)).toFixed(8)) : "unavailable" },
+    providerKeyUsage: {
+      before,
+      after,
+      delta: before !== "unavailable" && after !== "unavailable" ? Number((Number(after) - Number(before)).toFixed(8)) : "unavailable",
+    },
+    rawResponsePath: rawText === "" ? null : `runs/attempts/${attemptId}/raw/response.txt`,
   };
 
-  fs.writeFileSync(path.join(runsDir, `criteria-assessment-${id}.json`), `${JSON.stringify(evidence, null, 2)}\n`);
-  if (result.ok) fs.writeFileSync(path.join(runsDir, `criteria-output-${id}.txt`), `${result.text}\n`);
-  console.log(JSON.stringify(evidence.result, null, 2));
+  const state = result.ok ? "completed" : "failed";
+  if (!result.ok) {
+    stopReason = result.code;
+    exitCode = 5;
+  }
+  if (forwarded.some((line) => line.halted !== null)) {
+    stopReason = forwarded.find((line) => line.halted !== null).halted;
+    exitCode = 4;
+  }
+  finishAttempt(attemptId, { state, stopReason, result: report });
+  process.stdout.write(`${JSON.stringify({ attemptId, state, stopReason, report }, null, 2)}\n`);
+} catch (error) {
+  stopReason = "launcher_error";
+  finishAttempt(attemptId, {
+    state: "failed",
+    stopReason,
+    result: { error: String(error?.message ?? error), forwardedBodies },
+  });
+  process.stderr.write(`launcher_error: ${String(error?.message ?? error)}\n`);
+  exitCode = 5;
 } finally {
   proxy.kill("SIGKILL");
-  fs.writeFileSync(path.join(runsDir, `criteria-proxy-${id}.log`), proxyOut);
+  fs.writeFileSync(path.join(dir, "request", "proxy.log"), proxyOut, { mode: 0o600 });
 }
+
+process.exit(exitCode);

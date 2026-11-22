@@ -12,7 +12,9 @@
   "scripts": {
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "build:types": "tsc -p tsconfig.json",
-    "test": "node --experimental-strip-types --test --test-concurrency=1 tests/*.ts"
+    "test": "node --experimental-strip-types --test --test-concurrency=1 tests/*.ts",
+    "test:next-family": "node --test --test-concurrency=1 --test-timeout=180000 synthetic/next-family/tests/proxy-path.test.mjs synthetic/next-family/tests/serialize.test.mjs synthetic/next-family/tests/proxy-limits.test.mjs synthetic/next-family/tests/budget.test.mjs synthetic/next-family/tests/attempt.test.mjs synthetic/next-family/tests/fixture.test.mjs",
+    "check:next-family": "node synthetic/next-family/checks/verify-gates.mjs"
   },
   "devDependencies": {
     "@types/node": "24.0.0",

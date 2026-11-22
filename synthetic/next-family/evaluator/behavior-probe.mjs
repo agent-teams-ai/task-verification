@@ -2,9 +2,13 @@
 //
 //   node --experimental-strip-types behavior-probe.mjs <candidate-checkout-dir>
 //
-// Establishes the expected external behaviour of one candidate directly, without inference. The
-// results are the oracle for the batch; they are recorded under evaluator/ and never copied into
-// packets/ or into any file a reviewer receives.
+// Establishes the expected external behaviour of one candidate directly, without
+// inference. The results are the oracle for the batch; they are recorded under
+// evaluator/ and never copied into packets/ or into any file a reviewer receives.
+//
+// The precedence scenarios exercise the `delivery-req-v2` validation order: C3 and
+// C4 are answered before the idempotency index is consulted, so C1's duplicate
+// guarantee only applies to submissions that reach step 4.
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
@@ -33,6 +37,10 @@ function post(store, payload, headers = {}) {
     headers,
     body: JSON.stringify({ subscriptionId: "sub-1", payload }),
   });
+}
+
+function postRaw(store, body, headers = {}) {
+  return handle(store, { method: "POST", path: "/deliveries", headers, body: JSON.stringify(body) });
 }
 
 const out = { checkout: abs, scenarios: {} };
@@ -103,6 +111,18 @@ await record("c2_network_error_then_ok", async () => {
   return { targetCalls: calls, state: delivery?.state ?? null };
 });
 
+await record("c2_delay_growth", async () => {
+  const store = seeded();
+  const id = JSON.parse(post(store, "alpha").body).id;
+  const stamps = [];
+  const delivery = await attemptDelivery(store, id, async () => {
+    stamps.push(Date.now());
+    return 503;
+  });
+  const gaps = stamps.slice(1).map((stamp, index) => stamp - stamps[index]);
+  return { targetCalls: stamps.length, gapsMs: gaps, grows: gaps.length === 2 ? gaps[1] > gaps[0] : null, state: delivery?.state ?? null };
+});
+
 await record("c3_over_limit", () => {
   const store = seeded();
   const response = post(store, "x".repeat(65_537));
@@ -113,6 +133,30 @@ await record("c3_at_limit", () => {
   const store = seeded();
   const response = post(store, "x".repeat(65_536));
   return { status: response.status, queued: store.queued().length };
+});
+
+// Precedence interaction 1: an oversized repeat of an accepted key is a 413, not a 202.
+await record("precedence_c3_over_c1", () => {
+  const store = seeded();
+  post(store, "alpha", { "idempotency-key": "k-9" });
+  const repeat = post(store, "x".repeat(65_537), { "idempotency-key": "k-9" });
+  return { status: repeat.status, queued: store.queued().length };
+});
+
+// Precedence interaction 2: size is checked before the subscription is consulted.
+await record("precedence_c3_over_unknown_subscription", () => {
+  const store = seeded();
+  const response = postRaw(store, { subscriptionId: "sub-missing", payload: "x".repeat(65_537) });
+  return { status: response.status, queued: store.queued().length };
+});
+
+// Precedence interaction 3: a repeat for a disabled subscription is a 409, not a 202.
+await record("precedence_c4_over_c1", () => {
+  const store = seeded();
+  post(store, "alpha", { "idempotency-key": "k-7" });
+  store.disableSubscription("sub-1");
+  const repeat = post(store, "alpha", { "idempotency-key": "k-7" });
+  return { status: repeat.status, queued: store.queued().length };
 });
 
 await record("c4_410_disables", async () => {

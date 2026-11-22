@@ -1,0 +1,119 @@
+{
+  "checkout": "C:\\Users\\Adak\\AppData\\Local\\Temp\\next-family-tree-65f2103-R0Mivz\\repo",
+  "scenarios": {
+    "c1_same_key_same_payload": {
+      "ok": true,
+      "observed": {
+        "sameId": true,
+        "duplicate": true,
+        "queued": 1
+      }
+    },
+    "c1_same_key_different_payload": {
+      "ok": true,
+      "observed": {
+        "sameId": false,
+        "queued": 2
+      }
+    },
+    "c1_no_key_twice": {
+      "ok": true,
+      "observed": {
+        "queued": 1
+      }
+    },
+    "c2_persistent_5xx": {
+      "ok": true,
+      "observed": {
+        "targetCalls": 3,
+        "attempts": 3,
+        "state": "failed"
+      }
+    },
+    "c2_400_is_final": {
+      "ok": true,
+      "observed": {
+        "targetCalls": 1,
+        "state": "failed"
+      }
+    },
+    "c2_network_error_then_ok": {
+      "ok": true,
+      "observed": {
+        "targetCalls": 2,
+        "state": "delivered"
+      }
+    },
+    "c2_delay_growth": {
+      "ok": true,
+      "observed": {
+        "targetCalls": 3,
+        "gapsMs": [
+          111,
+          201
+        ],
+        "grows": true,
+        "state": "failed"
+      }
+    },
+    "c3_over_limit": {
+      "ok": true,
+      "observed": {
+        "status": 413,
+        "queued": 0
+      }
+    },
+    "c3_at_limit": {
+      "ok": true,
+      "observed": {
+        "status": 202,
+        "queued": 1
+      }
+    },
+    "precedence_c3_over_c1": {
+      "ok": true,
+      "observed": {
+        "status": 413,
+        "queued": 1
+      }
+    },
+    "precedence_c3_over_unknown_subscription": {
+      "ok": true,
+      "observed": {
+        "status": 413,
+        "queued": 0
+      }
+    },
+    "precedence_c4_over_c1": {
+      "ok": true,
+      "observed": {
+        "status": 409,
+        "queued": 1
+      }
+    },
+    "c4_410_disables": {
+      "ok": true,
+      "observed": {
+        "subscriptionStatus": "disabled",
+        "state": "failed",
+        "attempts": 1
+      }
+    },
+    "c4_disabled_intake": {
+      "ok": true,
+      "observed": {
+        "status": 409,
+        "queued": 0
+      }
+    },
+    "c5_health": {
+      "ok": true,
+      "observed": {
+        "status": 200,
+        "body": {
+          "status": "ok"
+        }
+      }
+    }
+  }
+}

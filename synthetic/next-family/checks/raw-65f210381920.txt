@@ -1,23 +1,19 @@
-
-> notification-delivery@0.1.0 test
-> node --experimental-strip-types --test --test-concurrency=1 tests/*.test.ts
-
-✔ deliveries: a valid submission is queued (1.35ms)
-✔ deliveries: an unknown subscription is rejected (0.1383ms)
-✔ deliveries: a missing payload is rejected (0.1172ms)
-✔ deliveries: the worker records the target status (0.2557ms)
-✔ health: GET /health reports ok (1.2791ms)
-✔ health: an unknown route is a 404 (0.1224ms)
-✔ idempotency: a repeated submission returns the original delivery (1.4051ms)
-✔ idempotency: distinct payloads create distinct deliveries (0.2108ms)
-✔ retry: a persistent 5xx is attempted at most three times (308.1802ms)
-✔ retry: a transient failure followed by success is delivered (114.8881ms)
-✔ retry: a network error is retried (113.27ms)
-✔ retry: a 400 is final and is not retried (0.5607ms)
-✔ subscriptions: a 410 from the target disables the subscription (1.4387ms)
-✔ subscriptions: a disabled subscription rejects further deliveries (0.1493ms)
-✔ limits: an oversized payload is rejected with 413 and is not queued (0.2403ms)
-✔ limits: a payload exactly at the limit is accepted (0.4121ms)
+✔ deliveries: a valid submission is queued (1.6507ms)
+✔ deliveries: an unknown subscription is rejected (0.1817ms)
+✔ deliveries: a missing payload is rejected (0.1544ms)
+✔ deliveries: the worker records the target status (0.3136ms)
+✔ health: GET /health reports ok (1.5816ms)
+✔ health: an unknown route is a 404 (0.1592ms)
+✔ idempotency: a repeated submission returns the original delivery (1.6704ms)
+✔ idempotency: distinct payloads create distinct deliveries (0.2488ms)
+✔ retry: a persistent 5xx is attempted at most three times (305.028ms)
+✔ retry: a transient failure followed by success is delivered (110.8928ms)
+✔ retry: a network error is retried (107.7322ms)
+✔ retry: a 400 is final and is not retried (0.3587ms)
+✔ subscriptions: a 410 from the target disables the subscription (1.6369ms)
+✔ subscriptions: a disabled subscription rejects further deliveries (0.176ms)
+✔ limits: an oversized payload is rejected with 413 and is not queued (0.3223ms)
+✔ limits: a payload exactly at the limit is accepted (0.8391ms)
 ℹ tests 16
 ℹ suites 0
 ℹ pass 16
@@ -25,4 +21,4 @@
 ℹ cancelled 0
 ℹ skipped 0
 ℹ todo 0
-ℹ duration_ms 1124.1637
+ℹ duration_ms 1209.9599

@@ -77,6 +77,24 @@ if (INPUT_ENFORCEMENT !== 'bytes' && INPUT_ENFORCEMENT !== 'estimate') {
   process.exit(2);
 }
 
+// Enforceable pair added in D3-R1. The input ceiling is expressed twice: as the
+// serialized body bytes actually admitted, and as the token ceiling the
+// reservation uses. `bytes` mode compares bodyBytes to the byte ceiling; the token
+// ceiling must dominate it, because every token covers at least one byte and only
+// the conversation/format special tokens cover none.
+const INPUT_SPECIAL_TOKEN_ALLOWANCE = num(args['input-special-token-allowance'], 0);
+const REQ_INPUT_BYTES = num(args['request-input-bytes'], REQ_INPUT_CEILING);
+
+// Model/provider identity. Enforcement happens on the reply, because the provider
+// reports the identity it served there; a mismatch halts the run and the body is
+// withheld instead of being handed to the caller.
+const ENFORCE_IDENTITY = Boolean(args['enforce-identity']);
+const REQUIRE_OBSERVED_MODEL = Boolean(args['require-observed-model']);
+const ALLOWED_OBSERVED_PROVIDERS =
+  typeof args['allow-observed-provider'] === 'string'
+    ? args['allow-observed-provider'].split(',').map((value) => value.trim()).filter(Boolean)
+    : [];
+
 const PINNED_MODEL = typeof args.model === 'string' ? args.model : 'openai/gpt-6.1-terra';
 const PINNED_TIER = typeof args['service-tier'] === 'string' ? args['service-tier'] : 'default';
 const PINNED_EFFORT = typeof args.effort === 'string' ? args.effort : 'medium';
@@ -86,12 +104,29 @@ for (const [name, value] of [
   ['max-input-tokens', MAX_INPUT_TOKENS],
   ['max-output-tokens', MAX_OUTPUT_TOKENS],
   ['request-input-tokens', REQ_INPUT_CEILING],
+  ['request-input-bytes', REQ_INPUT_BYTES],
   ['request-output-tokens', REQ_OUTPUT_CEILING],
 ]) {
   if (!Number.isInteger(value) || value < 1) {
     process.stderr.write(`proxy: --${name} must be a positive integer\n`);
     process.exit(2);
   }
+}
+
+if (!Number.isInteger(INPUT_SPECIAL_TOKEN_ALLOWANCE) || INPUT_SPECIAL_TOKEN_ALLOWANCE < 0) {
+  process.stderr.write('proxy: --input-special-token-allowance must be a non-negative integer\n');
+  process.exit(2);
+}
+
+// No silently widened limits: a token ceiling below the admitted body bytes plus
+// the special-token allowance cannot bound what was admitted, so the reservation
+// would be smaller than the maximum real input cost and the proxy refuses to run.
+if (REQ_INPUT_BYTES + INPUT_SPECIAL_TOKEN_ALLOWANCE > REQ_INPUT_CEILING) {
+  process.stderr.write(
+    `proxy: the token ceiling (${REQ_INPUT_CEILING}) does not dominate the admitted body bytes plus the special-token allowance ` +
+      `(${REQ_INPUT_BYTES} + ${INPUT_SPECIAL_TOKEN_ALLOWANCE}); the reservation could not bound the admitted request\n`
+  );
+  process.exit(2);
 }
 
 if (!OFFLINE) {
@@ -288,14 +323,16 @@ const server = http.createServer(async (req, res) => {
     return;
   }
   const overInput =
-    INPUT_ENFORCEMENT === 'bytes' ? inputBytes > REQ_INPUT_CEILING : estIn > REQ_INPUT_CEILING;
+    INPUT_ENFORCEMENT === 'bytes' ? inputBytes > REQ_INPUT_BYTES : estIn > REQ_INPUT_BYTES;
   if (overInput) {
     state.requests += 1;
     refuse(res, 413, 'proxy_input_ceiling_exceeded', {
       enforcement: INPUT_ENFORCEMENT,
       inputBytes,
       estimatedInputTokens: estIn,
-      ceiling: REQ_INPUT_CEILING,
+      ceiling: REQ_INPUT_BYTES,
+      bodyByteCeiling: REQ_INPUT_BYTES,
+      inputTokenCeiling: REQ_INPUT_CEILING,
     });
     return;
   }
@@ -337,6 +374,21 @@ const server = http.createServer(async (req, res) => {
     state.reservedInput -= reservedIn;
     state.reservedOutput -= reservedOut;
     const usagePresent = usage !== null && usage !== undefined;
+    // Identity is verified on the reply, never assumed from the request.
+    const modelMismatch = ENFORCE_IDENTITY && observed.model !== null && observed.model !== PINNED_MODEL;
+    const modelUnverified = ENFORCE_IDENTITY && REQUIRE_OBSERVED_MODEL && observed.model === null;
+    const providerMismatch =
+      ENFORCE_IDENTITY &&
+      observed.provider !== null &&
+      ALLOWED_OBSERVED_PROVIDERS.length > 0 &&
+      !ALLOWED_OBSERVED_PROVIDERS.includes(observed.provider);
+    const identityBlocked = modelMismatch
+      ? 'proxy_observed_model_mismatch'
+      : modelUnverified
+        ? 'proxy_observed_model_missing'
+        : providerMismatch
+          ? 'proxy_observed_provider_mismatch'
+          : null;
     // Reported usage is authoritative. When it is absent the reservation is
     // kept, and because the byte bound proves tokens <= ceiling the reservation
     // is a true upper bound rather than a guess.
@@ -349,6 +401,7 @@ const server = http.createServer(async (req, res) => {
     const ceilingBreached =
       chargedIn > REQ_INPUT_CEILING || chargedOut > REQ_OUTPUT_CEILING;
     if (ceilingBreached) state.halted = 'ceiling_breached_by_reported_usage';
+    else if (identityBlocked !== null) state.halted = identityBlocked;
     else if (ambiguous || !usagePresent) {
       state.halted = ambiguous ? 'ambiguous_upstream_outcome' : 'usage_unreliable';
     }
@@ -361,11 +414,16 @@ const server = http.createServer(async (req, res) => {
       requestedEffort: effort,
       inputBytes,
       inputEnforcement: INPUT_ENFORCEMENT,
+      bodyByteCeiling: REQ_INPUT_BYTES,
+      inputTokenCeiling: REQ_INPUT_CEILING,
       inputTokensEstimate: estIn,
       injectedMaxOutputTokens: injectedOutput,
       status,
       observedModel: observed.model,
       observedProvider: observed.provider,
+      identityEnforced: ENFORCE_IDENTITY,
+      identityVerified: !modelMismatch && !modelUnverified,
+      providerVerified: !providerMismatch && observed.provider !== null,
       usagePresent,
       usage,
       chargedInputTokens: chargedIn,
@@ -377,7 +435,7 @@ const server = http.createServer(async (req, res) => {
         chargedOutputTokens: state.chargedOutput,
       },
     });
-    return { chargedIn, chargedOut, usagePresent };
+    return { chargedIn, chargedOut, usagePresent, identityBlocked };
   };
 
   if (OFFLINE) {
@@ -426,7 +484,19 @@ const server = http.createServer(async (req, res) => {
   const usage = usageFromBody(bodyText);
   const status = upstream.status ?? 502;
   const ambiguous = Boolean(upstream.timedOut) || !(status >= 200 && status < 300);
-  settle({ status, usage, ambiguous, observed: observedIdentity(bodyText) });
+  const settled = settle({ status, usage, ambiguous, observed: observedIdentity(bodyText) });
+
+  // A substituted model, an unverifiable model or a provider outside the declared
+  // set is never handed to the caller: the run halts and the reply is withheld.
+  if (settled.identityBlocked !== null) {
+    res.writeHead(502, { 'content-type': 'application/json' });
+    res.end(
+      JSON.stringify({
+        error: { message: settled.identityBlocked, type: 'proxy_identity', code: settled.identityBlocked },
+      })
+    );
+    return;
+  }
 
   res.writeHead(status, { 'content-type': 'application/json' });
   res.end(bodyText);
@@ -437,7 +507,9 @@ server.listen(PORT, '127.0.0.1', () => {
   process.stdout.write(`proxy listening on http://127.0.0.1:${address.port}\n`);
   process.stdout.write(
     `proxy stage=${STAGE} requests=${MAX_REQUESTS} tokens=${MAX_INPUT_TOKENS}/${MAX_OUTPUT_TOKENS} ` +
-      `per-request=${REQ_INPUT_CEILING}/${REQ_OUTPUT_CEILING} input-enforcement=${INPUT_ENFORCEMENT} ` +
-      `model=${PINNED_MODEL} tier=${PINNED_TIER} effort=${PINNED_EFFORT} ledger=${LEDGER ?? '<disabled>'}\n`
+      `per-request=${REQ_INPUT_BYTES}B/${REQ_INPUT_CEILING}tok/${REQ_OUTPUT_CEILING}tok input-enforcement=${INPUT_ENFORCEMENT} ` +
+      `allowance=${INPUT_SPECIAL_TOKEN_ALLOWANCE} model=${PINNED_MODEL} tier=${PINNED_TIER} effort=${PINNED_EFFORT} ` +
+      `identity-enforced=${ENFORCE_IDENTITY} require-observed-model=${REQUIRE_OBSERVED_MODEL} ` +
+      `providers=${ALLOWED_OBSERVED_PROVIDERS.join('|') || '<unchecked>'} retries=none ledger=${LEDGER ?? '<disabled>'}\n`
   );
 });

@@ -1,13 +1,19 @@
 {
-  "schema": "next-family.family/v1",
+  "schema": "next-family.family/v2",
   "frozenAt": "2026-11-22",
-  "taskRevision": "delivery-req-v1",
-  "taskStatementSha256": "c7acd7d573424d721ee9345c76082c0368b5a82e4f31c79627f8a670b149692a",
+  "taskRevision": "delivery-req-v2",
+  "taskStatementSha256": "ff243a43a8a74a52679c0673984c0725d8d4ef75dae062e9397c7293280fe3eb",
   "base": "c65bc835ca35b94fd0de3e3c0cc2c8d459b556de",
   "candidates": {
     "c01": "54623dccc8b138c9ad5a41fc0347cf49ba039c61",
     "c02": "65f210381920fbfce032cf5ba8aaa440f3300162",
-    "c03": "98408d376ae16e0aea365cbb36f1207c0c4f495d"
+    "c03": "18bbde350074d4afd8a3e3d52be31479c6ba85fc"
+  },
+  "superseded": {
+    "c03": {
+      "sha": "98408d376ae16e0aea365cbb36f1207c0c4f495d",
+      "reason": "The retry policy module was not resolvable in the workspace, so the retry cases could not run at all: the case demonstrated a deterministic module-resolution defect instead of an evidence boundary. Replaced by a revision that resolves the same external workspace package, runs the same suite, and keeps the classification outside the reviewed checkout. The task, the family, the criteria and the evaluator expectation are unchanged."
+    }
   },
   "criteria": [
     "C1",
@@ -25,6 +31,33 @@
     "sdk": "@agent-teams/account-gateway/llm -> createLlmClient()",
     "outputMode": "json_schema",
     "stream": true,
+    "store": false,
+    "allowedObservedProviders": [
+      "OpenRouter",
+      "OpenAI"
+    ],
     "ocrComparator": "1.14.0-rr.1 (qualified development candidate), when OCR is run"
+  },
+  "caps": {
+    "authority": "synthetic/next-family/lib/limits.mjs",
+    "criteriaInputBodyBytes": 28672,
+    "specialTokenAllowance": 64,
+    "criteriaInputTokenCeiling": 28736,
+    "criteriaMaxOutputTokens": 2500,
+    "criteriaRequests": 3,
+    "correctionReserveRequests": 1,
+    "ocrForwardedRequests": 8,
+    "ocrInputBodyBytes": 15936,
+    "ocrInputTokenCeiling": 16000,
+    "ocrMaxOutputTokens": 1500,
+    "pricingInputUsdPerMillion": 1.25,
+    "pricingOutputUsdPerMillion": 5
+  },
+  "accounting": {
+    "approvedCeilingUsd": 1,
+    "historicalSettledUsd": 0.3163953,
+    "historicalConservativeUsd": 0.55929,
+    "committedBasis": "the larger of settled and conservative, never their sum",
+    "source": "synthetic/runs/d12-recheck/reconciliation.json"
   }
 }

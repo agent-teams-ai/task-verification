@@ -14,9 +14,13 @@ failures with a growing delay and stops after three attempts.
 
 ## Notes
 
-- Duplicate submissions are collapsed: a caller that retries the same submission gets the original
-  delivery id back instead of a second queued delivery.
+- Duplicate submissions are collapsed on the caller's `Idempotency-Key`: a caller that retries the same
+  submission gets the original delivery id back instead of a second queued delivery. Validation runs
+  first, so an oversized repeat is still a `413` and a repeat for a disabled subscription is still a
+  `409`.
 - Subscriptions whose target answers `410` are disabled and are not retried.
+- Retry classification and the backoff delay come from the shared workspace package
+  `@fixture/delivery-core`, which lives beside this repository.
 - Responses keep the existing JSON shape; no consumer change is required.
 
 ## Tests

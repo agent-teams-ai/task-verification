@@ -1,0 +1,25 @@
+✔ deliveries: a valid submission is queued (1.1335ms)
+✔ deliveries: an unknown subscription is rejected (0.1559ms)
+✔ deliveries: a missing payload is rejected (0.1371ms)
+✔ deliveries: the worker records the target status (0.2932ms)
+✔ health: GET /health reports ok (1.4892ms)
+✔ health: an unknown route is a 404 (0.1488ms)
+✔ idempotency: a repeated key returns the original delivery (1.2091ms)
+✔ idempotency: distinct keys create distinct deliveries (0.2356ms)
+✔ idempotency: a submission without a key is always queued (0.1482ms)
+✔ retry: a persistent 5xx is attempted at most three times (325.2274ms)
+✔ retry: a transient failure followed by success is delivered (104.4934ms)
+✔ retry: a network error is retried (107.1565ms)
+✔ retry: a 400 is final and is not retried (0.5119ms)
+✔ subscriptions: a 410 from the target disables the subscription (1.3848ms)
+✔ subscriptions: a disabled subscription rejects further deliveries (0.1824ms)
+✔ limits: an oversized payload is rejected with 413 and is not queued (1.0787ms)
+✔ limits: a payload exactly at the limit is accepted (0.3418ms)
+ℹ tests 17
+ℹ suites 0
+ℹ pass 17
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1148.1522

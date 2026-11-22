@@ -1,24 +1,20 @@
-
-> notification-delivery@0.1.0 test
-> node --experimental-strip-types --test --test-concurrency=1 tests/*.test.ts
-
-✔ deliveries: a valid submission is queued (1.0245ms)
-✔ deliveries: an unknown subscription is rejected (0.1416ms)
-✔ deliveries: a missing payload is rejected (0.1193ms)
-✔ deliveries: the worker records the target status (0.3179ms)
-✔ health: GET /health reports ok (1.2655ms)
-✔ health: an unknown route is a 404 (0.1257ms)
-✔ idempotency: a repeated key returns the original delivery (0.9805ms)
-✔ idempotency: distinct keys create distinct deliveries (0.2243ms)
-✔ idempotency: a submission without a key is always queued (0.1392ms)
-✔ retry: a persistent 5xx is attempted at most three times (330.7272ms)
-✔ retry: a transient failure followed by success is delivered (114.2163ms)
-✔ retry: a network error is retried (130.3497ms)
-✔ retry: a 400 is final and is not retried (0.3221ms)
-✔ subscriptions: a 410 from the target disables the subscription (1.0209ms)
-✔ subscriptions: a disabled subscription rejects further deliveries (0.1408ms)
-✔ limits: an oversized payload is rejected with 413 and is not queued (1.6546ms)
-✔ limits: a payload exactly at the limit is accepted (0.5355ms)
+✔ deliveries: a valid submission is queued (1.6244ms)
+✔ deliveries: an unknown subscription is rejected (0.2087ms)
+✔ deliveries: a missing payload is rejected (0.146ms)
+✔ deliveries: the worker records the target status (0.364ms)
+✔ health: GET /health reports ok (2.3551ms)
+✔ health: an unknown route is a 404 (0.2289ms)
+✔ idempotency: a repeated key returns the original delivery (1.7191ms)
+✔ idempotency: distinct keys create distinct deliveries (0.3044ms)
+✔ idempotency: a submission without a key is always queued (0.2268ms)
+✔ retry: a persistent 5xx is attempted at most three times (321.5682ms)
+✔ retry: a transient failure followed by success is delivered (106.3737ms)
+✔ retry: a network error is retried (107.3446ms)
+✔ retry: a 400 is final and is not retried (0.3776ms)
+✔ subscriptions: a 410 from the target disables the subscription (1.2773ms)
+✔ subscriptions: a disabled subscription rejects further deliveries (0.1719ms)
+✔ limits: an oversized payload is rejected with 413 and is not queued (1.0215ms)
+✔ limits: a payload exactly at the limit is accepted (0.3042ms)
 ℹ tests 17
 ℹ suites 0
 ℹ pass 17
@@ -26,4 +22,4 @@
 ℹ cancelled 0
 ℹ skipped 0
 ℹ todo 0
-ℹ duration_ms 1138.5363
+ℹ duration_ms 1297.8568

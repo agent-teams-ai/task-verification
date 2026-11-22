@@ -21,9 +21,9 @@
   "head": "54623dccc8b138c9ad5a41fc0347cf49ba039c61",
   "taskStatement": {
     "revision": "delivery-req-v1",
-    "sha256": "c7acd7d573424d721ee9345c76082c0368b5a82e4f31c79627f8a670b149692a"
+    "sha256": "ff243a43a8a74a52679c0673984c0725d8d4ef75dae062e9397c7293280fe3eb"
   },
-  "authorHandoffSha256": "c114cf4145294c81453b3591ed54377f62be3a411909a2e28284cd58263df129",
+  "authorHandoffSha256": "cc9e55e39346c0243a1ef3bb8bd9120d61c033a54d189bb71ea33caf9369d7e0",
   "files": [
     {
       "path": "README.md",
@@ -94,7 +94,7 @@
   "excluded": [],
   "packet": {
     "path": "packet-54623dccc8b1.md",
-    "bytes": 20731,
-    "sha256": "0f1fadbc01295c0fb7d5f698e0d1db8a009165e0feb2214c1ca4ede55254169f"
+    "bytes": 23220,
+    "sha256": "2c607491fd99d9aa12595e511d8196eb510dcf0bfa18b5c56d502d6a04f40f43"
   }
 }
