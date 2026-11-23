@@ -486,6 +486,17 @@ const bodyOfExactBytes = (bytes) => {
   return JSON.stringify({ model: MODEL, input: 'a'.repeat(bytes - prefix) });
 };
 
+// A body that already declares its output ceiling: nothing is injected, so the
+// forwarded body is exactly the admitted body. A body at the ceiling without it
+// would legitimately grow past the ceiling on injection and be refused.
+const bodyOfExactBytesWithOutput = (bytes) => {
+  const prefix = Buffer.byteLength(
+    JSON.stringify({ model: MODEL, max_output_tokens: 100, input: '' }),
+    'utf8'
+  );
+  return JSON.stringify({ model: MODEL, max_output_tokens: 100, input: 'a'.repeat(bytes - prefix) });
+};
+
 test('the revised 64 KiB bound admits exactly 65,536 bytes and refuses 65,537', async () => {
   const stub = await startStub((_req, res) => {
     res.writeHead(200, { 'content-type': 'application/json' });
@@ -499,8 +510,8 @@ test('the revised 64 KiB bound admits exactly 65,536 bytes and refuses 65,537', 
       String(REVISED_INPUT_CEILING),
     ])
   );
-  const atBound = bodyOfExactBytes(REVISED_INPUT_CEILING);
-  const overBound = bodyOfExactBytes(REVISED_INPUT_CEILING + 1);
+  const atBound = bodyOfExactBytesWithOutput(REVISED_INPUT_CEILING);
+  const overBound = bodyOfExactBytesWithOutput(REVISED_INPUT_CEILING + 1);
   assert.equal(Buffer.byteLength(atBound, 'utf8'), REVISED_INPUT_CEILING);
   assert.equal(Buffer.byteLength(overBound, 'utf8'), REVISED_INPUT_CEILING + 1);
   const admitted = await post(proxy.port, atBound);

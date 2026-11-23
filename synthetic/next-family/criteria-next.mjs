@@ -242,27 +242,18 @@ const waitReady = async () => {
   throw new Error("proxy did not become ready");
 };
 
-const keyUsage = async () => {
-  try {
-    const res = await fetch("https://openrouter.ai/api/v1/key", {
-      headers: { authorization: `Bearer ${process.env.OPENROUTER_API_KEY}` },
-    });
-    const body = await res.json();
-    return String(body?.data?.usage ?? "unavailable");
-  } catch {
-    return "unavailable";
-  }
-};
+// No credentialed egress outside the proxy (D3-R2 correction). This process used to
+// read the provider key's usage figure from `openrouter.ai/api/v1/key` directly.
+// That call carries the credential and leaves the bounded boundary even though it
+// is not an inference request, so it is gone: the single fetch below targets the
+// loopback proxy, and cost is reconciled from the proxy ledger's reported usage.
 
 let exitCode = 0;
 let stopReason = null;
 const startedAt = new Date().toISOString();
-let before = "unavailable";
-let after = "unavailable";
 
 try {
   await waitReady();
-  before = await keyUsage();
   const { createLlmClient } = await import(pathToFileURL(SDK_LLM_DIST).href);
 
   const control = {
@@ -319,7 +310,6 @@ try {
 
   const client = createLlmClient({ control, connectExecution });
   const result = await client.generate(task);
-  after = await keyUsage();
 
   const rawText = typeof result.text === "string" ? result.text : "";
   if (rawText !== "") writeRawResponse(attemptId, rawText);
@@ -377,10 +367,11 @@ try {
         halted: line.halted,
       })),
     },
-    providerKeyUsage: {
-      before,
-      after,
-      delta: before !== "unavailable" && after !== "unavailable" ? Number((Number(after) - Number(before)).toFixed(8)) : "unavailable",
+    transport: {
+      directProviderEgress: false,
+      credentialHolder: "bounded-proxy-only",
+      note:
+        "the launcher issues no credentialed request of its own; cost is reconciled from the proxy ledger's reported usage rather than from a direct provider account read",
     },
     rawResponsePath: rawText === "" ? null : `runs/attempts/${attemptId}/raw/response.txt`,
   };

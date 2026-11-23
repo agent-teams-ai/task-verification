@@ -203,6 +203,23 @@ gate("11. M2 PR #2 repository is untouched", () => {
   return `clean at ${head.slice(0, 12)}`;
 });
 
+gate("12. the launcher has no credentialed egress outside the proxy", () => {
+  const source = fs.readFileSync(path.join(FAMILY_ROOT, "criteria-next.mjs"), "utf8");
+  // A credentialed metadata read is still a bypass of the bounded boundary, so the
+  // check is on the whole source: one fetch, and it targets the loopback proxy.
+  const foreign = (source.match(/https?:\/\/(?!127\.0\.0\.1)[^\s"'`)]+/gu) ?? []).filter(
+    (url) => !url.startsWith("http://127.0.0.1"),
+  );
+  if (foreign.length > 0) throw new Error(`non-loopback URL in the launcher: ${foreign.join(", ")}`);
+  if (!source.includes("const proxyUrl = `http://127.0.0.1:${port}/v1/responses`;")) {
+    throw new Error("the loopback proxy URL is missing from the launcher");
+  }
+  const fetches = source.match(/\bfetch\(/gu) ?? [];
+  if (fetches.length !== 1) throw new Error(`expected exactly one fetch in the launcher, found ${fetches.length}`);
+  if (!source.includes("fetch(proxyUrl,")) throw new Error("the single fetch does not target the loopback proxy");
+  return "one fetch, loopback only, no provider host";
+});
+
 const width = Math.max(...results.map((result) => result.name.length));
 for (const result of results) {
   process.stdout.write(`${result.ok ? "PASS" : "FAIL"}  ${result.name.padEnd(width)}  ${result.detail}\n`);

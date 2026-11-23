@@ -200,8 +200,21 @@ test("the exact byte ceiling is admitted and one byte more is refused", async ()
     res.end(okReply());
   });
   const proxy = await startProxy({ stubPort: stub.port, extra: ["--max-requests", "4"] });
-  const atBound = bodyOfExactBytes(PROFILE.model, INPUT_BODY_BYTES);
-  const overBound = bodyOfExactBytes(PROFILE.model, INPUT_BODY_BYTES + 1);
+  // These bodies already declare their output ceiling, so the proxy injects
+  // nothing and the forwarded body is exactly the admitted body.
+  const withOutput = (bytes) => {
+    const prefix = Buffer.byteLength(
+      JSON.stringify({ model: PROFILE.model, max_output_tokens: MAX_OUTPUT_TOKENS, input: "" }),
+      "utf8",
+    );
+    return JSON.stringify({
+      model: PROFILE.model,
+      max_output_tokens: MAX_OUTPUT_TOKENS,
+      input: "a".repeat(bytes - prefix),
+    });
+  };
+  const atBound = withOutput(INPUT_BODY_BYTES);
+  const overBound = withOutput(INPUT_BODY_BYTES + 1);
   assert.equal(Buffer.byteLength(atBound, "utf8"), INPUT_BODY_BYTES);
   assert.equal(Buffer.byteLength(overBound, "utf8"), INPUT_BODY_BYTES + 1);
 
@@ -223,6 +236,44 @@ test("the exact byte ceiling is admitted and one byte more is refused", async ()
   assert.equal(refusal.code, "proxy_input_ceiling_exceeded");
   assert.equal(refusal.bodyByteCeiling, INPUT_BODY_BYTES);
   assert.equal(refusal.inputTokenCeiling, INPUT_TOKEN_CEILING);
+});
+
+test("a body whose forwarded form grows past the ceiling is refused before dispatch", async () => {
+  // The ceiling must govern the bytes the provider actually tokenizes. A body
+  // admitted on its received length can grow on re-serialization — here the proxy
+  // injects a missing max_output_tokens — so the forwarded length is checked
+  // separately, before any slot is reserved and before anything is sent.
+  const stub = await startStub((_req, res) => {
+    res.writeHead(200, { "content-type": "application/json" });
+    res.end(okReply());
+  });
+  const proxy = await startProxy({
+    stubPort: stub.port,
+    extra: ["--max-requests", "4", "--request-input-bytes", "120", "--request-input-tokens", "200"],
+  });
+  const body = bodyOfExactBytes(PROFILE.model, 100);
+  assert.equal(Buffer.byteLength(body, "utf8"), 100);
+  assert.equal(JSON.parse(body).max_output_tokens, undefined);
+  const expectedForwarded = Buffer.byteLength(
+    JSON.stringify({ ...JSON.parse(body), max_output_tokens: MAX_OUTPUT_TOKENS }),
+    "utf8",
+  );
+  assert.ok(expectedForwarded > 120, "the injected body must exceed the admitted ceiling");
+
+  const response = await post(proxy.port, body);
+  const payload = await response.json();
+  const ledger = proxy.read();
+  proxy.close();
+  stub.close();
+
+  assert.equal(response.status, 413);
+  assert.equal(payload.error.code, "proxy_forward_bytes_exceeded");
+  const refusal = ledger.find((line) => line.decision === "refused");
+  assert.equal(refusal.receivedBytes, 100);
+  assert.equal(refusal.forwardedBytes, expectedForwarded);
+  assert.equal(refusal.bodyByteCeiling, 120);
+  assert.equal(stub.calls.length, 0, "a body that grows past the ceiling never reaches the provider");
+  assert.equal(ledger.filter((line) => line.decision === "forwarded").length, 0);
 });
 
 test("a token ceiling that cannot dominate the byte ceiling refuses to start", async () => {

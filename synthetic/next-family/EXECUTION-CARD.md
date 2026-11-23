@@ -1,8 +1,10 @@
-# Execution card — next task family (revision 2)
+# Execution card — next task family (revision 3)
 
-Frozen 2026-11-22 as **D3-R1**, offline preparation only. **No paid inference has been run on this
-family.** Repo `agent-teams-ai/task-verification`, branch `exp/synthetic-live-pilot-01`.
-M2 PR #2 (`996cdcb002f898a5b73ce8f9ce7931e6299b14e4`) untouched.
+Revision 2 was frozen 2026-11-22 as **D3-R1**, offline preparation only; at that freeze **no paid
+inference had been run on this family**. Revision 3 is the D3-R2 admission pass: two transport defects
+found while verifying the live path are corrected in §8 and §10, and gate 12 now machine-checks the
+no-bypass property in §12. Repo `agent-teams-ai/task-verification`, branch
+`exp/synthetic-live-pilot-01`. M2 PR #2 (`996cdcb002f898a5b73ce8f9ce7931e6299b14e4`) untouched.
 
 Revision 1 was rejected in review for eight specific defects; each is corrected here and recorded in
 `D3-R1-PREPARATION.md`. The decision the batch must support is unchanged: for the human reader, choose
@@ -123,6 +125,14 @@ Enforced, in layers, before or around the one dispatch:
 | Observed provider | proxy, on the reply | `502 proxy_observed_provider_mismatch`; allowed set `OpenRouter,OpenAI` |
 | Retries / fallback | nowhere | `--max-requests 1` per attempt; the SDK performs one attempt; a halt refuses everything after |
 
+**No credentialed egress outside the proxy (revision 3).** The launcher used to read the provider key's
+usage figure from `openrouter.ai/api/v1/key` before and after the call. That request carries the
+credential and leaves the bounded boundary even though it is not inference, so it is removed: the
+launcher now performs exactly one `fetch`, to `http://127.0.0.1:<port>/v1/responses`, and gate 12 fails
+the batch if any non-loopback URL or a second fetch appears in its source. Cost is therefore reconciled
+from the proxy ledger's reported usage rather than from a direct provider account read; the trade-off is
+that the provider's own billed total is not independently read in this phase.
+
 **Stated limitation.** Provider and model identity are reported *after* the provider runs; the interface
 offers no way to pin an upstream provider before dispatch. What we can enforce is the requested identity
 on the wire, the absence of substitution in the reply, an allowed-provider set, and a hard halt on any
@@ -163,8 +173,10 @@ recheck is a new stage id with a new attempt id, and a correction must name the 
 | Per-request timeout | 150 s |
 | Wall time | criteria ≤ 10 min, OCR ≤ 25 min, batch ≤ 40 min |
 
-Enforceable-limit statement. The proxy enforces **body bytes**; the token ceiling is the byte ceiling plus
-a special-token allowance, valid because a byte-level BPE tokenizer emits tokens that each cover at least
+Enforceable-limit statement. The proxy enforces **body bytes**, and it enforces them twice: on the
+received body, and again on the exact payload it forwards (`proxy_forward_bytes_exceeded`), because
+re-serialization or the injected output ceiling can grow a body after the first check (revision 3). The
+token ceiling is the byte ceiling plus a special-token allowance, valid because a byte-level BPE tokenizer emits tokens that each cover at least
 one byte, and only format special tokens cover none. The exact tokenizer for `openai/gpt-6.1-terra` cannot
 be obtained offline, so this is a documented upper bound, not a token count; it is falsified empirically
 on the first live reply, where the proxy charges reported usage and halts
@@ -191,15 +203,16 @@ per-request safety limit is weakened and no usage is invented.
 
 ## 12. Readiness gates
 
-`node synthetic/next-family/checks/verify-gates.mjs` — **11/11 PASS** (exit 0) at the frozen state:
+`node synthetic/next-family/checks/verify-gates.mjs` — **12/12 PASS** (exit 0) at revision 3:
 
 1. Packets reproduce at their frozen digests. 2. Task digest and candidate commits match `family.json`.
 3. No evaluator material or role word inside a packet. 4. Credential scan clean (tracked + new files).
 5. Historical A/B/C evidence untouched. 6. Proxy resolves module-relatively; its selftest passes and its
-20-test audit still passes. 7. All 44 offline tests pass, 0 skipped. 8. Launcher admission works for all
+20-test audit still passes. 7. All 52 offline tests pass, 0 skipped. 8. Launcher admission works for all
 three candidates and a credential-less run refuses with exit 3. 9. Budget arithmetic fits the
 authorization, with an empty attempt ledger. 10. Frozen metadata is internally consistent (caps, oracle,
-receipts). 11. The M2 repository is clean at `996cdcb0…`.
+receipts). 11. The M2 repository is clean at `996cdcb0…`. 12. The launcher makes exactly one fetch, to the loopback
+proxy, with no provider host anywhere in its source.
 
 ## 13. Expected decisions (evaluator-only, `evaluator/ORACLE.json`)
 

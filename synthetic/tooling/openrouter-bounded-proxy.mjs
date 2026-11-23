@@ -337,6 +337,32 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // The forwarded bytes are what the provider tokenizes, so the admitted byte
+  // ceiling must govern the bytes actually sent, not only the bytes received.
+  // Re-serializing the parsed body and injecting a missing output ceiling can each
+  // grow the payload, so this is a second, independent pre-dispatch refusal instead
+  // of an assumption that the forwarded body equals the received body.
+  let injectedOutput = null;
+  if (parsed !== null && typeof parsed === 'object' && declaredOutput === undefined) {
+    parsed.max_output_tokens = REQ_OUTPUT_CEILING;
+    injectedOutput = REQ_OUTPUT_CEILING;
+  }
+  const payload = parsed === null ? raw : Buffer.from(JSON.stringify(parsed), 'utf8');
+  const forwardedBytes = payload.length;
+  // Only the provable byte bound has a forwarded-byte form; 'estimate' is a
+  // fixture-only mode with no hard bound to preserve (see INPUT_ENFORCEMENT).
+  if (INPUT_ENFORCEMENT === 'bytes' && forwardedBytes > REQ_INPUT_BYTES) {
+    state.requests += 1;
+    refuse(res, 413, 'proxy_forward_bytes_exceeded', {
+      receivedBytes: inputBytes,
+      forwardedBytes,
+      bodyByteCeiling: REQ_INPUT_BYTES,
+      inputTokenCeiling: REQ_INPUT_CEILING,
+      injectedMaxOutputTokens: injectedOutput,
+    });
+    return;
+  }
+
   // Atomic reservation at the maximum permitted request cost. Committed spend
   // plus in-flight reservations plus this reservation must fit the stage cap.
   if (
@@ -362,12 +388,6 @@ const server = http.createServer(async (req, res) => {
   const reservedIn = REQ_INPUT_CEILING;
   const reservedOut = REQ_OUTPUT_CEILING;
 
-  let injectedOutput = null;
-  if (parsed !== null && typeof parsed === 'object' && declaredOutput === undefined) {
-    parsed.max_output_tokens = REQ_OUTPUT_CEILING;
-    injectedOutput = REQ_OUTPUT_CEILING;
-  }
-  const payload = parsed === null ? raw : Buffer.from(JSON.stringify(parsed), 'utf8');
   // ---- end critical section -------------------------------------------------
 
   const settle = ({ status, usage, ambiguous, observed = { model: null, provider: null } }) => {
@@ -413,6 +433,7 @@ const server = http.createServer(async (req, res) => {
       requestedServiceTier: tier,
       requestedEffort: effort,
       inputBytes,
+      forwardedBytes,
       inputEnforcement: INPUT_ENFORCEMENT,
       bodyByteCeiling: REQ_INPUT_BYTES,
       inputTokenCeiling: REQ_INPUT_CEILING,
