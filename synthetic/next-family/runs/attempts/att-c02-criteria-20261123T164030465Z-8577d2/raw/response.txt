@@ -1,0 +1,86 @@
+{
+  "assessments": [
+    {
+      "requirementId": "C1",
+      "status": "violated",
+      "evidence": [
+        {
+          "path": "src/router.ts",
+          "reference": "deliveryFingerprint and handle idempotency block"
+        },
+        {
+          "path": "src/store.ts",
+          "reference": "lookupIdempotency and rememberIdempotency"
+        }
+      ],
+      "explanation": "Intake ignores the header and indexes by payload hash. The same key with different payloads creates multiple deliveries, while identical payloads without a key are incorrectly collapsed.",
+      "correction": "Use the Idempotency-Key header as the index key, and consult or record the index only when that header is present."
+    },
+    {
+      "requirementId": "C2",
+      "status": "violated",
+      "evidence": [
+        {
+          "path": "src/delivery.ts",
+          "reference": "attemptDelivery and isRetryableStatus"
+        },
+        {
+          "path": "src/limits.ts",
+          "reference": "MAX_ATTEMPTS and backoffMs"
+        }
+      ],
+      "explanation": "Within one invocation, 4xx responses stop the loop, transient failures retry, and delays grow. However, calling attemptDelivery again after a 400 invokes the target again because it does not check the failed state. Thus a non-retryable delivery can be retried.",
+      "correction": "Prevent worker invocations from attempting terminal deliveries, including under concurrent invocation."
+    },
+    {
+      "requirementId": "C3",
+      "status": "satisfied",
+      "evidence": [
+        {
+          "path": "src/router.ts",
+          "reference": "handle payloadBytes check and subsequent subscription lookup"
+        },
+        {
+          "path": "src/limits.ts",
+          "reference": "MAX_PAYLOAD_BYTES"
+        }
+      ],
+      "explanation": "The UTF-8 byte check rejects sizes over 65,536 before subscription lookup and allows exactly 65,536. Separately, a JSON null body throws on property access rather than returning the request-validation 400.",
+      "correction": "Guard against null or non-object parsed bodies before accessing their properties."
+    },
+    {
+      "requirementId": "C4",
+      "status": "violated",
+      "evidence": [
+        {
+          "path": "src/delivery.ts",
+          "reference": "attemptDelivery 410 branch and initial delivery lookup"
+        },
+        {
+          "path": "src/router.ts",
+          "reference": "handle disabled-subscription check before idempotency lookup"
+        }
+      ],
+      "explanation": "A 410 disables the subscription and stops the current invocation, and disabled intake returns 409 before idempotency lookup. But a later call to attemptDelivery for that failed delivery invokes the target again, even though the subscription is disabled.",
+      "correction": "Reject further attempts for terminal deliveries and ensure concurrent worker invocations cannot retry a delivery after a 410."
+    },
+    {
+      "requirementId": "C5",
+      "status": "satisfied",
+      "evidence": [
+        {
+          "path": "src/router.ts",
+          "reference": "handle GET /health branch"
+        },
+        {
+          "path": "tests/health.test.ts",
+          "reference": "health: GET /health reports ok"
+        }
+      ],
+      "explanation": "GET /health returns status 200 and the JSON object {\"status\":\"ok\"}."
+    				
+    																			, 										
+    																			"correction": "None."
+    }
+  ]
+}

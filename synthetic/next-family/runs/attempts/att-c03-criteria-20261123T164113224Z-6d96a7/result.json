@@ -1,0 +1,220 @@
+{
+  "schema": "next-family.criteria-report/v1",
+  "attemptId": "att-c03-criteria-20261123T164113224Z-6d96a7",
+  "state": "completed",
+  "stopReason": null,
+  "candidateId": "c03",
+  "head": "18bbde350074d4afd8a3e3d52be31479c6ba85fc",
+  "stageId": "criteria",
+  "startedAt": "2026-11-23T16:41:13.253Z",
+  "endedAt": "2026-11-23T16:41:46.867Z",
+  "profile": {
+    "provider": "OpenRouter",
+    "providerEndpoint": "openrouter",
+    "model": "openai/gpt-6.1-terra",
+    "serviceTier": "default",
+    "effort": "medium",
+    "outputMode": "json_schema",
+    "stream": true,
+    "store": false,
+    "sdk": "@agent-teams/account-gateway/llm -> createLlmClient()",
+    "sdkVersion": "0.1.0",
+    "taskRevision": "delivery-req-v2"
+  },
+  "profileDigest": "2a7532d7c60408121f74af389dc0b15e9b2cee44076eb33a5baa11078f59112a",
+  "inputProfile": {
+    "packet": {
+      "path": "packet-18bbde350074.md",
+      "bytes": 23743,
+      "sha256": "89e4be23879acb67e337ab08407cdc17ab83fa34bc31ce92cbcb2424f92d8641"
+    },
+    "rule": "next-family-packet-rule-v1",
+    "instructionsSha256": "1c30edd0f0eecb14e15b7f66e364478400f0fe1fe83a50821ff8e43c07b5422d",
+    "serializedBody": {
+      "bytes": 26427,
+      "sha256": "15198130b6cdb928d5ba6f1ff3118e5ab0b001ecb11bc748e70f6578a8cdf595"
+    }
+  },
+  "ceilings": {
+    "bodyBytes": 28672,
+    "inputTokens": 28736,
+    "outputTokens": 2500
+  },
+  "reservation": {
+    "maxUsd": 0.04842,
+    "admission": {
+      "admitted": true,
+      "requestedUsd": 0.04842,
+      "totals": {
+        "settledUsd": 0.03780875,
+        "unresolvedUsd": 0,
+        "reservedUsd": 0.04842,
+        "newSpendUsd": 0.08622875,
+        "aggregateWorstCaseUsd": 0.64551875,
+        "remainingUsd": 0.35448125
+      }
+    }
+  },
+  "outcome": {
+    "ok": true,
+    "usage": {
+      "inputTokens": 5975,
+      "outputTokens": 2055,
+      "cachedInputTokens": 0,
+      "reasoningTokens": 1402
+    },
+    "receipt": {
+      "executionRef": "exec_next-family-criteria-c03-a1-p",
+      "requestRef": "next-family-criteria-c03-a1-r",
+      "accountRef": "openrouter-primary",
+      "authorizationEpoch": 1,
+      "taskId": "next-family-criteria-c03",
+      "attempt": 1,
+      "profileId": "next-family-criteria",
+      "model": "openai/gpt-6.1-terra",
+      "observedModel": "openai/gpt-6.1-terra",
+      "responseId": "gen-1795452075-tUymO1sKtSQuzxTYeUCU",
+      "requestSha256": "15198130b6cdb928d5ba6f1ff3118e5ab0b001ecb11bc748e70f6578a8cdf595",
+      "outputSha256": "905b7d6fefc19f1b3d9e35041860ccde75a6aee47e83a8943ad8608f60f26805"
+    },
+    "cleanup": "closed",
+    "value": {
+      "assessments": [
+        {
+          "requirementId": "C1",
+          "status": "violated",
+          "evidence": [
+            {
+              "path": "src/router.ts",
+              "reference": "handle: idempotency-key lookup and nonempty-key checks"
+            },
+            {
+              "path": "src/types.ts",
+              "reference": "Request.headers"
+            },
+            {
+              "path": "src/router.ts",
+              "reference": "handle: JSON parsing and body-shape checks"
+            }
+          ],
+          "explanation": "The handler only recognizes the lowercase header name and ignores an empty key. Two valid requests using `Idempotency-Key: k` in the exposed Request object, or an empty key, can therefore enqueue two deliveries. Also, a JSON `null` body throws during shape validation rather than returning 400.",
+          "correction": "Normalize header names case-insensitively and index every present key; guard against null and other invalid body shapes before accessing their fields."
+        },
+        {
+          "requirementId": "C2",
+          "status": "violated",
+          "evidence": [
+            {
+              "path": "src/delivery.ts",
+              "reference": "attemptDelivery: final classification and entry into the attempts loop"
+            },
+            {
+              "path": "src/delivery.ts",
+              "reference": "loadRetryPolicy and policy.classify/nextDelayMs"
+            },
+            {
+              "path": "tests/retry.test.ts",
+              "reference": "retry tests"
+            }
+          ],
+          "explanation": "A terminal 4xx leaves the delivery failed, but a later call to attemptDelivery does not check its state and can attempt it again. Separately, the provided material cannot establish the external policy's classifications or growing delays; the tests have no execution receipt.",
+          "correction": "Do not attempt terminal deliveries again. Verify the workspace policy source or provide execution evidence covering all required classifications and increasing delays."
+        },
+        {
+          "requirementId": "C3",
+          "status": "satisfied",
+          "evidence": [
+            {
+              "path": "src/router.ts",
+              "reference": "handle: Buffer.byteLength check before subscription lookup"
+            },
+            {
+              "path": "src/limits.ts",
+              "reference": "MAX_PAYLOAD_BYTES"
+            },
+            {
+              "path": "tests/subscriptions.test.ts",
+              "reference": "limits tests"
+            }
+          ],
+          "explanation": "The handler measures UTF-8 payload bytes, rejects sizes greater than 65,536 before consulting the subscription or queuing, and accepts the boundary.",
+          "correction": ""
+        },
+        {
+          "requirementId": "C4",
+          "status": "violated",
+          "evidence": [
+            {
+              "path": "src/delivery.ts",
+              "reference": "attemptDelivery: 410 branch and attempts loop"
+            },
+            {
+              "path": "src/router.ts",
+              "reference": "handle: disabled subscription check before idempotency lookup"
+            },
+            {
+              "path": "src/store.ts",
+              "reference": "disableSubscription and queued"
+            }
+          ],
+          "explanation": "A 410 disables the subscription and stops the current invocation, and intake correctly rejects disabled subscriptions before idempotency lookup. However, calling attemptDelivery again for that failed delivery invokes the target again: the worker checks neither terminal state nor disabled status.",
+          "correction": "Prevent subsequent worker invocations from attempting a delivery already failed by a 410, and retain the existing intake precedence."
+        },
+        {
+          "requirementId": "C5",
+          "status": "satisfied",
+          "evidence": [
+            {
+              "path": "src/router.ts",
+              "reference": "handle: GET /health"
+            },
+            {
+              "path": "tests/health.test.ts",
+              "reference": "health: GET /health reports ok"
+            }
+          ],
+          "explanation": "The health route returns status 200 with the required JSON body.",
+          "correction": ""
+        }
+      ]
+    }
+  },
+  "execution": {
+    "forwardedBodies": 1,
+    "forwardedRequests": 1,
+    "refusals": [],
+    "charged": {
+      "inputTokens": 5975,
+      "outputTokens": 2055
+    },
+    "settlement": {
+      "settled": true,
+      "state": "settled",
+      "settledUsd": 0.01774375,
+      "totals": {
+        "settledUsd": 0.0555525,
+        "unresolvedUsd": 0,
+        "reservedUsd": 0,
+        "newSpendUsd": 0.0555525,
+        "aggregateWorstCaseUsd": 0.6148425,
+        "remainingUsd": 0.3851575
+      }
+    },
+    "observed": [
+      {
+        "status": 200,
+        "model": "openai/gpt-6.1-terra",
+        "provider": null,
+        "identityVerified": true,
+        "providerVerified": false,
+        "halted": null
+      }
+    ]
+  },
+  "transport": {
+    "directProviderEgress": false,
+    "credentialHolder": "bounded-proxy-only",
+    "note": "the launcher issues no credentialed request of its own; cost is reconciled from the proxy ledger's reported usage rather than from a direct provider account read"
+  },
+  "rawResponsePath": "runs/attempts/att-c03-criteria-20261123T164113224Z-6d96a7/raw/response.txt"
+}

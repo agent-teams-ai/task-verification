@@ -1,0 +1,64 @@
+{
+  "schema": "next-family.budget-guard/v1",
+  "approvedCeilingUsd": 1,
+  "historical": {
+    "settledUsd": 0.3163953,
+    "conservativeUsd": 0.55929,
+    "reconciliationPath": "synthetic/runs/d12-recheck/reconciliation.json",
+    "committedUsd": 0.55929
+  },
+  "pricing": {
+    "inputUsdPerMillion": 1.25,
+    "outputUsdPerMillion": 5,
+    "cacheReadUsdPerMillion": 0.05,
+    "basis": "worst-case rate of the approved profile: every input token at the cache-write rate, every output token at the output rate; cache reads (0.05/M) are cheaper and are never assumed"
+  },
+  "reservations": [
+    {
+      "requestKey": "e834bcaae851ad9e55e5a550cdce7f77097f5616193b53eb6ad9d3348b80f7a1",
+      "attemptId": "att-c01-criteria-20261123T163938612Z-581a22",
+      "candidateId": "c01",
+      "stageId": "criteria",
+      "maxUsd": 0.04842,
+      "state": "settled",
+      "reservedAt": "2026-11-23T16:39:38.615Z",
+      "settledUsd": 0.019745,
+      "charged": {
+        "inputTokens": 5868,
+        "outputTokens": 2482
+      },
+      "settledAt": "2026-11-23T16:40:16.659Z"
+    },
+    {
+      "requestKey": "1d5acd6e4a6cb077885158e57159e6b3d0449a39fa304ab46fecff276eb99b92",
+      "attemptId": "att-c02-criteria-20261123T164030465Z-8577d2",
+      "candidateId": "c02",
+      "stageId": "criteria",
+      "maxUsd": 0.04842,
+      "state": "settled",
+      "reservedAt": "2026-11-23T16:40:30.469Z",
+      "settledUsd": 0.01806375,
+      "charged": {
+        "inputTokens": 5811,
+        "outputTokens": 2160
+      },
+      "settledAt": "2026-11-23T16:41:05.241Z"
+    },
+    {
+      "requestKey": "e0647067cd31f22f214d4609cbdce5f5b2c47b4013cb90bd61106d5cc93bb79b",
+      "attemptId": "att-c03-criteria-20261123T164113224Z-6d96a7",
+      "candidateId": "c03",
+      "stageId": "criteria",
+      "maxUsd": 0.04842,
+      "state": "settled",
+      "reservedAt": "2026-11-23T16:41:13.229Z",
+      "settledUsd": 0.01774375,
+      "charged": {
+        "inputTokens": 5975,
+        "outputTokens": 2055
+      },
+      "settledAt": "2026-11-23T16:41:46.865Z"
+    }
+  ],
+  "createdAt": "2026-11-23T16:39:38.615Z"
+}

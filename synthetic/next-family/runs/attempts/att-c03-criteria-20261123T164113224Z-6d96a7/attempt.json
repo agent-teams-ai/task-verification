@@ -1,0 +1,23 @@
+{
+  "schema": "next-family.attempt/v1",
+  "attemptId": "att-c03-criteria-20261123T164113224Z-6d96a7",
+  "candidateId": "c03",
+  "stageId": "criteria",
+  "runKey": "e0647067cd31f22f214d4609cbdce5f5b2c47b4013cb90bd61106d5cc93bb79b",
+  "corrects": null,
+  "createdAt": "2026-11-23T16:41:13.226Z",
+  "input": {
+    "packet": {
+      "path": "packet-18bbde350074.md",
+      "bytes": 23743,
+      "sha256": "89e4be23879acb67e337ab08407cdc17ab83fa34bc31ce92cbcb2424f92d8641"
+    },
+    "serializedBody": {
+      "bytes": 26427,
+      "sha256": "15198130b6cdb928d5ba6f1ff3118e5ab0b001ecb11bc748e70f6578a8cdf595"
+    },
+    "profileDigest": "2a7532d7c60408121f74af389dc0b15e9b2cee44076eb33a5baa11078f59112a"
+  },
+  "reservationUsd": 0.04842,
+  "state": "admitted"
+}

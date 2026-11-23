@@ -1,0 +1,177 @@
+{
+  "schema": "next-family.d3-r2-index/v1",
+  "frozenAt": "2026-11-23T16:42:29.769Z",
+  "branch": "exp/synthetic-live-pilot-01",
+  "attempts": [
+    {
+      "candidate": "c01",
+      "attemptId": "att-c01-criteria-20261123T163938612Z-581a22",
+      "state": "completed",
+      "stopReason": null,
+      "statuses": {
+        "C1": "violated",
+        "C2": "violated",
+        "C3": "violated",
+        "C4": "violated",
+        "C5": "satisfied"
+      },
+      "usage": {
+        "inputTokens": 5868,
+        "outputTokens": 2482,
+        "cachedInputTokens": 0,
+        "reasoningTokens": 1552
+      },
+      "charged": {
+        "inputTokens": 5868,
+        "outputTokens": 2482
+      },
+      "forwardedRequests": 1,
+      "refusals": [],
+      "observed": [
+        {
+          "status": 200,
+          "model": "openai/gpt-6.1-terra",
+          "provider": null,
+          "identityVerified": true,
+          "providerVerified": false,
+          "halted": null
+        }
+      ],
+      "settledUsd": 0.019745,
+      "rawSha256": "5b094c70f6d10e357945a2c82121c8c6c2d3cb0a73616480a343153eaeb93dda",
+      "rawBytes": 4217,
+      "bodyBytes": 25884,
+      "bodySha256": "ad23c1ea2aefce601c4b846b92a8e2801a7e2c85dbad026b1139d5629f5b6806",
+      "packetSha256": "2c607491fd99d9aa12595e511d8196eb510dcf0bfa18b5c56d502d6a04f40f43",
+      "ceilings": {
+        "bodyBytes": 28672,
+        "inputTokens": 28736,
+        "outputTokens": 2500
+      }
+    },
+    {
+      "candidate": "c02",
+      "attemptId": "att-c02-criteria-20261123T164030465Z-8577d2",
+      "state": "completed",
+      "stopReason": null,
+      "statuses": {
+        "C1": "violated",
+        "C2": "violated",
+        "C3": "satisfied",
+        "C4": "violated",
+        "C5": "satisfied"
+      },
+      "usage": {
+        "inputTokens": 5811,
+        "outputTokens": 2160,
+        "cachedInputTokens": 0,
+        "reasoningTokens": 1370
+      },
+      "charged": {
+        "inputTokens": 5811,
+        "outputTokens": 2160
+      },
+      "forwardedRequests": 1,
+      "refusals": [],
+      "observed": [
+        {
+          "status": 200,
+          "model": "openai/gpt-6.1-terra",
+          "provider": null,
+          "identityVerified": true,
+          "providerVerified": false,
+          "halted": null
+        }
+      ],
+      "settledUsd": 0.01806375,
+      "rawSha256": "32796bc5b58e83c097e67ae780cd4885793075661ae77c0c6f23c1d5c425bbe9",
+      "rawBytes": 3448,
+      "bodyBytes": 25741,
+      "bodySha256": "792c42f2e86529c8af805ec0fb735204e6879f8b9a0ffb6db76eadaadf0dddaf",
+      "packetSha256": "d38c0af7cc82077a4d2787f7c5e02ca490b2235ef195a0c7b232c1d488093bfc",
+      "ceilings": {
+        "bodyBytes": 28672,
+        "inputTokens": 28736,
+        "outputTokens": 2500
+      }
+    },
+    {
+      "candidate": "c03",
+      "attemptId": "att-c03-criteria-20261123T164113224Z-6d96a7",
+      "state": "completed",
+      "stopReason": null,
+      "statuses": {
+        "C1": "violated",
+        "C2": "violated",
+        "C3": "satisfied",
+        "C4": "violated",
+        "C5": "satisfied"
+      },
+      "usage": {
+        "inputTokens": 5975,
+        "outputTokens": 2055,
+        "cachedInputTokens": 0,
+        "reasoningTokens": 1402
+      },
+      "charged": {
+        "inputTokens": 5975,
+        "outputTokens": 2055
+      },
+      "forwardedRequests": 1,
+      "refusals": [],
+      "observed": [
+        {
+          "status": 200,
+          "model": "openai/gpt-6.1-terra",
+          "provider": null,
+          "identityVerified": true,
+          "providerVerified": false,
+          "halted": null
+        }
+      ],
+      "settledUsd": 0.01774375,
+      "rawSha256": "905b7d6fefc19f1b3d9e35041860ccde75a6aee47e83a8943ad8608f60f26805",
+      "rawBytes": 3091,
+      "bodyBytes": 26427,
+      "bodySha256": "15198130b6cdb928d5ba6f1ff3118e5ab0b001ecb11bc748e70f6578a8cdf595",
+      "packetSha256": "89e4be23879acb67e337ab08407cdc17ab83fa34bc31ce92cbcb2424f92d8641",
+      "ceilings": {
+        "bodyBytes": 28672,
+        "inputTokens": 28736,
+        "outputTokens": 2500
+      }
+    }
+  ],
+  "budget": {
+    "approvedCeilingUsd": 1,
+    "historicalCommittedUsd": 0.55929,
+    "newSettledUsd": 0.0555525,
+    "aggregateWorstCaseUsd": 0.6148425,
+    "remainingUsd": 0.3851575,
+    "reservations": [
+      {
+        "candidateId": "c01",
+        "state": "settled",
+        "maxUsd": 0.04842,
+        "settledUsd": 0.019745
+      },
+      {
+        "candidateId": "c02",
+        "state": "settled",
+        "maxUsd": 0.04842,
+        "settledUsd": 0.01806375
+      },
+      {
+        "candidateId": "c03",
+        "state": "settled",
+        "maxUsd": 0.04842,
+        "settledUsd": 0.01774375
+      }
+    ]
+  },
+  "ocr": {
+    "executed": false,
+    "reason": "comparator 1.14.0-rr.1 unavailable: only rr.7 images are present locally and the qualified linux/amd64 binary is absent; the frozen card forbids substitution"
+  },
+  "oracleConsulted": false
+}

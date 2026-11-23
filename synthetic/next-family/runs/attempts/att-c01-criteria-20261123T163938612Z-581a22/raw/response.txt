@@ -1,0 +1,96 @@
+{
+  "assessments": [
+    {
+      "requirementId": "C1",
+      "status": "violated",
+      "evidence": [
+        {
+          "path": "src/router.ts",
+          "reference": "handle: idempotency-key lookup and nonempty-key checks"
+        },
+        {
+          "path": "src/types.ts",
+          "reference": "Request.headers"
+        }
+      ],
+      "explanation": "The handler only recognizes a lowercase header name and ignores an empty header value. Callers can supply either `Idempotency-Key` or an empty `idempotency-key` through the Request interface, and repeated valid submissions then create separate deliveries.",
+      "correction": "Normalize header names case-insensitively and index every supplied key value, including an empty value, unless the contract is changed to reject it."
+    },
+    {
+      "requirementId": "C2",
+      "status": "violated",
+      "evidence": [
+        {
+          "path": "src/delivery.ts",
+          "reference": "attemptDelivery: terminal failure branch and entry into the attempt loop"
+        },
+        {
+          "path": "src/limits.ts",
+          "reference": "MAX_ATTEMPTS and backoffMs"
+        },
+        {
+          "path": "src/store.ts",
+          "reference": "pending"
+        }
+      ],
+      "explanation": "A 400 marks the delivery failed, but a subsequent call to attemptDelivery attempts it again because the entry point does not check its terminal state. Pending also retains the delivery. The local policy otherwise caps attempts at three and uses growing delays.",
+      "correction": "Make attemptDelivery return without calling the target for terminal deliveries, and test repeated worker invocation after a non-retryable 4xx."
+    },
+    {
+      "requirementId": "C3",
+      "status": "violated",
+      "evidence": [
+        {
+          "path": "src/router.ts",
+          "reference": "handle: subscriptionId validation before payload byte-length check"
+        },
+        {
+          "path": "src/store.ts",
+          "reference": "addSubscription"
+        },
+        {
+          "path": "src/limits.ts",
+          "reference": "MAX_PAYLOAD_BYTES"
+        }
+      ],
+      "explanation": "An empty subscriptionId is a present string under the specified body-shape rule, but the handler rejects it with 400 before checking size. Thus an oversized payload with that subscriptionId receives 400 rather than 413, whether the subscription is unknown or disabled. The byte-counting and boundary checks otherwise implement the stated limit.",
+      "correction": "Apply the specified missing/non-string shape check, then check payload size before subscription lookup. Also guard parsed null bodies so missing fields return 400 rather than throwing."
+    },
+    {
+      "requirementId": "C4",
+      "status": "violated",
+      "evidence": [
+        {
+          "path": "src/delivery.ts",
+          "reference": "attemptDelivery: 410 branch and lack of a terminal-state check on entry"
+        },
+        {
+          "path": "src/router.ts",
+          "reference": "handle: subscription validation before idempotency lookup"
+        },
+        {
+          "path": "src/store.ts",
+          "reference": "addSubscription and disableSubscription"
+        }
+      ],
+      "explanation": "A 410 disables the subscription and stops the current invocation, but calling attemptDelivery again retries the failed delivery. Intake correctly checks a normally named disabled subscription before idempotency, but a disabled subscription with an empty string id receives 400 instead of 409.",
+      "correction": "Prevent worker calls from reattempting terminal deliveries and follow the specified body-shape rule for string subscription IDs. Test repeated invocation after 410 and disabled-subscription intake."
+    },
+    {
+      "requirementId": "C5",
+      "status": "satisfied",
+      "evidence": [
+        {
+          "path": "src/router.ts",
+          "reference": "handle: GET /health"
+        },
+        {
+          "path": "tests/health.test.ts",
+          "reference": "health: GET /health reports ok"
+        }
+      ],
+      "explanation": "The health route returns 200 with the required JSON body.",
+      "correction": "No correction needed."
+    }
+  ]
+}

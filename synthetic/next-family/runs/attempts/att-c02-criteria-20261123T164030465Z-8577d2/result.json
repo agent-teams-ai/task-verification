@@ -1,0 +1,204 @@
+{
+  "schema": "next-family.criteria-report/v1",
+  "attemptId": "att-c02-criteria-20261123T164030465Z-8577d2",
+  "state": "completed",
+  "stopReason": null,
+  "candidateId": "c02",
+  "head": "65f210381920fbfce032cf5ba8aaa440f3300162",
+  "stageId": "criteria",
+  "startedAt": "2026-11-23T16:40:30.493Z",
+  "endedAt": "2026-11-23T16:41:05.243Z",
+  "profile": {
+    "provider": "OpenRouter",
+    "providerEndpoint": "openrouter",
+    "model": "openai/gpt-6.1-terra",
+    "serviceTier": "default",
+    "effort": "medium",
+    "outputMode": "json_schema",
+    "stream": true,
+    "store": false,
+    "sdk": "@agent-teams/account-gateway/llm -> createLlmClient()",
+    "sdkVersion": "0.1.0",
+    "taskRevision": "delivery-req-v2"
+  },
+  "profileDigest": "2a7532d7c60408121f74af389dc0b15e9b2cee44076eb33a5baa11078f59112a",
+  "inputProfile": {
+    "packet": {
+      "path": "packet-65f210381920.md",
+      "bytes": 23093,
+      "sha256": "d38c0af7cc82077a4d2787f7c5e02ca490b2235ef195a0c7b232c1d488093bfc"
+    },
+    "rule": "next-family-packet-rule-v1",
+    "instructionsSha256": "1c30edd0f0eecb14e15b7f66e364478400f0fe1fe83a50821ff8e43c07b5422d",
+    "serializedBody": {
+      "bytes": 25741,
+      "sha256": "792c42f2e86529c8af805ec0fb735204e6879f8b9a0ffb6db76eadaadf0dddaf"
+    }
+  },
+  "ceilings": {
+    "bodyBytes": 28672,
+    "inputTokens": 28736,
+    "outputTokens": 2500
+  },
+  "reservation": {
+    "maxUsd": 0.04842,
+    "admission": {
+      "admitted": true,
+      "requestedUsd": 0.04842,
+      "totals": {
+        "settledUsd": 0.019745,
+        "unresolvedUsd": 0,
+        "reservedUsd": 0.04842,
+        "newSpendUsd": 0.068165,
+        "aggregateWorstCaseUsd": 0.627455,
+        "remainingUsd": 0.372545
+      }
+    }
+  },
+  "outcome": {
+    "ok": true,
+    "usage": {
+      "inputTokens": 5811,
+      "outputTokens": 2160,
+      "cachedInputTokens": 0,
+      "reasoningTokens": 1370
+    },
+    "receipt": {
+      "executionRef": "exec_next-family-criteria-c02-a1-p",
+      "requestRef": "next-family-criteria-c02-a1-r",
+      "accountRef": "openrouter-primary",
+      "authorizationEpoch": 1,
+      "taskId": "next-family-criteria-c02",
+      "attempt": 1,
+      "profileId": "next-family-criteria",
+      "model": "openai/gpt-6.1-terra",
+      "observedModel": "openai/gpt-6.1-terra",
+      "responseId": "gen-1795452032-iDlENQ7EF9ih9lXP6QaI",
+      "requestSha256": "792c42f2e86529c8af805ec0fb735204e6879f8b9a0ffb6db76eadaadf0dddaf",
+      "outputSha256": "32796bc5b58e83c097e67ae780cd4885793075661ae77c0c6f23c1d5c425bbe9"
+    },
+    "cleanup": "closed",
+    "value": {
+      "assessments": [
+        {
+          "requirementId": "C1",
+          "status": "violated",
+          "evidence": [
+            {
+              "path": "src/router.ts",
+              "reference": "deliveryFingerprint and handle idempotency block"
+            },
+            {
+              "path": "src/store.ts",
+              "reference": "lookupIdempotency and rememberIdempotency"
+            }
+          ],
+          "explanation": "Intake ignores the header and indexes by payload hash. The same key with different payloads creates multiple deliveries, while identical payloads without a key are incorrectly collapsed.",
+          "correction": "Use the Idempotency-Key header as the index key, and consult or record the index only when that header is present."
+        },
+        {
+          "requirementId": "C2",
+          "status": "violated",
+          "evidence": [
+            {
+              "path": "src/delivery.ts",
+              "reference": "attemptDelivery and isRetryableStatus"
+            },
+            {
+              "path": "src/limits.ts",
+              "reference": "MAX_ATTEMPTS and backoffMs"
+            }
+          ],
+          "explanation": "Within one invocation, 4xx responses stop the loop, transient failures retry, and delays grow. However, calling attemptDelivery again after a 400 invokes the target again because it does not check the failed state. Thus a non-retryable delivery can be retried.",
+          "correction": "Prevent worker invocations from attempting terminal deliveries, including under concurrent invocation."
+        },
+        {
+          "requirementId": "C3",
+          "status": "satisfied",
+          "evidence": [
+            {
+              "path": "src/router.ts",
+              "reference": "handle payloadBytes check and subsequent subscription lookup"
+            },
+            {
+              "path": "src/limits.ts",
+              "reference": "MAX_PAYLOAD_BYTES"
+            }
+          ],
+          "explanation": "The UTF-8 byte check rejects sizes over 65,536 before subscription lookup and allows exactly 65,536. Separately, a JSON null body throws on property access rather than returning the request-validation 400.",
+          "correction": "Guard against null or non-object parsed bodies before accessing their properties."
+        },
+        {
+          "requirementId": "C4",
+          "status": "violated",
+          "evidence": [
+            {
+              "path": "src/delivery.ts",
+              "reference": "attemptDelivery 410 branch and initial delivery lookup"
+            },
+            {
+              "path": "src/router.ts",
+              "reference": "handle disabled-subscription check before idempotency lookup"
+            }
+          ],
+          "explanation": "A 410 disables the subscription and stops the current invocation, and disabled intake returns 409 before idempotency lookup. But a later call to attemptDelivery for that failed delivery invokes the target again, even though the subscription is disabled.",
+          "correction": "Reject further attempts for terminal deliveries and ensure concurrent worker invocations cannot retry a delivery after a 410."
+        },
+        {
+          "requirementId": "C5",
+          "status": "satisfied",
+          "evidence": [
+            {
+              "path": "src/router.ts",
+              "reference": "handle GET /health branch"
+            },
+            {
+              "path": "tests/health.test.ts",
+              "reference": "health: GET /health reports ok"
+            }
+          ],
+          "explanation": "GET /health returns status 200 and the JSON object {\"status\":\"ok\"}.",
+          "correction": "None."
+        }
+      ]
+    }
+  },
+  "execution": {
+    "forwardedBodies": 1,
+    "forwardedRequests": 1,
+    "refusals": [],
+    "charged": {
+      "inputTokens": 5811,
+      "outputTokens": 2160
+    },
+    "settlement": {
+      "settled": true,
+      "state": "settled",
+      "settledUsd": 0.01806375,
+      "totals": {
+        "settledUsd": 0.03780875,
+        "unresolvedUsd": 0,
+        "reservedUsd": 0,
+        "newSpendUsd": 0.03780875,
+        "aggregateWorstCaseUsd": 0.59709875,
+        "remainingUsd": 0.40290125
+      }
+    },
+    "observed": [
+      {
+        "status": 200,
+        "model": "openai/gpt-6.1-terra",
+        "provider": null,
+        "identityVerified": true,
+        "providerVerified": false,
+        "halted": null
+      }
+    ]
+  },
+  "transport": {
+    "directProviderEgress": false,
+    "credentialHolder": "bounded-proxy-only",
+    "note": "the launcher issues no credentialed request of its own; cost is reconciled from the proxy ledger's reported usage rather than from a direct provider account read"
+  },
+  "rawResponsePath": "runs/attempts/att-c02-criteria-20261123T164030465Z-8577d2/raw/response.txt"
+}
