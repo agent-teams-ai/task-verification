@@ -3,6 +3,7 @@
   "status": "D3_PARTIAL — EVIDENCE_OR_BUDGET_LIMIT_RECORDED",
   "baseline": {
     "researchHead": "9367ce4e7dee40d076f654397fd535a09e2d6c3a",
+    "d3r3EvidenceCommit": "498d724b4a66e7123017901aa6aac424fc02e1eb",
     "branch": "exp/synthetic-live-pilot-01",
     "m2Pr2": "996cdcb002f898a5b73ce8f9ce7931e6299b14e4",
     "d3r2ReportSha256": "a48b0afe5ce6e1345f93156fa2bc660e2209694aa1ed0d6a7dea0b88426939f3",

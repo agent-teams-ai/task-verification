@@ -14,6 +14,7 @@ remaining authorization, so the OCR column of the comparison stays empty rather 
 | Task family | `delivery-req-v2`, sha256 `ff243a43a8a7…` — unchanged |
 | Adjudication | `synthetic/next-family/adjudication/ADJUDICATION.md` |
 | Original D3-R2 report | `synthetic/next-family/runs/D3-R2-REPORT.md` (unmodified) |
+| D3-R3 evidence commit | `498d724b4a66e7123017901aa6aac424fc02e1eb` (pushed `9367ce4..498d724`) |
 | Reader | Iliya |
 
 ---
