@@ -9,7 +9,7 @@ were frozen, no candidate modified.
 | Frozen requirements | `TASK.md`, revision `delivery-req-v2`, sha256 `ff243a43a8a7…` (not revised in this pass) |
 | Candidates | c01 `54623dccc8b1…`, c02 `65f210381920…`, c03 `18bbde350074…` |
 | Base | `c65bc835ca35b94fd0de3e3c0cc2c8d459b556de` |
-| Reproductions | `adjudication/reproduce.mjs`, `adjudication/policy-variants.mjs`; receipts in `adjudication/reproductions/` |
+| Reproductions | `synthetic/next-family/adjudication/reproduce.mjs`, `synthetic/next-family/adjudication/policy-variants.mjs`; receipts in `synthetic/next-family/adjudication/reproductions/` |
 | Original replies | `runs/attempts/att-c01…`, `att-c02…`, `att-c03…` — unmodified |
 | Matrix | §2G |
 
@@ -24,7 +24,7 @@ unresolved uncertainty.
 Three evidence classes are kept separate, and every row says which one it uses:
 
 - **Reproduced** — the frozen commit materialized into a temporary tree and driven through its own
-  exported entry points (`node --experimental-strip-types adjudication/reproduce.mjs <id> <sha>`).
+  exported entry points (`node --experimental-strip-types synthetic/next-family/adjudication/reproduce.mjs <id> <sha>`).
   No working tree was mutated; `lib/fixture.mjs` writes the tree file by file from `git ls-tree`.
 - **Source inspection** — the frozen blob, quoted by file and symbol.
 - **Retained receipt** — `checks/raw-<commit>.txt`, `checks/probe-<commit>.json`, `evaluator/ORACLE.json`.
@@ -78,7 +78,7 @@ collapsed."
 | no header, `alpha` twice | 2 ids, 2 queued | **1 id, 1 queued** | two deliveries |
 | same key `k-1`, same payload twice | 1 id, 1 queued | 1 id, 1 queued | one delivery |
 
-Receipts: `adjudication/reproductions/c01.json`, `c02.json`, scenarios `c1_same_key_different_payload`,
+Receipts: `synthetic/next-family/adjudication/reproductions/c01.json` and its c02 sibling, scenarios `c1_same_key_different_payload`,
 `c1_no_key_identical_payloads`.
 
 **Caller boundary.** `handle(store, { method:"POST", path:"/deliveries", headers, body })`. `headers` is
@@ -147,7 +147,7 @@ delivery." c02 and c03 assert the same mechanism, with the same confidence.
 
 Receipts: `c1_reentry_after_400`, `c3_reentry_after_410`, `c2_reentry_after_410_already_disabled`,
 `c2_terminal_pending_includes_failed`, `c2_delivered_pending_includes_delivered` in each
-`adjudication/reproductions/*.json`. The derivative `0d85551a83cb` returns `[1,0,0]` for both re-entry
+`synthetic/next-family/adjudication/reproductions/c01.json` and the c02/c03 siblings. The derivative `0d85551a83cb` returns `[1,0,0]` for both re-entry
 scenarios — the same reproductions falsify the fixed tree, so the counterexample is specific to the
 missing guard rather than to the harness.
 
@@ -376,7 +376,7 @@ node --experimental-strip-types synthetic/next-family/adjudication/policy-varian
 ```
 
 Each run materializes the frozen commit into a temporary directory; nothing in `repo/` changes. The
-reproductions write only to `adjudication/reproductions/`.
+reproductions write only to `synthetic/next-family/adjudication/reproductions/`.
 
 ## 5. What this document is not
 

@@ -42,10 +42,10 @@ Full field-by-field record: `synthetic/next-family/adjudication/ADJUDICATION.md`
 
 | Class | Count | Claims |
 | --- | --- | --- |
-| `CONFIRMED_REQUIRED_VIOLATION` | 8 criterion rows (5 mechanisms) | c02.C1; C2 and C4 on c01, c02, c03 from one terminal re-entry mechanism |
+| `CONFIRMED_REQUIRED_VIOLATION` | 7 criterion rows (2 mechanisms; 5 claim rows in the adjudication matrix) | c02.C1; C2 and C4 on c01, c02, c03 from one terminal re-entry mechanism |
 | `SUPPORTED_SATISFACTION` | 5 | c01.C5, c02.C3, c02.C5, c03.C3, c03.C5 |
 | `AMBIGUOUS_REQUIREMENT` | 3 | c01.C1, c03.C1 (header casing / empty key); c01.C3 (empty-string `subscriptionId` ordering) |
-| `INSUFFICIENT_EVIDENCE` | 1 | c03.C2 clauses (a) transient classification and (d) growing delay — delegated to the external package |
+| `INSUFFICIENT_EVIDENCE` | 1 clause pair (inside c03.C2 — adds no row) | c03.C2 clauses (a) transient classification and (d) growing delay — delegated to the external package |
 | `OPTIONAL_REVIEW_OBSERVATION` | 3 | null-body `TypeError`; concurrent double-invocation lost update; empty-key normalisation |
 | `UNSUPPORTED_MODEL_CLAIM` | 0 | — |
 
@@ -413,3 +413,44 @@ complete qualified OCR run is possible, the assessor's marginal value over ordin
 > contradiction was gone — the abstention works. Spend: USD 0.07374375 new, USD 0.63303375 aggregate,
 > USD 0.36696625 left. Recommendation: keep the assessment as a narrow optional gap detector, never as a
 > completion gate. Your call on that, and on the three owner ambiguities in the adjudication.
+
+## 14. Erratum — confirmed-violation row count (added 2026-11-25, documentation only)
+
+§2's summary table stated `8 criterion rows (5 mechanisms)`. The correct figure is **7 criterion rows
+from 2 independent mechanisms**, carried by 5 claim rows in the adjudication matrix. No finding, verdict,
+class or witness changed; only the count was wrong.
+
+| # | Criterion row | Candidate | Mechanism |
+| --- | --- | --- | --- |
+| 1 | C1 | c02 | payload-hash idempotency index |
+| 2 | C2 | c01 | missing terminal-state guard at worker entry |
+| 3 | C4 | c01 | same guard, `410` path |
+| 4 | C2 | c02 | same guard |
+| 5 | C4 | c02 | same guard |
+| 6 | C2 | c03 | same guard |
+| 7 | C4 | c03 | same guard |
+
+How the two wrong numbers arose:
+
+- **`8`** is the seven violation rows plus the `INSUFFICIENT_EVIDENCE` entry for c03.C2 clauses (a) and (d).
+  That entry is clause-level *inside* c03.C2, which is already row 6 above; adding it counts the same claim
+  twice. It is not an eighth finding.
+- **`5`** is the number of claim rows in the adjudication matrix (2G #1–#5), equivalently five distinct
+  re-entry *observations* (re-entry after `400`, re-entry after `410`, `pending()` retaining `failed`,
+  `pending()` retaining `delivered`, disabled subscription still contacted). Neither is a count of
+  independent mechanisms; there are two.
+
+Reconciliation with the counts already carried elsewhere in this report: the fifteen criterion rows are
+7 violation + 3 ambiguous + 5 satisfied, i.e. 3 candidates × 5 criteria, and the ten `violated` verdicts of
+D3-R2 are 7 confirmed + 3 ambiguous. Both `8` and `5` are consistent with neither, which is why §8, §13 and
+the adjudication's §3 all stated seven and needed no change.
+
+Mandatory clauses relied on, unchanged: C2's "It is not retried for any other `4xx` response" and C4's
+"the delivery is not retried" after `410`. For c03.C2 the aggregate rests on clause (b) alone, with (a) and
+(d) unverified, and still counts as one row.
+
+The seven rows are reproducible in `synthetic/next-family/adjudication/reproductions/c01.json`,
+`synthetic/next-family/adjudication/reproductions/c02.json` and
+`synthetic/next-family/adjudication/reproductions/c03.json` — scenarios `c1_same_key_different_payload`,
+`c1_no_key_identical_payloads`, `c1_reentry_after_400`, `c3_reentry_after_410`, with
+`callsPerInvocation [1,1,1]` on all three candidates.
