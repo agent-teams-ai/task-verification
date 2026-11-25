@@ -281,7 +281,7 @@ changed for this recheck.
 | Real scope of the checks | positive cases only; never calls the worker twice; c02's suite encodes the wrong collapse | reads all 13 files; no receipts | — |
 | Manual preparation | none | 13-file rule, automatic; **~2 h expert** for this adjudication and the reproductions, which the assessment did not have | plus the same |
 | Additional source investigation | none | 0 extra reads (Strategy A packet) | — |
-| Model execution time | — | 32 s / 35 s / 33 s / 35 s | — |
+| Model execution time | — | 38.0 s / 34.8 s / 33.6 s / 35.0 s | — |
 | Inference requests | 0 | 4 total (3 + 1 recheck) | 4 |
 | Costs | 0 | 0.07374375 settled, 0.63303375 aggregate worst case | same |
 | What Iliya can decide | "the suite is green" — which was **wrong** for all three | which requirements to correct, and which evidence to request | both, with the ambiguity kept visible |
