@@ -1,0 +1,55 @@
+{
+  "reviewrouter_managed_paths": [
+    "src/delivery.ts",
+    "src/limits.ts",
+    "src/router.ts",
+    "src/store.ts",
+    "tests/idempotency.test.ts",
+    "tests/retry.test.ts",
+    "tests/subscriptions.test.ts"
+  ],
+  "rules": [
+    {
+      "path": "src/delivery.ts",
+      "rule": "ReviewRouter managed additive policy (reviewrouter-managed-v1).\nReport only issues material to this change: introduced or aggravated by the base-to-head diff.\nFor every finding describe the causal base-to-head change that creates or worsens the issue.\nAllowed finding scope is the reviewed changed paths assigned to this run.\nWrite finding titles and messages in the repository language.",
+      "merge_system_rule": true,
+      "reviewrouter_exact_path": true
+    },
+    {
+      "path": "src/limits.ts",
+      "rule": "ReviewRouter managed additive policy (reviewrouter-managed-v1).\nReport only issues material to this change: introduced or aggravated by the base-to-head diff.\nFor every finding describe the causal base-to-head change that creates or worsens the issue.\nAllowed finding scope is the reviewed changed paths assigned to this run.\nWrite finding titles and messages in the repository language.",
+      "merge_system_rule": true,
+      "reviewrouter_exact_path": true
+    },
+    {
+      "path": "src/router.ts",
+      "rule": "ReviewRouter managed additive policy (reviewrouter-managed-v1).\nReport only issues material to this change: introduced or aggravated by the base-to-head diff.\nFor every finding describe the causal base-to-head change that creates or worsens the issue.\nAllowed finding scope is the reviewed changed paths assigned to this run.\nWrite finding titles and messages in the repository language.",
+      "merge_system_rule": true,
+      "reviewrouter_exact_path": true
+    },
+    {
+      "path": "src/store.ts",
+      "rule": "ReviewRouter managed additive policy (reviewrouter-managed-v1).\nReport only issues material to this change: introduced or aggravated by the base-to-head diff.\nFor every finding describe the causal base-to-head change that creates or worsens the issue.\nAllowed finding scope is the reviewed changed paths assigned to this run.\nWrite finding titles and messages in the repository language.",
+      "merge_system_rule": true,
+      "reviewrouter_exact_path": true
+    },
+    {
+      "path": "tests/idempotency.test.ts",
+      "rule": "ReviewRouter managed additive policy (reviewrouter-managed-v1).\nReport only issues material to this change: introduced or aggravated by the base-to-head diff.\nFor every finding describe the causal base-to-head change that creates or worsens the issue.\nAllowed finding scope is the reviewed changed paths assigned to this run.\nWrite finding titles and messages in the repository language.",
+      "merge_system_rule": true,
+      "reviewrouter_exact_path": true
+    },
+    {
+      "path": "tests/retry.test.ts",
+      "rule": "ReviewRouter managed additive policy (reviewrouter-managed-v1).\nReport only issues material to this change: introduced or aggravated by the base-to-head diff.\nFor every finding describe the causal base-to-head change that creates or worsens the issue.\nAllowed finding scope is the reviewed changed paths assigned to this run.\nWrite finding titles and messages in the repository language.",
+      "merge_system_rule": true,
+      "reviewrouter_exact_path": true
+    },
+    {
+      "path": "tests/subscriptions.test.ts",
+      "rule": "ReviewRouter managed additive policy (reviewrouter-managed-v1).\nReport only issues material to this change: introduced or aggravated by the base-to-head diff.\nFor every finding describe the causal base-to-head change that creates or worsens the issue.\nAllowed finding scope is the reviewed changed paths assigned to this run.\nWrite finding titles and messages in the repository language.",
+      "merge_system_rule": true,
+      "reviewrouter_exact_path": true
+    }
+  ]
+}

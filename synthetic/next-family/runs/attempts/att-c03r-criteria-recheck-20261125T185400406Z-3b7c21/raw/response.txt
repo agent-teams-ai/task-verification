@@ -1,0 +1,100 @@
+{
+  "assessments": [
+    {
+      "requirementId": "C1",
+      "status": "violated",
+      "evidence": [
+        {
+          "path": "src/router.ts",
+          "reference": "handle: idempotency-key lookup and nonempty-key checks"
+        },
+        {
+          "path": "src/store.ts",
+          "reference": "DeliveryStore.lookupIdempotency and rememberIdempotency"
+        },
+        {
+          "path": "src/types.ts",
+          "reference": "Request.headers"
+        }
+      ],
+      "explanation": "The router recognizes only the lowercase header name and treats an empty key as absent. Repeating a valid submission with an empty key, or with the header represented as `Idempotency-Key`, can therefore enqueue a second delivery. Nonempty lowercase keys are otherwise indexed independently of payload.",
+      "correction": "Read header names case-insensitively and distinguish an absent header from a present empty key; index every present key."
+    },
+    {
+      "requirementId": "C2",
+      "status": "inconclusive",
+      "evidence": [
+        {
+          "path": "src/delivery.ts",
+          "reference": "attemptDelivery, loadRetryPolicy, MAX_ATTEMPTS"
+        },
+        {
+          "path": "tests/retry.test.ts",
+          "reference": "retry tests for 500, 503, network error and 400"
+        },
+        {
+          "path": "README.md",
+          "reference": "Dependencies"
+        }
+      ],
+      "explanation": "The worker caps attempts at three and delegates classification and delay to the external policy. The provided material does not establish that the policy retries every required status and error, rejects other 4xx statuses, or supplies growing delays. The test source is not an execution receipt.",
+      "correction": "Provide the external retry-policy source or a run receipt with sufficient coverage of status classification, timeout errors, and increasing delays."
+    },
+    {
+      "requirementId": "C3",
+      "status": "satisfied",
+      "evidence": [
+        {
+          "path": "src/router.ts",
+          "reference": "handle: Buffer.byteLength size check before subscription lookup"
+        },
+        {
+          "path": "src/limits.ts",
+          "reference": "MAX_PAYLOAD_BYTES"
+        },
+        {
+          "path": "tests/subscriptions.test.ts",
+          "reference": "payload limit and exact-boundary tests"
+        }
+      ],
+      "explanation": "The router measures UTF-8 bytes, rejects only sizes above 65,536, and does so before subscription or idempotency lookup. Separately, the shared body-shape rule has a gap: a JSON `null` body throws when its properties are accessed instead of returning 400.",
+      "correction": "Guard against null and other non-object parsed bodies before accessing their properties to satisfy the shared validation rule."
+    },
+    {
+      "requirementId": "C4",
+      "status": "satisfied",
+      "evidence": [
+        {
+          "path": "src/delivery.ts",
+          "reference": "attemptDelivery: 410 branch and disabled-subscription entry guard"
+        },
+        {
+          "path": "src/router.ts",
+          "reference": "handle: disabled subscription check before idempotency lookup"
+        },
+        {
+          "path": "src/store.ts",
+          "reference": "DeliveryStore.disableSubscription"
+        }
+      ],
+      "explanation": "A 410 disables the subscription and ends that delivery attempt as failed. Intake checks subscription status before the idempotency index, so disabled subscriptions return 409 without enqueueing, including for previously accepted keys.",
+      "correction": "No correction needed for the stated lifecycle behavior."
+    },
+    {
+      "requirementId": "C5",
+      "status": "satisfied",
+      "evidence": [
+        {
+          "path": "src/router.ts",
+          "reference": "handle: GET /health"
+        },
+        {
+          "path": "tests/health.test.ts",
+          "reference": "health: GET /health reports ok"
+        }
+      ],
+      "explanation": "GET /health returns status 200 and serializes the requested JSON object.",
+      "correction": "No correction needed."
+    }
+  ]
+}

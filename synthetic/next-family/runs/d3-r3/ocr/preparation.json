@@ -1,0 +1,39 @@
+{
+  "schema": "d3-r3.ocr-preparation/v1",
+  "candidate": "c02",
+  "head": "65f210381920fbfce032cf5ba8aaa440f3300162",
+  "base": "c65bc835ca35b94fd0de3e3c0cc2c8d459b556de",
+  "comparator": {
+    "version": "1.14.0-rr.1",
+    "binarySha256": "443d7777b9fffae6300085c3afc6027181de181befa118bbe6f580dce3fcb399",
+    "binarySizeBytes": 87356967,
+    "artifactId": 14714439075,
+    "runId": 44924052949,
+    "sourceCommit": "8a70944f567beba9ffc12d1153e33ef5fd60967d"
+  },
+  "assignedPaths": [
+    "src/delivery.ts",
+    "src/limits.ts",
+    "src/router.ts",
+    "src/store.ts",
+    "tests/idempotency.test.ts",
+    "tests/retry.test.ts",
+    "tests/subscriptions.test.ts"
+  ],
+  "managedPolicy": {
+    "id": "reviewrouter-managed-v1",
+    "sourceDocument": "synthetic/runs/d12-initial-rr1/rule.json",
+    "policyTextSha256": "32c49219ac909d625860640baaf8dd32926b23e039301c0d33939b2bbacaaa50",
+    "policyTextBytes": 387,
+    "wordingChanged": false
+  },
+  "digests": {
+    "ruleDocumentSha256": "7e28d5afcc5a3924b3e9e521ac7dbcd336326ab581e32da20178dca0414f69a2",
+    "backgroundSha256": "ff243a43a8a74a52679c0673984c0725d8d4ef75dae062e9397c7293280fe3eb",
+    "configSha256": "2f1ef31e5ad9ce5ff5ce139aea20517ca223120c64fc0cbbf1c91382353ff2bf"
+  },
+  "leakCheck": {
+    "containsRoleWords": false,
+    "note": "the rule text and the authored task statement only; no evaluator ids, roles or expected verdicts"
+  }
+}

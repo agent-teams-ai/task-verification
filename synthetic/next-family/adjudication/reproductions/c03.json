@@ -1,0 +1,305 @@
+{
+  "schema": "d3-r3.adjudication-reproduction/v1",
+  "candidateId": "c03",
+  "head": "18bbde350074d4afd8a3e3d52be31479c6ba85fc",
+  "workspacePackagePresent": true,
+  "generatedAt": "2026-11-25T18:40:29.027Z",
+  "scenarios": {
+    "c1_same_key_same_payload": {
+      "ok": true,
+      "observed": {
+        "firstId": "dlv-1",
+        "secondId": "dlv-1",
+        "sameId": true,
+        "secondStatus": 202,
+        "queued": 1
+      }
+    },
+    "c1_same_key_different_payload": {
+      "ok": true,
+      "observed": {
+        "firstId": "dlv-1",
+        "secondId": "dlv-1",
+        "sameId": true,
+        "secondStatus": 202,
+        "deliveries": [
+          {
+            "id": "dlv-1",
+            "payloadSha": "8ed3f6ad"
+          }
+        ],
+        "queued": 1
+      }
+    },
+    "c1_no_key_identical_payloads": {
+      "ok": true,
+      "observed": {
+        "firstId": "dlv-1",
+        "secondId": "dlv-2",
+        "distinctIds": true,
+        "queued": 2
+      }
+    },
+    "c1_no_key_different_payloads": {
+      "ok": true,
+      "observed": {
+        "queued": 2
+      }
+    },
+    "c1_header_mixed_case": {
+      "ok": true,
+      "observed": {
+        "firstId": "dlv-1",
+        "secondId": "dlv-2",
+        "sameId": false,
+        "queued": 2
+      }
+    },
+    "c1_header_upper_case": {
+      "ok": true,
+      "observed": {
+        "firstId": "dlv-1",
+        "secondId": "dlv-2",
+        "sameId": false,
+        "queued": 2
+      }
+    },
+    "c1_header_lower_case": {
+      "ok": true,
+      "observed": {
+        "firstId": "dlv-1",
+        "secondId": "dlv-1",
+        "sameId": true,
+        "queued": 1
+      }
+    },
+    "c1_empty_key_twice": {
+      "ok": true,
+      "observed": {
+        "firstId": "dlv-1",
+        "secondId": "dlv-2",
+        "sameId": false,
+        "queued": 2
+      }
+    },
+    "c1_undefined_header_value": {
+      "ok": true,
+      "observed": {
+        "firstId": "dlv-1",
+        "secondId": "dlv-2",
+        "sameId": false,
+        "queued": 2
+      }
+    },
+    "c1_reentry_after_400": {
+      "ok": true,
+      "observed": {
+        "firstStatus": 400,
+        "callsPerInvocation": [
+          1,
+          1,
+          1
+        ],
+        "totalTargetCalls": 3,
+        "attemptsAfter": [
+          1,
+          2,
+          3
+        ],
+        "stateAfter": [
+          "failed",
+          "failed",
+          "failed"
+        ],
+        "lastStatusAfter": [
+          400,
+          400,
+          400
+        ],
+        "subscriptionStatus": "active",
+        "queuedAfter": 1,
+        "pendingAfter": [
+          {
+            "id": "dlv-1",
+            "state": "failed",
+            "attempts": 3
+          }
+        ],
+        "subscriptionNote": "single subscription"
+      }
+    },
+    "c3_reentry_after_410": {
+      "ok": true,
+      "observed": {
+        "firstStatus": 410,
+        "callsPerInvocation": [
+          1,
+          1,
+          1
+        ],
+        "totalTargetCalls": 3,
+        "attemptsAfter": [
+          1,
+          2,
+          3
+        ],
+        "stateAfter": [
+          "failed",
+          "failed",
+          "failed"
+        ],
+        "lastStatusAfter": [
+          410,
+          410,
+          410
+        ],
+        "subscriptionStatus": "disabled",
+        "queuedAfter": 1,
+        "pendingAfter": [
+          {
+            "id": "dlv-1",
+            "state": "failed",
+            "attempts": 3
+          }
+        ]
+      }
+    },
+    "c2_reentry_after_410_already_disabled": {
+      "ok": true,
+      "observed": {
+        "targetCalls": 1,
+        "state": "delivered",
+        "subscriptionStatus": "disabled"
+      }
+    },
+    "c2_reentry_after_5xx_exhaustion": {
+      "ok": true,
+      "observed": {
+        "callsPerInvocation": [
+          3,
+          0
+        ],
+        "totalTargetCalls": 3
+      }
+    },
+    "c2_terminal_pending_includes_failed": {
+      "ok": true,
+      "observed": {
+        "pendingIds": [
+          "dlv-1"
+        ],
+        "pendingStates": [
+          "failed"
+        ],
+        "queued": 1
+      }
+    },
+    "c2_delivered_pending_includes_delivered": {
+      "ok": true,
+      "observed": {
+        "pendingStates": [
+          "delivered"
+        ],
+        "queued": 1
+      }
+    },
+    "c2_two_deliveries_one_terminal_one_queued": {
+      "ok": true,
+      "observed": {
+        "pending": [
+          {
+            "id": "dlv-1",
+            "state": "failed",
+            "attempts": 1
+          },
+          {
+            "id": "dlv-2",
+            "state": "queued",
+            "attempts": 0
+          }
+        ]
+      }
+    },
+    "concurrent_two_invocations_same_delivery": {
+      "ok": true,
+      "observed": {
+        "targetCalls": 2,
+        "attemptsAfter": [
+          2,
+          2
+        ],
+        "state": "failed"
+      }
+    },
+    "c3_empty_string_subscription_oversized": {
+      "ok": true,
+      "observed": {
+        "status": 400,
+        "body": "{\"error\":\"subscriptionId is required\"}",
+        "queued": 0
+      }
+    },
+    "c3_empty_string_subscription_at_limit": {
+      "ok": true,
+      "observed": {
+        "status": 400,
+        "queued": 0
+      }
+    },
+    "c3_missing_subscription_oversized": {
+      "ok": true,
+      "observed": {
+        "status": 400,
+        "queued": 0
+      }
+    },
+    "c3_non_string_subscription_oversized": {
+      "ok": true,
+      "observed": {
+        "status": 400,
+        "queued": 0
+      }
+    },
+    "c3_unknown_subscription_oversized": {
+      "ok": true,
+      "observed": {
+        "status": 413,
+        "queued": 0
+      }
+    },
+    "c3_disabled_subscription_oversized": {
+      "ok": true,
+      "observed": {
+        "status": 413,
+        "queued": 0
+      }
+    },
+    "null_body": {
+      "ok": false,
+      "error": "Cannot read properties of null (reading 'subscriptionId')",
+      "errorName": "TypeError",
+      "errorMessage": "Cannot read properties of null (reading 'subscriptionId')"
+    },
+    "array_body": {
+      "ok": true,
+      "observed": {
+        "status": 400,
+        "body": "{\"error\":\"subscriptionId is required\"}"
+      }
+    },
+    "number_body": {
+      "ok": true,
+      "observed": {
+        "status": 400,
+        "body": "{\"error\":\"subscriptionId is required\"}"
+      }
+    },
+    "empty_body": {
+      "ok": true,
+      "observed": {
+        "status": 400,
+        "body": "{\"error\":\"subscriptionId is required\"}"
+      }
+    }
+  }
+}

@@ -1,0 +1,43 @@
+{
+  "schema": "next-family.derivative/v1",
+  "id": "c03r",
+  "frozenAt": "2026-11-25",
+  "parent": "c03",
+  "parentHead": "18bbde350074d4afd8a3e3d52be31479c6ba85fc",
+  "head": "0d85551a83cbd87d3664a9de17b9c01990bacaf3",
+  "branch": "candidate-c03r",
+  "bundle": "synthetic/next-family/artifacts/notification-delivery-c03r.bundle",
+  "bundleVerification": "git bundle verify: complete history, refs/heads/candidate-c03r = 0d85551a83cbd87d3664a9de17b9c01990bacaf3",
+  "base": "c65bc835ca35b94fd0de3e3c0cc2c8d459b556de",
+  "branchTipNote": "the branch tip is the derivative commit; it is not merged into any frozen candidate branch",
+  "taskRevision": "delivery-req-v2",
+  "taskStatementSha256": "ff243a43a8a74a52679c0673984c0725d8d4ef75dae062e9397c7293280fe3eb",
+  "ruleRevision": "next-family-packet-rule-v1",
+  "packet": {
+    "path": "packet-0d85551a83cb.md",
+    "bytes": 24078,
+    "sha256": "21938fd20764886422e98fc8d6febcd5b87ace7c19abe09df236fd3581f8016b"
+  },
+  "changes": [
+    {
+      "file": "src/delivery.ts",
+      "lines": "+7",
+      "kind": "confirmed-mandatory-contradiction",
+      "fix": "attemptDelivery returns without contacting the target when the delivery is no longer queued, and when the subscription is disabled",
+      "evidence": "adjudication/reproductions/c01.json, c02.json, c03.json: `c1_reentry_after_400` and `c3_reentry_after_410` call the target once per invocation for three invocations on the parent commit; the derivative returns after the first (`callsPerInvocation` [1,0,0])",
+      "criterionEffect": "C2 clause 'not retried for any other 4xx' and C4 clause 'the delivery is not retried' are satisfied after the fix; the external policy remains unresolved"
+    }
+  ],
+  "preserved": [
+    "The shared retry policy remains a dynamic import of ../packages/delivery-core/src/retry.ts, an external workspace sibling that is not in the checkout or the packet.",
+    "No clause was removed, no requirement text was changed, no production hardening was added, nothing was inserted into the reviewer-visible material.",
+    "C1 header-case and empty-key behaviour, the empty-string subscriptionId validation order, the null-body fault and the concurrent-invocation race are unchanged."
+  ],
+  "prohibitedFromModelInput": [
+    "derivatives/EXPECTED-c03r.json",
+    "adjudication/**",
+    "evaluator/**",
+    "checks/**"
+  ],
+  "uncertaintyQualification": "adjudication/reproductions/c03r-policy-variants.json: two legitimate external retry policies produce one target call (final) and three target calls (retried) for the same 429 status on the same tree, with the same reviewer-visible packet"
+}

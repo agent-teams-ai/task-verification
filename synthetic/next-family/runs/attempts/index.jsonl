@@ -4,3 +4,5 @@
 {"attemptId":"att-c02-criteria-20261123T164030465Z-8577d2","state":"completed","stopReason":null,"at":"2026-11-23T16:41:05.243Z"}
 {"attemptId":"att-c03-criteria-20261123T164113224Z-6d96a7","runKey":"e0647067cd31f22f214d4609cbdce5f5b2c47b4013cb90bd61106d5cc93bb79b","candidateId":"c03","stageId":"criteria","state":"admitted","at":"2026-11-23T16:41:13.226Z"}
 {"attemptId":"att-c03-criteria-20261123T164113224Z-6d96a7","state":"completed","stopReason":null,"at":"2026-11-23T16:41:46.869Z"}
+{"attemptId":"att-c03r-criteria-recheck-20261125T185400406Z-3b7c21","runKey":"ed62d760850689c07a816c1eabd756b0487f5e6b0b8b03346052af3cb152b7fa","candidateId":"c03r","stageId":"criteria-recheck","state":"admitted","at":"2026-11-25T18:54:00.408Z"}
+{"attemptId":"att-c03r-criteria-recheck-20261125T185400406Z-3b7c21","state":"completed","stopReason":null,"at":"2026-11-25T18:54:35.393Z"}

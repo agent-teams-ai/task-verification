@@ -1,0 +1,229 @@
+{
+  "schema": "next-family.criteria-report/v1",
+  "attemptId": "att-c03r-criteria-recheck-20261125T185400406Z-3b7c21",
+  "state": "completed",
+  "stopReason": null,
+  "candidateId": "c03r",
+  "derivative": {
+    "id": "c03r",
+    "parent": "c03",
+    "parentHead": "18bbde350074d4afd8a3e3d52be31479c6ba85fc",
+    "head": "0d85551a83cbd87d3664a9de17b9c01990bacaf3",
+    "fixes": [
+      "confirmed-mandatory-contradiction"
+    ]
+  },
+  "head": "0d85551a83cbd87d3664a9de17b9c01990bacaf3",
+  "stageId": "criteria-recheck",
+  "startedAt": "2026-11-25T18:54:00.435Z",
+  "endedAt": "2026-11-25T18:54:35.392Z",
+  "profile": {
+    "provider": "OpenRouter",
+    "providerEndpoint": "openrouter",
+    "model": "openai/gpt-6.1-terra",
+    "serviceTier": "default",
+    "effort": "medium",
+    "outputMode": "json_schema",
+    "stream": true,
+    "store": false,
+    "sdk": "@agent-teams/account-gateway/llm -> createLlmClient()",
+    "sdkVersion": "0.1.0",
+    "taskRevision": "delivery-req-v2"
+  },
+  "profileDigest": "2a7532d7c60408121f74af389dc0b15e9b2cee44076eb33a5baa11078f59112a",
+  "inputProfile": {
+    "packet": {
+      "path": "packet-0d85551a83cb.md",
+      "bytes": 24078,
+      "sha256": "21938fd20764886422e98fc8d6febcd5b87ace7c19abe09df236fd3581f8016b"
+    },
+    "rule": "next-family-packet-rule-v1",
+    "instructionsSha256": "1c30edd0f0eecb14e15b7f66e364478400f0fe1fe83a50821ff8e43c07b5422d",
+    "serializedBody": {
+      "bytes": 26773,
+      "sha256": "d763654cfd68e674d913423846d4dccea452c92001a8e1ad2e05fadc0602b183"
+    }
+  },
+  "ceilings": {
+    "bodyBytes": 28672,
+    "inputTokens": 28736,
+    "outputTokens": 2500
+  },
+  "reservation": {
+    "maxUsd": 0.04842,
+    "admission": {
+      "admitted": true,
+      "requestedUsd": 0.04842,
+      "totals": {
+        "settledUsd": 0.0555525,
+        "unresolvedUsd": 0,
+        "reservedUsd": 0.04842,
+        "newSpendUsd": 0.1039725,
+        "aggregateWorstCaseUsd": 0.6632625,
+        "remainingUsd": 0.3367375
+      }
+    }
+  },
+  "outcome": {
+    "ok": true,
+    "usage": {
+      "inputTokens": 6045,
+      "outputTokens": 2127,
+      "cachedInputTokens": 0,
+      "reasoningTokens": 1204
+    },
+    "receipt": {
+      "executionRef": "exec_next-family-criteria-c03r-a1-p",
+      "requestRef": "next-family-criteria-c03r-a1-r",
+      "accountRef": "openrouter-primary",
+      "authorizationEpoch": 1,
+      "taskId": "next-family-criteria-c03r",
+      "attempt": 1,
+      "profileId": "next-family-criteria",
+      "model": "openai/gpt-6.1-terra",
+      "observedModel": "openai/gpt-6.1-terra",
+      "responseId": "gen-1795632841-imNxZtVAZZg07ISma0SD",
+      "requestSha256": "d763654cfd68e674d913423846d4dccea452c92001a8e1ad2e05fadc0602b183",
+      "outputSha256": "9bb4b555c8b26d754aba77a04e2215050f7871c79a549d7fe9ace935ec97b573"
+    },
+    "cleanup": "closed",
+    "value": {
+      "assessments": [
+        {
+          "requirementId": "C1",
+          "status": "violated",
+          "evidence": [
+            {
+              "path": "src/router.ts",
+              "reference": "handle: idempotency-key lookup and nonempty-key checks"
+            },
+            {
+              "path": "src/store.ts",
+              "reference": "DeliveryStore.lookupIdempotency and rememberIdempotency"
+            },
+            {
+              "path": "src/types.ts",
+              "reference": "Request.headers"
+            }
+          ],
+          "explanation": "The router recognizes only the lowercase header name and treats an empty key as absent. Repeating a valid submission with an empty key, or with the header represented as `Idempotency-Key`, can therefore enqueue a second delivery. Nonempty lowercase keys are otherwise indexed independently of payload.",
+          "correction": "Read header names case-insensitively and distinguish an absent header from a present empty key; index every present key."
+        },
+        {
+          "requirementId": "C2",
+          "status": "inconclusive",
+          "evidence": [
+            {
+              "path": "src/delivery.ts",
+              "reference": "attemptDelivery, loadRetryPolicy, MAX_ATTEMPTS"
+            },
+            {
+              "path": "tests/retry.test.ts",
+              "reference": "retry tests for 500, 503, network error and 400"
+            },
+            {
+              "path": "README.md",
+              "reference": "Dependencies"
+            }
+          ],
+          "explanation": "The worker caps attempts at three and delegates classification and delay to the external policy. The provided material does not establish that the policy retries every required status and error, rejects other 4xx statuses, or supplies growing delays. The test source is not an execution receipt.",
+          "correction": "Provide the external retry-policy source or a run receipt with sufficient coverage of status classification, timeout errors, and increasing delays."
+        },
+        {
+          "requirementId": "C3",
+          "status": "satisfied",
+          "evidence": [
+            {
+              "path": "src/router.ts",
+              "reference": "handle: Buffer.byteLength size check before subscription lookup"
+            },
+            {
+              "path": "src/limits.ts",
+              "reference": "MAX_PAYLOAD_BYTES"
+            },
+            {
+              "path": "tests/subscriptions.test.ts",
+              "reference": "payload limit and exact-boundary tests"
+            }
+          ],
+          "explanation": "The router measures UTF-8 bytes, rejects only sizes above 65,536, and does so before subscription or idempotency lookup. Separately, the shared body-shape rule has a gap: a JSON `null` body throws when its properties are accessed instead of returning 400.",
+          "correction": "Guard against null and other non-object parsed bodies before accessing their properties to satisfy the shared validation rule."
+        },
+        {
+          "requirementId": "C4",
+          "status": "satisfied",
+          "evidence": [
+            {
+              "path": "src/delivery.ts",
+              "reference": "attemptDelivery: 410 branch and disabled-subscription entry guard"
+            },
+            {
+              "path": "src/router.ts",
+              "reference": "handle: disabled subscription check before idempotency lookup"
+            },
+            {
+              "path": "src/store.ts",
+              "reference": "DeliveryStore.disableSubscription"
+            }
+          ],
+          "explanation": "A 410 disables the subscription and ends that delivery attempt as failed. Intake checks subscription status before the idempotency index, so disabled subscriptions return 409 without enqueueing, including for previously accepted keys.",
+          "correction": "No correction needed for the stated lifecycle behavior."
+        },
+        {
+          "requirementId": "C5",
+          "status": "satisfied",
+          "evidence": [
+            {
+              "path": "src/router.ts",
+              "reference": "handle: GET /health"
+            },
+            {
+              "path": "tests/health.test.ts",
+              "reference": "health: GET /health reports ok"
+            }
+          ],
+          "explanation": "GET /health returns status 200 and serializes the requested JSON object.",
+          "correction": "No correction needed."
+        }
+      ]
+    }
+  },
+  "execution": {
+    "forwardedBodies": 1,
+    "forwardedRequests": 1,
+    "refusals": [],
+    "charged": {
+      "inputTokens": 6045,
+      "outputTokens": 2127
+    },
+    "settlement": {
+      "settled": true,
+      "state": "settled",
+      "settledUsd": 0.01819125,
+      "totals": {
+        "settledUsd": 0.07374375,
+        "unresolvedUsd": 0,
+        "reservedUsd": 0,
+        "newSpendUsd": 0.07374375,
+        "aggregateWorstCaseUsd": 0.63303375,
+        "remainingUsd": 0.36696625
+      }
+    },
+    "observed": [
+      {
+        "status": 200,
+        "model": "openai/gpt-6.1-terra",
+        "provider": null,
+        "identityVerified": true,
+        "providerVerified": false,
+        "halted": null
+      }
+    ]
+  },
+  "transport": {
+    "directProviderEgress": false,
+    "credentialHolder": "bounded-proxy-only",
+    "note": "the launcher issues no credentialed request of its own; cost is reconciled from the proxy ledger's reported usage rather than from a direct provider account read"
+  },
+  "rawResponsePath": "runs/attempts/att-c03r-criteria-recheck-20261125T185400406Z-3b7c21/raw/response.txt"
+}

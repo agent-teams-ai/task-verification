@@ -28,7 +28,7 @@ import net from "node:net";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
-import { FAMILY_ROOT, RESEARCH_ROOT, SDK_LLM_DIST, proxyPath } from "./lib/paths.mjs";
+import { FAMILY_ROOT, PACKETS_DIR, RESEARCH_ROOT, SDK_LLM_DIST, proxyPath } from "./lib/paths.mjs";
 import { INSTRUCTIONS, PROFILE, buildTask, loadFamily, loadPacket, profileDigest, sha256 } from "./lib/task.mjs";
 import { measureSerializedRequest } from "./lib/measure.mjs";
 import {
@@ -41,7 +41,7 @@ import {
 import { attemptDir, createAttempt, finishAttempt, findDuplicate, isTerminal, newAttemptId, runKey, writeRawResponse } from "./lib/attempt.mjs";
 import { reserve, settle, verifyHistorical, availableUsd, committedUsd, readState, totals } from "./lib/budget.mjs";
 
-const STAGES = new Set(["criteria", "criteria-correction"]);
+const STAGES = new Set(["criteria", "criteria-correction", "criteria-recheck"]);
 
 function parseArgs(argv) {
   const out = { positional: [] };
@@ -65,7 +65,34 @@ function parseArgs(argv) {
 const args = parseArgs(process.argv.slice(2));
 const candidateId = args.positional[0];
 const stageId = typeof args.stage === "string" ? args.stage : "criteria";
+const derivativeId = typeof args.derivative === "string" ? args.derivative : null;
 const dryRun = Boolean(args["dry-run"]);
+
+/**
+ * A derivative candidate (D3-R3) is a frozen commit that is not in `family.json`.
+ * Its identity lives in `derivatives/<id>.json`, and the packet must still match the
+ * digest recorded there, so a derivative input cannot drift after it is frozen.
+ */
+function loadDerivativePacket(id) {
+  const manifestPath = path.join(FAMILY_ROOT, "derivatives", `${id}.json`);
+  const derivative = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+  if (derivative.id !== id) throw new Error(`derivative manifest id mismatch: ${derivative.id} !== ${id}`);
+  const text = fs.readFileSync(path.join(PACKETS_DIR, derivative.packet.path), "utf8");
+  const digest = sha256(text);
+  if (digest !== derivative.packet.sha256) throw new Error(`derivative packet digest does not match its manifest for ${id}`);
+  if (Buffer.byteLength(text, "utf8") !== derivative.packet.bytes) {
+    throw new Error(`derivative packet byte length does not match its manifest for ${id}`);
+  }
+  return {
+    head: derivative.head,
+    short: derivative.head.slice(0, 12),
+    text,
+    derivative,
+    sha256: digest,
+    bytes: derivative.packet.bytes,
+    manifest: { packet: { path: derivative.packet.path }, rule: { revision: derivative.ruleRevision } },
+  };
+}
 
 const fail = (code, message, exitCode = 3) => {
   process.stderr.write(`${code}: ${message}\n`);
@@ -77,7 +104,13 @@ if (!STAGES.has(stageId)) fail("usage", `--stage must be one of ${[...STAGES].jo
 if (!fs.existsSync(SDK_LLM_DIST)) fail("sdk_missing", `the pinned SDK entry is absent: ${SDK_LLM_DIST}`);
 
 const family = loadFamily(FAMILY_ROOT);
-const packet = loadPacket(candidateId, family);
+if (derivativeId !== null && derivativeId !== candidateId) {
+  fail("usage", `--derivative ${derivativeId} does not match the positional candidate ${candidateId}`, 2);
+}
+if ((stageId === "criteria-recheck") !== (derivativeId !== null)) {
+  fail("usage", "--stage criteria-recheck requires --derivative, and --derivative requires that stage", 2);
+}
+const packet = derivativeId === null ? loadPacket(candidateId, family) : loadDerivativePacket(derivativeId);
 const digest = profileDigest();
 const task = buildTask({
   candidateId,
@@ -159,11 +192,12 @@ if (duplicate !== null) {
   fail("duplicate_execution", `${duplicate.attemptId} already ran this exact request (state ${duplicate.state}); use a new stage id for an authorized recheck`, 5);
 }
 
-if (stageId === "criteria-correction") {
+if (stageId === "criteria-correction" || stageId === "criteria-recheck") {
   const corrects = typeof args.corrects === "string" ? args.corrects : null;
-  if (corrects === null) fail("usage", "a correction requires --corrects <attemptId>", 2);
+  if (corrects === null) fail("usage", "a correction or recheck requires --corrects <attemptId>", 2);
   if (!isTerminal(corrects)) fail("correction_target", `${corrects} is not a finished attempt`, 5);
-  if (!corrects.includes(`-${candidateId}-`)) fail("correction_target", `${corrects} is not an attempt on ${candidateId}`, 5);
+  const parent = packet.derivative ? packet.derivative.parent : candidateId;
+  if (!corrects.includes(`-${parent}-`)) fail("correction_target", `${corrects} is not an attempt on ${parent}`, 5);
 }
 
 if (!process.env.OPENROUTER_API_KEY || !process.env.OPENROUTER_BASE_URL) {
@@ -335,6 +369,16 @@ try {
     schema: "next-family.criteria-report/v1",
     attemptId,
     candidateId,
+    derivative:
+      packet.derivative === undefined
+        ? null
+        : {
+            id: packet.derivative.id,
+            parent: packet.derivative.parent,
+            parentHead: packet.derivative.parentHead,
+            head: packet.derivative.head,
+            fixes: packet.derivative.changes.map((change) => change.kind),
+          },
     head: packet.head,
     stageId,
     startedAt,

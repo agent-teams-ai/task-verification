@@ -1,0 +1,2 @@
+proxy listening on http://127.0.0.1:8787
+proxy stage=d3-r3-ocr-c02-offline requests=24 tokens=6291456/12000 per-request=262144B/262208tok/1500tok input-enforcement=bytes allowance=0 model=openai/gpt-6.1-terra tier=default effort=medium identity-enforced=false require-observed-model=false providers=<unchecked> retries=none ledger=/run/ledger-ocr-c02-offline.jsonl

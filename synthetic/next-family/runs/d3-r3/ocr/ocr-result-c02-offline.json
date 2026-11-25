@@ -1,0 +1,655 @@
+{
+  "status": "failed",
+  "llm": {
+    "provider": "reviewrouter",
+    "model": "openai/gpt-6.1-terra"
+  },
+  "message": "Review failed: 0 finding(s); 7 of 7 selected item(s) failed.",
+  "summary": {
+    "files_reviewed": 7,
+    "comments": 0,
+    "total_tokens": 0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "elapsed": "2s"
+  },
+  "tool_calls": {
+    "total": 0,
+    "by_tool": {},
+    "failure": 0,
+    "failure_by_tool": {},
+    "failure_details": []
+  },
+  "comments": null,
+  "groups": [
+    {
+      "label": "src/delivery.ts",
+      "files": [
+        "src/delivery.ts"
+      ]
+    },
+    {
+      "label": "src/limits.ts",
+      "files": [
+        "src/limits.ts"
+      ]
+    },
+    {
+      "label": "src/router.ts",
+      "files": [
+        "src/router.ts"
+      ]
+    },
+    {
+      "label": "src/store.ts",
+      "files": [
+        "src/store.ts"
+      ]
+    },
+    {
+      "label": "tests/idempotency.test.ts",
+      "files": [
+        "tests/idempotency.test.ts"
+      ]
+    },
+    {
+      "label": "tests/retry.test.ts",
+      "files": [
+        "tests/retry.test.ts"
+      ]
+    },
+    {
+      "label": "tests/subscriptions.test.ts",
+      "files": [
+        "tests/subscriptions.test.ts"
+      ]
+    }
+  ],
+  "session_id": "f5fa44db-94b9-4c21-82c3-8c8ceaf5fcff",
+  "manifest": {
+    "schema_version": "ocr.run-manifest/v1",
+    "run_id": "f5fa44db-94b9-4c21-82c3-8c8ceaf5fcff",
+    "operation": "review",
+    "terminal_state": "failed",
+    "repository": {},
+    "input": {
+      "mode": "range",
+      "requested_from": "c65bc835ca35b94fd0de3e3c0cc2c8d459b556de",
+      "requested_head": "65f210381920fbfce032cf5ba8aaa440f3300162",
+      "resolved_base": "c65bc835ca35b94fd0de3e3c0cc2c8d459b556de",
+      "resolved_head": "65f210381920fbfce032cf5ba8aaa440f3300162",
+      "exact_range": "c65bc835ca35b94fd0de3e3c0cc2c8d459b556de..65f210381920fbfce032cf5ba8aaa440f3300162",
+      "source_artifact_sha256": "fda783e41bfb7d744dd0a29422bf41096b612bb9f08e7fd0aa640edcdaebaa57"
+    },
+    "execution": {
+      "ocr_version": "1.14.0-rr.1",
+      "provider": "reviewrouter",
+      "model": "openai/gpt-6.1-terra",
+      "configured_concurrency": 1,
+      "max_tool_request_times": 100,
+      "rule_config_sha256": "21abbcce3bf90f2be9a3ef20fce09e0545a14c27055ff70de9c736570a6418e3",
+      "runtime_config_sha256": "518f1fe68649447d463390f693afb20478d16aa19605a18f63b391bbf50d7c9f"
+    },
+    "coverage": {
+      "selected": [
+        {
+          "item_id": "0083e57ac5ddc72779611cd6b755383d8da2224890011942aaee5b229bc07cc5",
+          "path": "src/store.ts",
+          "fingerprint": "2468f5234b0fcb1bc481b26d02273a265ec3f0930838040750a4775713816daf"
+        },
+        {
+          "item_id": "0b97027ebc6c5de474a9fb6c6d8cf1137bfac2cd20eaf18461c9dffc404b19e9",
+          "path": "src/delivery.ts",
+          "fingerprint": "3a75790356c8dfb03cf0ee48f770ff115939b17668a5b16b35004a9082b3fa08"
+        },
+        {
+          "item_id": "128a9a9120eb9d9289ebb7ec8ffbf60ff6e4b87c5bb5769692c415347f6cb9f3",
+          "path": "src/limits.ts",
+          "fingerprint": "64935fd743adcdbf4c26214d9141fcc27c81c7212154697834c28c5267d6ec36"
+        },
+        {
+          "item_id": "6f2dd0f3809b22b09c36d1377ccb2996cd7e821a08214d4013d29447f12b85e6",
+          "path": "tests/idempotency.test.ts",
+          "fingerprint": "49afaad5eea764620cbbd128ab2163f4fb53b9e8ca2ed364e41c42c06816cdfd"
+        },
+        {
+          "item_id": "83ba5f038ce1c26cc41912587652419964cbc134e47f8b95bb511054c03a69d3",
+          "path": "src/router.ts",
+          "fingerprint": "deb5332f1ee27c1884b9a4dd803f895fcbd65d78c2686f5950bcf26ccf637f07"
+        },
+        {
+          "item_id": "94643e7aa90075496eb2227c2089be74593eab0f8ffb546120eef74be15a75dc",
+          "path": "tests/subscriptions.test.ts",
+          "fingerprint": "dba934cbae07593b512549cfe4a7f47b89c74904c5d51bc97d2d8f9155fc4afc"
+        },
+        {
+          "item_id": "bef2dcd3350e3bce7485ac960ad728324c663df4edc3929c7b50e9f35d57e374",
+          "path": "tests/retry.test.ts",
+          "fingerprint": "ed2aef0e247cd7ab8d2789ed250c35f1e2ce8f98fbf16a137e8c605085b04431"
+        }
+      ],
+      "completed": [],
+      "reused": [],
+      "failed": [
+        {
+          "item_id": "0083e57ac5ddc72779611cd6b755383d8da2224890011942aaee5b229bc07cc5",
+          "path": "src/store.ts",
+          "fingerprint": "2468f5234b0fcb1bc481b26d02273a265ec3f0930838040750a4775713816daf",
+          "classification": "provider",
+          "reason": "provider or subtask request failed"
+        },
+        {
+          "item_id": "0b97027ebc6c5de474a9fb6c6d8cf1137bfac2cd20eaf18461c9dffc404b19e9",
+          "path": "src/delivery.ts",
+          "fingerprint": "3a75790356c8dfb03cf0ee48f770ff115939b17668a5b16b35004a9082b3fa08",
+          "classification": "provider",
+          "reason": "provider or subtask request failed"
+        },
+        {
+          "item_id": "128a9a9120eb9d9289ebb7ec8ffbf60ff6e4b87c5bb5769692c415347f6cb9f3",
+          "path": "src/limits.ts",
+          "fingerprint": "64935fd743adcdbf4c26214d9141fcc27c81c7212154697834c28c5267d6ec36",
+          "classification": "provider",
+          "reason": "provider or subtask request failed"
+        },
+        {
+          "item_id": "6f2dd0f3809b22b09c36d1377ccb2996cd7e821a08214d4013d29447f12b85e6",
+          "path": "tests/idempotency.test.ts",
+          "fingerprint": "49afaad5eea764620cbbd128ab2163f4fb53b9e8ca2ed364e41c42c06816cdfd",
+          "classification": "provider",
+          "reason": "provider or subtask request failed"
+        },
+        {
+          "item_id": "83ba5f038ce1c26cc41912587652419964cbc134e47f8b95bb511054c03a69d3",
+          "path": "src/router.ts",
+          "fingerprint": "deb5332f1ee27c1884b9a4dd803f895fcbd65d78c2686f5950bcf26ccf637f07",
+          "classification": "provider",
+          "reason": "provider or subtask request failed"
+        },
+        {
+          "item_id": "94643e7aa90075496eb2227c2089be74593eab0f8ffb546120eef74be15a75dc",
+          "path": "tests/subscriptions.test.ts",
+          "fingerprint": "dba934cbae07593b512549cfe4a7f47b89c74904c5d51bc97d2d8f9155fc4afc",
+          "classification": "provider",
+          "reason": "provider or subtask request failed"
+        },
+        {
+          "item_id": "bef2dcd3350e3bce7485ac960ad728324c663df4edc3929c7b50e9f35d57e374",
+          "path": "tests/retry.test.ts",
+          "fingerprint": "ed2aef0e247cd7ab8d2789ed250c35f1e2ce8f98fbf16a137e8c605085b04431",
+          "classification": "provider",
+          "reason": "provider or subtask request failed"
+        }
+      ],
+      "waived": [],
+      "excluded": []
+    },
+    "elapsed_ms": 1649
+  },
+  "reviewrouter_outcome": {
+    "schema_version": "reviewrouter.ocr-outcome/v1",
+    "run_stop_cause": null,
+    "grouping": {
+      "state": "failed",
+      "reason": "fallback"
+    },
+    "groups": [
+      {
+        "paths": [
+          "src/delivery.ts"
+        ],
+        "main_completed": false,
+        "stop_cause": "provider_error",
+        "rounds": {
+          "configured": 2,
+          "started": 1,
+          "completed": 0
+        },
+        "phases": {
+          "plan": {
+            "state": "failed",
+            "reason": "error"
+          },
+          "compression": {
+            "state": "not_applicable",
+            "reason": "no_zone"
+          },
+          "relocation": {
+            "state": "not_applicable",
+            "reason": "no_candidates"
+          },
+          "filter": {
+            "state": "cancelled",
+            "reason": "not_dispatched"
+          }
+        },
+        "filter_decision_valid": null
+      },
+      {
+        "paths": [
+          "src/limits.ts"
+        ],
+        "main_completed": false,
+        "stop_cause": "provider_error",
+        "rounds": {
+          "configured": 2,
+          "started": 1,
+          "completed": 0
+        },
+        "phases": {
+          "plan": {
+            "state": "not_applicable",
+            "reason": "threshold"
+          },
+          "compression": {
+            "state": "not_applicable",
+            "reason": "no_zone"
+          },
+          "relocation": {
+            "state": "not_applicable",
+            "reason": "no_candidates"
+          },
+          "filter": {
+            "state": "cancelled",
+            "reason": "not_dispatched"
+          }
+        },
+        "filter_decision_valid": null
+      },
+      {
+        "paths": [
+          "src/router.ts"
+        ],
+        "main_completed": false,
+        "stop_cause": "provider_error",
+        "rounds": {
+          "configured": 2,
+          "started": 1,
+          "completed": 0
+        },
+        "phases": {
+          "plan": {
+            "state": "not_applicable",
+            "reason": "threshold"
+          },
+          "compression": {
+            "state": "not_applicable",
+            "reason": "no_zone"
+          },
+          "relocation": {
+            "state": "not_applicable",
+            "reason": "no_candidates"
+          },
+          "filter": {
+            "state": "cancelled",
+            "reason": "not_dispatched"
+          }
+        },
+        "filter_decision_valid": null
+      },
+      {
+        "paths": [
+          "src/store.ts"
+        ],
+        "main_completed": false,
+        "stop_cause": "provider_error",
+        "rounds": {
+          "configured": 2,
+          "started": 1,
+          "completed": 0
+        },
+        "phases": {
+          "plan": {
+            "state": "not_applicable",
+            "reason": "threshold"
+          },
+          "compression": {
+            "state": "not_applicable",
+            "reason": "no_zone"
+          },
+          "relocation": {
+            "state": "not_applicable",
+            "reason": "no_candidates"
+          },
+          "filter": {
+            "state": "cancelled",
+            "reason": "not_dispatched"
+          }
+        },
+        "filter_decision_valid": null
+      },
+      {
+        "paths": [
+          "tests/idempotency.test.ts"
+        ],
+        "main_completed": false,
+        "stop_cause": "provider_error",
+        "rounds": {
+          "configured": 2,
+          "started": 1,
+          "completed": 0
+        },
+        "phases": {
+          "plan": {
+            "state": "failed",
+            "reason": "error"
+          },
+          "compression": {
+            "state": "not_applicable",
+            "reason": "no_zone"
+          },
+          "relocation": {
+            "state": "not_applicable",
+            "reason": "no_candidates"
+          },
+          "filter": {
+            "state": "cancelled",
+            "reason": "not_dispatched"
+          }
+        },
+        "filter_decision_valid": null
+      },
+      {
+        "paths": [
+          "tests/retry.test.ts"
+        ],
+        "main_completed": false,
+        "stop_cause": "provider_error",
+        "rounds": {
+          "configured": 2,
+          "started": 1,
+          "completed": 0
+        },
+        "phases": {
+          "plan": {
+            "state": "failed",
+            "reason": "error"
+          },
+          "compression": {
+            "state": "not_applicable",
+            "reason": "no_zone"
+          },
+          "relocation": {
+            "state": "not_applicable",
+            "reason": "no_candidates"
+          },
+          "filter": {
+            "state": "cancelled",
+            "reason": "not_dispatched"
+          }
+        },
+        "filter_decision_valid": null
+      },
+      {
+        "paths": [
+          "tests/subscriptions.test.ts"
+        ],
+        "main_completed": false,
+        "stop_cause": "provider_error",
+        "rounds": {
+          "configured": 2,
+          "started": 1,
+          "completed": 0
+        },
+        "phases": {
+          "plan": {
+            "state": "failed",
+            "reason": "error"
+          },
+          "compression": {
+            "state": "not_applicable",
+            "reason": "no_zone"
+          },
+          "relocation": {
+            "state": "not_applicable",
+            "reason": "no_candidates"
+          },
+          "filter": {
+            "state": "cancelled",
+            "reason": "not_dispatched"
+          }
+        },
+        "filter_decision_valid": null
+      }
+    ]
+  },
+  "retry_report": {
+    "schema_version": "ocr.llm-retry-report/v1",
+    "total_requests": 12,
+    "retried_requests": 0,
+    "total_retries": 0,
+    "recovered_requests": 0,
+    "failed_requests": 12,
+    "cancelled_requests": 0,
+    "requests": [
+      {
+        "logical_request_id": "0ff39367c0a45aec6c641677a6ddc76a0996da2dd4f0c674ede6381589578eaa",
+        "provider": "reviewrouter",
+        "model": "openai/gpt-6.1-terra",
+        "file_path": "tests/subscriptions.test.ts",
+        "task_type": "main_task",
+        "request_no": 1,
+        "outcome": "failed",
+        "attempts": [
+          {
+            "attempt": 1,
+            "outcome": "error",
+            "error_class": "provider",
+            "failure_phase": "stream",
+            "status_code": 200,
+            "duration_to_headers_ms": 4
+          }
+        ]
+      },
+      {
+        "logical_request_id": "385e12a4dc97177fe31ddb2dc6b2ae9036ec1fab6acb3bb83f8b8e7e57c0dc44",
+        "provider": "reviewrouter",
+        "model": "openai/gpt-6.1-terra",
+        "file_path": "src/router.ts",
+        "task_type": "main_task",
+        "request_no": 1,
+        "outcome": "failed",
+        "attempts": [
+          {
+            "attempt": 1,
+            "outcome": "error",
+            "error_class": "provider",
+            "failure_phase": "stream",
+            "status_code": 200,
+            "duration_to_headers_ms": 6
+          }
+        ]
+      },
+      {
+        "logical_request_id": "40f8456557470d1708e3ef667a3badea7d7a2a75d97f7f39efd7260030332acf",
+        "provider": "reviewrouter",
+        "model": "openai/gpt-6.1-terra",
+        "file_path": "__grouping__",
+        "task_type": "grouping_task",
+        "request_no": 1,
+        "outcome": "failed",
+        "attempts": [
+          {
+            "attempt": 1,
+            "outcome": "error",
+            "error_class": "provider",
+            "failure_phase": "stream",
+            "status_code": 200,
+            "duration_to_headers_ms": 14
+          }
+        ]
+      },
+      {
+        "logical_request_id": "5a393f23537c1d7eca8772aa9a6e0a9fc5066488de71d8c1f880c7fd08904e32",
+        "provider": "reviewrouter",
+        "model": "openai/gpt-6.1-terra",
+        "file_path": "src/limits.ts",
+        "task_type": "main_task",
+        "request_no": 1,
+        "outcome": "failed",
+        "attempts": [
+          {
+            "attempt": 1,
+            "outcome": "error",
+            "error_class": "provider",
+            "failure_phase": "stream",
+            "status_code": 200,
+            "duration_to_headers_ms": 8
+          }
+        ]
+      },
+      {
+        "logical_request_id": "5dd93a025b07ddb2a25a31ef9a0189aaf34a010750be194e02d827116a7e0866",
+        "provider": "reviewrouter",
+        "model": "openai/gpt-6.1-terra",
+        "file_path": "tests/subscriptions.test.ts",
+        "task_type": "plan_task",
+        "request_no": 1,
+        "outcome": "failed",
+        "attempts": [
+          {
+            "attempt": 1,
+            "outcome": "error",
+            "error_class": "provider",
+            "failure_phase": "stream",
+            "status_code": 200,
+            "duration_to_headers_ms": 11
+          }
+        ]
+      },
+      {
+        "logical_request_id": "6be247bc6c0a4200843e011f29b6ad8875918ae4c877902c8c2dc7db02e03636",
+        "provider": "reviewrouter",
+        "model": "openai/gpt-6.1-terra",
+        "file_path": "src/delivery.ts",
+        "task_type": "main_task",
+        "request_no": 1,
+        "outcome": "failed",
+        "attempts": [
+          {
+            "attempt": 1,
+            "outcome": "error",
+            "error_class": "provider",
+            "failure_phase": "stream",
+            "status_code": 200,
+            "duration_to_headers_ms": 4
+          }
+        ]
+      },
+      {
+        "logical_request_id": "6d92c5679d4856494fbba2302f0db02aec9795a4a739d0514795923491499a8b",
+        "provider": "reviewrouter",
+        "model": "openai/gpt-6.1-terra",
+        "file_path": "src/delivery.ts",
+        "task_type": "plan_task",
+        "request_no": 1,
+        "outcome": "failed",
+        "attempts": [
+          {
+            "attempt": 1,
+            "outcome": "error",
+            "error_class": "provider",
+            "failure_phase": "stream",
+            "status_code": 200,
+            "duration_to_headers_ms": 4
+          }
+        ]
+      },
+      {
+        "logical_request_id": "7391224fd8233c9fc6de67c754dbc4ad6495b32c422644f8870de67474b4143d",
+        "provider": "reviewrouter",
+        "model": "openai/gpt-6.1-terra",
+        "file_path": "tests/retry.test.ts",
+        "task_type": "plan_task",
+        "request_no": 1,
+        "outcome": "failed",
+        "attempts": [
+          {
+            "attempt": 1,
+            "outcome": "error",
+            "error_class": "provider",
+            "failure_phase": "stream",
+            "status_code": 200,
+            "duration_to_headers_ms": 10
+          }
+        ]
+      },
+      {
+        "logical_request_id": "a7b7337778abbc7411346da0caad5892948c0a059958dc6fc8bab7c7fa0eb727",
+        "provider": "reviewrouter",
+        "model": "openai/gpt-6.1-terra",
+        "file_path": "tests/retry.test.ts",
+        "task_type": "main_task",
+        "request_no": 1,
+        "outcome": "failed",
+        "attempts": [
+          {
+            "attempt": 1,
+            "outcome": "error",
+            "error_class": "provider",
+            "failure_phase": "stream",
+            "status_code": 200,
+            "duration_to_headers_ms": 5
+          }
+        ]
+      },
+      {
+        "logical_request_id": "dc0270c33e06c357e08ef0143bb062190ffc4e694d1d758663de765c1ff74727",
+        "provider": "reviewrouter",
+        "model": "openai/gpt-6.1-terra",
+        "file_path": "tests/idempotency.test.ts",
+        "task_type": "plan_task",
+        "request_no": 1,
+        "outcome": "failed",
+        "attempts": [
+          {
+            "attempt": 1,
+            "outcome": "error",
+            "error_class": "provider",
+            "failure_phase": "stream",
+            "status_code": 200,
+            "duration_to_headers_ms": 9
+          }
+        ]
+      },
+      {
+        "logical_request_id": "dc89e78aded34a3c942475648f9b7595acbb0f22c0081052dbfc8eab2899ef30",
+        "provider": "reviewrouter",
+        "model": "openai/gpt-6.1-terra",
+        "file_path": "src/store.ts",
+        "task_type": "main_task",
+        "request_no": 1,
+        "outcome": "failed",
+        "attempts": [
+          {
+            "attempt": 1,
+            "outcome": "error",
+            "error_class": "provider",
+            "failure_phase": "stream",
+            "status_code": 200,
+            "duration_to_headers_ms": 4
+          }
+        ]
+      },
+      {
+        "logical_request_id": "fc8821a733ebbc83641041c554a18102c1bc3297341b368639e33400a0febfe3",
+        "provider": "reviewrouter",
+        "model": "openai/gpt-6.1-terra",
+        "file_path": "tests/idempotency.test.ts",
+        "task_type": "main_task",
+        "request_no": 1,
+        "outcome": "failed",
+        "attempts": [
+          {
+            "attempt": 1,
+            "outcome": "error",
+            "error_class": "provider",
+            "failure_phase": "stream",
+            "status_code": 200,
+            "duration_to_headers_ms": 6
+          }
+        ]
+      }
+    ]
+  }
+}

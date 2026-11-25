@@ -1,0 +1,153 @@
+{
+  "schema": "d3-r3.index/v1",
+  "status": "D3_PARTIAL — EVIDENCE_OR_BUDGET_LIMIT_RECORDED",
+  "baseline": {
+    "researchHead": "9367ce4e7dee40d076f654397fd535a09e2d6c3a",
+    "branch": "exp/synthetic-live-pilot-01",
+    "m2Pr2": "996cdcb002f898a5b73ce8f9ce7931e6299b14e4",
+    "d3r2ReportSha256": "a48b0afe5ce6e1345f93156fa2bc660e2209694aa1ed0d6a7dea0b88426939f3",
+    "d3r2IndexSha256": "b06decb06d239cf1dcbfbe6e624c9f9db8d2ca4de020901ef70fde32c9732e1d"
+  },
+  "family": {
+    "taskRevision": "delivery-req-v2",
+    "taskStatementSha256": "ff243a43a8a74a52679c0673984c0725d8d4ef75dae062e9397c7293280fe3eb",
+    "profileDigest": "2a7532d7c60408121f74af389dc0b15e9b2cee44076eb33a5baa11078f59112a",
+    "candidates": {
+      "c01": "54623dccc8b138c9ad5a41fc0347cf49ba039c61",
+      "c02": "65f210381920fbfce032cf5ba8aaa440f3300162",
+      "c03": "18bbde350074d4afd8a3e3d52be31479c6ba85fc"
+    },
+    "derivative": {
+      "id": "c03r",
+      "head": "0d85551a83cbd87d3664a9de17b9c01990bacaf3",
+      "parent": "18bbde350074d4afd8a3e3d52be31479c6ba85fc",
+      "packetSha256": "21938fd20764886422e98fc8d6febcd5b87ace7c19abe09df236fd3581f8016b",
+      "packetBytes": 24078,
+      "serializedBodyBytes": 26773
+    }
+  },
+  "adjudication": {
+    "document": "synthetic/next-family/adjudication/ADJUDICATION.md",
+    "reproductions": [
+      "synthetic/next-family/adjudication/reproductions/c01.json",
+      "synthetic/next-family/adjudication/reproductions/c02.json",
+      "synthetic/next-family/adjudication/reproductions/c03.json",
+      "synthetic/next-family/adjudication/reproductions/c03r.json",
+      "synthetic/next-family/adjudication/reproductions/c03r-policy-variants.json"
+    ],
+    "counts": {
+      "confirmedRequiredViolations": 8,
+      "confirmedMechanisms": 5,
+      "supportedSatisfactions": 5,
+      "ambiguousRequirements": 3,
+      "insufficientEvidence": 1,
+      "optionalObservations": 3,
+      "unsupportedModelClaims": 0
+    },
+    "oracleCorrection": "c01 (the 'complete' control) violates C2 and C4 by terminal re-entry; the c01 oracle row is wrong on those two criteria"
+  },
+  "ocr": {
+    "comparator": "1.14.0-rr.1",
+    "binarySha256": "443d7777b9fffae6300085c3afc6027181de181befa118bbe6f580dce3fcb399",
+    "binaryBytes": 87356967,
+    "artifactId": 14714439075,
+    "runId": 44924052949,
+    "sourceCommit": "8a70944f567beba9ffc12d1153e33ef5fd60967d",
+    "artifactVerified": true,
+    "stage": "BLOCKED",
+    "reason": "measured c02 requests are 19,627-23,258 bytes against the frozen 15,936-byte per-request cap and 12 requests against the 8-request cap; a lifted cap cannot be bounded inside the remaining authorization",
+    "forwardedRequests": 12,
+    "receivedRefusals": 0,
+    "spendUsd": 0,
+    "nativeFindings": null,
+    "publicationEligible": null,
+    "incomplete": true,
+    "preparation": "synthetic/next-family/runs/d3-r3/ocr/preparation.json",
+    "stageSummary": "synthetic/next-family/runs/d3-r3/ocr/stage-summary-ocr-c02-offline.json",
+    "artifactVerification": "synthetic/next-family/runs/d3-r3/ocr/artifact-verification.json"
+  },
+  "attempts": [
+    {
+      "attemptId": "att-c01-criteria-20261123T163938612Z-581a22",
+      "stage": "criteria",
+      "candidate": "c01",
+      "state": "completed",
+      "forwardedRequests": 1,
+      "inputTokens": 5868,
+      "outputTokens": 2482,
+      "reasoningTokens": 1552,
+      "settledUsd": 0.019745,
+      "observedProvider": null,
+      "source": "D3-R2"
+    },
+    {
+      "attemptId": "att-c02-criteria-20261123T164030465Z-8577d2",
+      "stage": "criteria",
+      "candidate": "c02",
+      "state": "completed",
+      "forwardedRequests": 1,
+      "inputTokens": 5811,
+      "outputTokens": 2160,
+      "reasoningTokens": 1370,
+      "settledUsd": 0.01806375,
+      "observedProvider": null,
+      "source": "D3-R2"
+    },
+    {
+      "attemptId": "att-c03-criteria-20261123T164113224Z-6d96a7",
+      "stage": "criteria",
+      "candidate": "c03",
+      "state": "completed",
+      "forwardedRequests": 1,
+      "inputTokens": 5975,
+      "outputTokens": 2055,
+      "reasoningTokens": 1402,
+      "settledUsd": 0.01774375,
+      "observedProvider": null,
+      "source": "D3-R2"
+    },
+    {
+      "attemptId": "att-c03r-criteria-recheck-20261125T185400406Z-3b7c21",
+      "stage": "criteria-recheck",
+      "candidate": "c03r",
+      "corrects": "att-c03-criteria-20261123T164113224Z-6d96a7",
+      "state": "completed",
+      "forwardedRequests": 1,
+      "inputTokens": 6045,
+      "outputTokens": 2127,
+      "reasoningTokens": 1204,
+      "settledUsd": 0.01819125,
+      "observedProvider": null,
+      "verdicts": { "C1": "violated", "C2": "inconclusive", "C3": "satisfied", "C4": "satisfied", "C5": "satisfied" },
+      "source": "D3-R3"
+    }
+  ],
+  "accounting": {
+    "approvedCeilingUsd": 1,
+    "historicalSettledUsd": 0.3163953,
+    "historicalConservativeUsd": 0.55929,
+    "committedBasisUsd": 0.55929,
+    "d3r2SettledUsd": 0.0555525,
+    "d3r3SettledUsd": 0.01819125,
+    "newSettledUsd": 0.07374375,
+    "unresolvedUsd": 0,
+    "activeReservationsUsd": 0,
+    "aggregateWorstCaseUsd": 0.63303375,
+    "remainingUsd": 0.36696625,
+    "correctionReserveSpent": true,
+    "providerAccountSettlement": "unverified; no credentialed egress outside the bounded proxy",
+    "openReconciliationItem": "maintainer's ~0.05555025 vs ledger 0.05555250 for the three D3-R2 replies: 0.00000225 (0.004%) unexplained; the larger ledger figure is carried"
+  },
+  "decision": {
+    "recommended": "continue with a narrowly scoped optional advisory Criteria Assessment for gap detection, never as a completion gate",
+    "alternatives": [
+      "reuse ordinary check evidence plus one targeted regression test per confirmed defect (findable only after the defect is known)",
+      "stop on the missing OCR comparator capability until a complete qualified run is possible"
+    ],
+    "oracleConsultedBeforeFreeze": false,
+    "c02Modified": false,
+    "c03Modified": false,
+    "newDependencies": false,
+    "wireSchemaChanged": false
+  }
+}

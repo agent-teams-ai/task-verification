@@ -1,0 +1,404 @@
+{
+  "schema": "d3-r3.ocr-stage/v1",
+  "candidate": "c02",
+  "mode": "offline",
+  "exitCode": 1,
+  "comparator": "1.14.0-rr.1",
+  "binarySha256": "443d7777b9fffae6300085c3afc6027181de181befa118bbe6f580dce3fcb399",
+  "ruleDocumentSha256": "7e28d5afcc5a3924b3e9e521ac7dbcd336326ab581e32da20178dca0414f69a2",
+  "backgroundSha256": "ff243a43a8a74a52679c0673984c0725d8d4ef75dae062e9397c7293280fe3eb",
+  "requests": {
+    "forwarded": 12,
+    "refused": 0,
+    "records": 12
+  },
+  "refusals": [],
+  "inputBytes": [
+    1641,
+    19766,
+    23056,
+    21415,
+    22976,
+    22363,
+    19627,
+    22917,
+    19968,
+    23258,
+    19787,
+    23077
+  ],
+  "forwardedBytes": [
+    1666,
+    19791,
+    23081,
+    21440,
+    23001,
+    22388,
+    19652,
+    22942,
+    19993,
+    23283,
+    19812,
+    23102
+  ],
+  "maxInputBytes": 23258,
+  "maxForwardedBytes": 23283,
+  "ceilings": {
+    "requestInputBytes": 262144,
+    "requestInputTokens": 262208,
+    "requestOutputTokens": 1500,
+    "stageInputTokens": 6291456,
+    "stageOutputTokens": 12000,
+    "maxRequests": 24
+  },
+  "requested": {
+    "model": "openai/gpt-6.1-terra",
+    "serviceTier": "default",
+    "effort": "medium"
+  },
+  "observed": [
+    {
+      "status": 200,
+      "model": null,
+      "provider": null,
+      "usagePresent": true
+    },
+    {
+      "status": 200,
+      "model": null,
+      "provider": null,
+      "usagePresent": true
+    },
+    {
+      "status": 200,
+      "model": null,
+      "provider": null,
+      "usagePresent": true
+    },
+    {
+      "status": 200,
+      "model": null,
+      "provider": null,
+      "usagePresent": true
+    },
+    {
+      "status": 200,
+      "model": null,
+      "provider": null,
+      "usagePresent": true
+    },
+    {
+      "status": 200,
+      "model": null,
+      "provider": null,
+      "usagePresent": true
+    },
+    {
+      "status": 200,
+      "model": null,
+      "provider": null,
+      "usagePresent": true
+    },
+    {
+      "status": 200,
+      "model": null,
+      "provider": null,
+      "usagePresent": true
+    },
+    {
+      "status": 200,
+      "model": null,
+      "provider": null,
+      "usagePresent": true
+    },
+    {
+      "status": 200,
+      "model": null,
+      "provider": null,
+      "usagePresent": true
+    },
+    {
+      "status": 200,
+      "model": null,
+      "provider": null,
+      "usagePresent": true
+    },
+    {
+      "status": 200,
+      "model": null,
+      "provider": null,
+      "usagePresent": true
+    }
+  ],
+  "usage": {
+    "inputTokens": 59862,
+    "outputTokens": 0
+  },
+  "chargedUsdConservative": 0.0748275,
+  "halted": null,
+  "result": {
+    "status": "failed",
+    "message": "Review failed: 0 finding(s); 7 of 7 selected item(s) failed.",
+    "terminal": "failed",
+    "comments": 0,
+    "filesReviewed": 7,
+    "groups": [
+      {
+        "label": "src/delivery.ts",
+        "files": 1
+      },
+      {
+        "label": "src/limits.ts",
+        "files": 1
+      },
+      {
+        "label": "src/router.ts",
+        "files": 1
+      },
+      {
+        "label": "src/store.ts",
+        "files": 1
+      },
+      {
+        "label": "tests/idempotency.test.ts",
+        "files": 1
+      },
+      {
+        "label": "tests/retry.test.ts",
+        "files": 1
+      },
+      {
+        "label": "tests/subscriptions.test.ts",
+        "files": 1
+      }
+    ],
+    "outcome": {
+      "schema_version": "reviewrouter.ocr-outcome/v1",
+      "run_stop_cause": null,
+      "grouping": {
+        "state": "failed",
+        "reason": "fallback"
+      },
+      "groups": [
+        {
+          "paths": [
+            "src/delivery.ts"
+          ],
+          "main_completed": false,
+          "stop_cause": "provider_error",
+          "rounds": {
+            "configured": 2,
+            "started": 1,
+            "completed": 0
+          },
+          "phases": {
+            "plan": {
+              "state": "failed",
+              "reason": "error"
+            },
+            "compression": {
+              "state": "not_applicable",
+              "reason": "no_zone"
+            },
+            "relocation": {
+              "state": "not_applicable",
+              "reason": "no_candidates"
+            },
+            "filter": {
+              "state": "cancelled",
+              "reason": "not_dispatched"
+            }
+          },
+          "filter_decision_valid": null
+        },
+        {
+          "paths": [
+            "src/limits.ts"
+          ],
+          "main_completed": false,
+          "stop_cause": "provider_error",
+          "rounds": {
+            "configured": 2,
+            "started": 1,
+            "completed": 0
+          },
+          "phases": {
+            "plan": {
+              "state": "not_applicable",
+              "reason": "threshold"
+            },
+            "compression": {
+              "state": "not_applicable",
+              "reason": "no_zone"
+            },
+            "relocation": {
+              "state": "not_applicable",
+              "reason": "no_candidates"
+            },
+            "filter": {
+              "state": "cancelled",
+              "reason": "not_dispatched"
+            }
+          },
+          "filter_decision_valid": null
+        },
+        {
+          "paths": [
+            "src/router.ts"
+          ],
+          "main_completed": false,
+          "stop_cause": "provider_error",
+          "rounds": {
+            "configured": 2,
+            "started": 1,
+            "completed": 0
+          },
+          "phases": {
+            "plan": {
+              "state": "not_applicable",
+              "reason": "threshold"
+            },
+            "compression": {
+              "state": "not_applicable",
+              "reason": "no_zone"
+            },
+            "relocation": {
+              "state": "not_applicable",
+              "reason": "no_candidates"
+            },
+            "filter": {
+              "state": "cancelled",
+              "reason": "not_dispatched"
+            }
+          },
+          "filter_decision_valid": null
+        },
+        {
+          "paths": [
+            "src/store.ts"
+          ],
+          "main_completed": false,
+          "stop_cause": "provider_error",
+          "rounds": {
+            "configured": 2,
+            "started": 1,
+            "completed": 0
+          },
+          "phases": {
+            "plan": {
+              "state": "not_applicable",
+              "reason": "threshold"
+            },
+            "compression": {
+              "state": "not_applicable",
+              "reason": "no_zone"
+            },
+            "relocation": {
+              "state": "not_applicable",
+              "reason": "no_candidates"
+            },
+            "filter": {
+              "state": "cancelled",
+              "reason": "not_dispatched"
+            }
+          },
+          "filter_decision_valid": null
+        },
+        {
+          "paths": [
+            "tests/idempotency.test.ts"
+          ],
+          "main_completed": false,
+          "stop_cause": "provider_error",
+          "rounds": {
+            "configured": 2,
+            "started": 1,
+            "completed": 0
+          },
+          "phases": {
+            "plan": {
+              "state": "failed",
+              "reason": "error"
+            },
+            "compression": {
+              "state": "not_applicable",
+              "reason": "no_zone"
+            },
+            "relocation": {
+              "state": "not_applicable",
+              "reason": "no_candidates"
+            },
+            "filter": {
+              "state": "cancelled",
+              "reason": "not_dispatched"
+            }
+          },
+          "filter_decision_valid": null
+        },
+        {
+          "paths": [
+            "tests/retry.test.ts"
+          ],
+          "main_completed": false,
+          "stop_cause": "provider_error",
+          "rounds": {
+            "configured": 2,
+            "started": 1,
+            "completed": 0
+          },
+          "phases": {
+            "plan": {
+              "state": "failed",
+              "reason": "error"
+            },
+            "compression": {
+              "state": "not_applicable",
+              "reason": "no_zone"
+            },
+            "relocation": {
+              "state": "not_applicable",
+              "reason": "no_candidates"
+            },
+            "filter": {
+              "state": "cancelled",
+              "reason": "not_dispatched"
+            }
+          },
+          "filter_decision_valid": null
+        },
+        {
+          "paths": [
+            "tests/subscriptions.test.ts"
+          ],
+          "main_completed": false,
+          "stop_cause": "provider_error",
+          "rounds": {
+            "configured": 2,
+            "started": 1,
+            "completed": 0
+          },
+          "phases": {
+            "plan": {
+              "state": "failed",
+              "reason": "error"
+            },
+            "compression": {
+              "state": "not_applicable",
+              "reason": "no_zone"
+            },
+            "relocation": {
+              "state": "not_applicable",
+              "reason": "no_candidates"
+            },
+            "filter": {
+              "state": "cancelled",
+              "reason": "not_dispatched"
+            }
+          },
+          "filter_decision_valid": null
+        }
+      ]
+    }
+  },
+  "resultPath": "ocr-result-c02-offline.json"
+}

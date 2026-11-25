@@ -1,0 +1,103 @@
+{
+  "schema": "d3-r3.policy-variants/v1",
+  "head": "0d85551a83cbd87d3664a9de17b9c01990bacaf3",
+  "variants": {
+    "conforming-5xx-only": {
+      "policySha256": "bd96c2c86e39102dee1254323cf3fec5876101521c2af787a5770d3493213771",
+      "runs": {
+        "status_500": {
+          "targetCalls": 3,
+          "gapsMs": [
+            125,
+            201
+          ],
+          "grows": true,
+          "state": "failed",
+          "attempts": 3
+        },
+        "status_400": {
+          "targetCalls": 1,
+          "gapsMs": [],
+          "grows": null,
+          "state": "failed",
+          "attempts": 1
+        },
+        "status_429": {
+          "targetCalls": 1,
+          "gapsMs": [],
+          "grows": null,
+          "state": "failed",
+          "attempts": 1
+        },
+        "status_0": {
+          "targetCalls": 3,
+          "gapsMs": [
+            109,
+            203
+          ],
+          "grows": true,
+          "state": "failed",
+          "attempts": 3
+        },
+        "reentry_after_400": {
+          "callsPerInvocation": [
+            1,
+            0
+          ],
+          "totalTargetCalls": 1,
+          "state": "failed"
+        }
+      }
+    },
+    "transient-429-included": {
+      "policySha256": "beeb269267ad25a88bb7286b2ef4ef084243358988138b7bcb6a3caa570df9f8",
+      "runs": {
+        "status_500": {
+          "targetCalls": 3,
+          "gapsMs": [
+            314,
+            506
+          ],
+          "grows": true,
+          "state": "failed",
+          "attempts": 3
+        },
+        "status_400": {
+          "targetCalls": 1,
+          "gapsMs": [],
+          "grows": null,
+          "state": "failed",
+          "attempts": 1
+        },
+        "status_429": {
+          "targetCalls": 3,
+          "gapsMs": [
+            260,
+            508
+          ],
+          "grows": true,
+          "state": "failed",
+          "attempts": 3
+        },
+        "status_0": {
+          "targetCalls": 3,
+          "gapsMs": [
+            250,
+            527
+          ],
+          "grows": true,
+          "state": "failed",
+          "attempts": 3
+        },
+        "reentry_after_400": {
+          "callsPerInvocation": [
+            1,
+            0
+          ],
+          "totalTargetCalls": 1,
+          "state": "failed"
+        }
+      }
+    }
+  }
+}

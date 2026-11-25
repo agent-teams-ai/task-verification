@@ -58,6 +58,21 @@
         "outputTokens": 2055
       },
       "settledAt": "2026-11-23T16:41:46.865Z"
+    },
+    {
+      "requestKey": "ed62d760850689c07a816c1eabd756b0487f5e6b0b8b03346052af3cb152b7fa",
+      "attemptId": "att-c03r-criteria-recheck-20261125T185400406Z-3b7c21",
+      "candidateId": "c03r",
+      "stageId": "criteria-recheck",
+      "maxUsd": 0.04842,
+      "state": "settled",
+      "reservedAt": "2026-11-25T18:54:00.410Z",
+      "settledUsd": 0.01819125,
+      "charged": {
+        "inputTokens": 6045,
+        "outputTokens": 2127
+      },
+      "settledAt": "2026-11-25T18:54:35.390Z"
     }
   ],
   "createdAt": "2026-11-23T16:39:38.615Z"

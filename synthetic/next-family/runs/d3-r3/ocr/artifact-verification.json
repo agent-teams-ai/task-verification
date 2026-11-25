@@ -1,0 +1,21 @@
+{
+  "schema": "d3-r3.ocr-artifact-verification/v1",
+  "retrievedAt": "2026-11-25T18:57:04.599Z",
+  "repository": "agent-teams-ai/open-code-review",
+  "runId": 44924052949,
+  "artifactId": 14714439075,
+  "artifactName": "managed-ocr-8a70944f567beba9ffc12d1153e33ef5fd60967d",
+  "artifactExpiresAt": "2026-12-21T16:28:12Z",
+  "sourceCommit": "8a70944f567beba9ffc12d1153e33ef5fd60967d",
+  "version": "1.14.0-rr.1",
+  "platform": "linux/amd64",
+  "binaryName": "opencodereview-linux-amd64",
+  "binaryBytes": 87356967,
+  "binarySha256": "443d7777b9fffae6300085c3afc6027181de181befa118bbe6f580dce3fcb399",
+  "expectedSha256": "443d7777b9fffae6300085c3afc6027181de181befa118bbe6f580dce3fcb399",
+  "expectedBytes": 87356967,
+  "digestMatches": true,
+  "versionOutput": "open-code-review 1.14.0-rr.1 linux/amd64",
+  "executedUnder": "docker --platform linux/amd64, image m2-ocr-rr7:local",
+  "qualificationReceipt": "qualification.json in the same artifact: 4/4 cases passed, model_free true, public schema opencodereview.managed-qualification/v1"
+}
