@@ -1,335 +1,558 @@
-# D4-P0 — Adaptive native OCR requirements investigator: architecture review and bounded qualification card
+# D4-P0.1 — Adaptive native OCR requirements investigator: final decision package
 
-**Status: `D4_P0_ARCHITECTURE_PLAN_READY — AWAITING_ILIYA_SCOPE_APPROVAL`**
+**Status: `D4_P0_FINAL_PLAN_READY — AWAITING_ILIYA_DECISION`**
 
-This document is a plan. Nothing in it is implemented, dispatched, paid for or authorized. It is a
-critical response to the 2026-11-26 owner direction, not a defence of it, and not final architecture
-approval.
+This document supersedes D4-P0 in place; it is the only D4 architecture proposal. Nothing here is
+implemented, dispatched, paid for or authorized. It is an independent assessment of the 2026-11-26 owner
+direction, not a defence of it.
 
 | | |
 | --- | --- |
 | Branch | `exp/synthetic-live-pilot-01` (research only) |
-| Base commit | `9c21a7b00c53243315fd86a7a921c76c6d6c69d4` (= `origin`, clean) |
+| Base commit | `349c034770636682cd7a34969c60b035eca2a483` |
+| OCR source examined | `agent-teams-ai/open-code-review` @ `8a70944f567beba9ffc12d1153e33ef5fd60967d` |
 | M2 PR #2 | `996cdcb002f898a5b73ce8f9ce7931e6299b14e4`, draft, untouched |
 | D3 raw outputs | unmodified; one bookkeeping residue recorded in Appendix A |
 | Paid inference in this phase | none |
-| New spend authorization | none; D3's remaining USD 0.36696625 is **not** an allowance |
+| New spend authorization | none. D3's USD 0.36696625 is **not** an allowance (see §4.6) |
 | Reader | Iliya |
 
 ---
 
-## 0. Executive execution card
+## 0. Decision card
 
-**Independent verdict.** Native OCR reuse is feasible with a genuinely thin seam, and the
-"package-private makes it invasive" objection is **not supported by the source**. `internal/llmloop`
-already exposes a complete task API, and `internal/behaviortask` is an existing sibling package that
-consumes it without a single edit to the loop. A Requirements task can be added the same way: one new
-package, one new CLI file, one line in `root.go`. The real cost is not the loop — it is (a) a typed
-criteria result contract that does not exist today, (b) incremental criterion persistence that does not
-exist today, and (c) ~500 lines of read/search/authorization policy that `behaviortask` keeps private
-and that must be re-expressed, not copied.
+### 0.1 Selected mechanism, and the smallest credible fallback
 
-**What the source does *not* establish** (and therefore what this card does not promise): that one
-session's first turn is cheaper than a two-pass adapter on simple tasks; that six requests suffice for a
-cross-component obligation; that typed criteria improve the owner's decision; or that the managed OCR
-channel admits a new subcommand. Each has a named smallest test in §1 and §11.
+**Selected: Option A — one adaptive native task** in a new `internal/requirementstask`, reusing
+`internal/llmloop` unchanged, `internal/tool` providers directly, `internal/gitcmd`, `internal/session`
+and prompts embedded in the new package. Verified feasible from source (§2). **Smallest credible
+fallback: Option B — a fixed two-pass adapter** on the already-qualified `@agent-teams/account-gateway/llm`
+single-request client (250–450 new lines, 2 requests per case, no multi-hop). Switch condition is
+numerical (§2.5), not a preference.
 
-**Recommended scope**: Option A (native adaptive task), built as `internal/requirementstask`, reusing
-`llmloop`, `internal/tool`, `internal/gitcmd`, `internal/session` and embedded prompts, with **zero
-edits to shared upstream Go files except one registration line**. One realistic fixture first; the
-second only on a stated trigger.
+### 0.2 D4-P1 scope (offline only, one tiny sample)
 
-**Rough size**: 1,150–1,750 lines of new Requirements code, 180–260 lines of new CLI code, 900–1,400
-lines of tests, 700–1,100 lines of fixture (plus 250–400 lines of probes). Shared-file delta: 1–3 lines.
+Prove eight things against a fake provider, real git and the real loop: registration; `llmloop.Task`
+invocation; authorized source reading; immutable candidate identity; one finding persisted before the
+next request; `partial` after a request-limit stop; no change to `ocr review` / `ocr review --analysis`
+behaviour; shared delta ≤ 3 lines. No fixture project, no semantic evaluation, no spend. GO/STOP in §3.3.
 
-**Numbers requested**: live ceiling **USD 0.90** for five fixed cases, per-case cap USD 0.20, 8 requests
-and 120,000 aggregate tokens per case, 10 minutes per case. Expected actual USD 0.42–0.60.
+### 0.3 P1 files and size
 
-**Stop condition**: if the extraction/adapter needs more than ~600 lines of shared-file edits, or two
-consecutive fixture runs show the loop never uses a turn beyond the first in a way that changes a
-criterion's state, the direction falls back to Option B (§5).
+8 new Go files + 3 embedded prompt files (~880–1,180 lines) + 5 new test files (~560–750 lines) + **1 shared line** in
+`cmd/opencodereview/root.go` `init()`. No `go.mod` change (`jsonschema-go v0.4.3` is already a direct
+dependency). Full list in §3.2.
+
+### 0.4 Conditional P2 / P3 scope
+
+- **P2** (only on P1 GO): typed `ocr.requirements/v1` contract, intent record, incremental findings,
+  coverage arithmetic, and the `quota-service` fixture with an independently qualified oracle.
+- **P3** (only on P2 GO **and** a separate live authorization): 4 live cases, 5 requests each, USD 0.90
+  worst case. One OCR comparator case only if its own USD 0.46 block is granted.
+
+### 0.5 Fixture choice
+
+`quota-service` — one purpose-built workflow/budget service, seven frozen scenarios of which **S7 is held
+out of prompt tuning entirely**. A second fixture (`plugin-cli`) is **not** proposed; it has a measured
+trigger (§12.2) and a measured cost.
+
+### 0.6 Worst-case live budget
+
+**USD 0.90** requested for 4 adaptive cases × USD 0.22, each 5 requests at 24,576 B input and 2,560
+output tokens, 12 min per case. Expected actual **USD 0.15–0.28**. OCR comparator is a **separate**
+USD 0.46 request, not inside the 0.90. The D4-P0 pairing of "5 cases × USD 0.20 within USD 0.90" is
+arithmetically impossible and is withdrawn (§4.5).
+
+### 0.7 OCR baseline accounting
+
+No D3 OCR observation is reusable — the D3 OCR stage ended `BLOCKED`, so its finding set is *unobserved*,
+not empty. A live OCR comparator on any realistic candidate costs **at least USD 0.306** structurally
+(8 requests × 24,640 input tokens) and **USD 0.46** at the observed 12-request shape, because OCR's minimum
+request width is ~19.6 KB of fixed prompt regardless of fixture size. It is therefore a separate
+authorization, and if it is not granted the report **cannot claim** incremental value over ordinary OCR.
+
+### 0.8 Owner decisions requested
+
+1. **Scope** — approve P1 as specified in §3, or require Option B first.
+2. **Budget** — authorize **USD 0.90** (4 cases, 5 requests, USD 0.22 each) as a *new, standalone* live
+   ceiling; D3's remainder is not reused. Or state a different number and the code-halving consequence.
+3. **OCR baseline** — separately authorize **USD 0.46** for one OCR comparator case, or accept a report
+   with **no OCR column** and the limitation in §5.6.
+4. **Transport** — confirm which credential/transport may run the adaptive cases. `--analysis` is barred
+   from `--reviewrouter-managed` (verified), so the adaptive command cannot ride the managed channel
+   without new integration; a plain provider key with its own cap is the alternative.
+5. **Bookkeeping** — accept the D3 index residue in Appendix A as documented-and-closed.
+
+### 0.9 Key uncertainties and stop conditions
+
+Uncertain: whether 4 investigation rounds suffice for a cross-component obligation; whether a 24,576-byte
+request carries enough context for turn 5; whether the owner reads typed criteria faster than D3's
+Markdown brief; whether 4.4 bytes/token holds for this prompt shape (D3's ratio, not a tokenizer
+guarantee). Stop conditions: unsupported `satisfied` on a mandatory requirement; partial reported as
+`completed`; ordinary-OCR regression; > 100 shared-file lines or any edit to `llmloop`/`behaviortask`/
+`tool`; no decision difference from checks/OCR on the multi-hop case.
 
 ---
 
-## 1. Architecture critique: does the selected direction survive inspection?
+## 1. What the source actually says: ten corrections to D4-P0
 
-Ten questions, answered from source. "Established" means I read the code; "unproven" means the source
-cannot settle it and a test is named.
+Every item is a claim in D4-P0 that inspection at `8a70944f` contradicts or sharpens. "Effect" states the
+consequence for the architecture decision, not just for wording.
 
-| # | Question | Verdict from source | Smallest resolving test |
+| # | D4-P0 claim | Verified source | Effect |
 | --- | --- | --- | --- |
-| 1 | Is one adaptive session materially simpler than separate fast/deep engines? | **Partly established.** One `llmloop.Task` and one template per run; a second engine would duplicate the driver in `internal/llmloop/loop.go` plus its own prompts, budget and submission path. Simpler in components, not proven cheaper in tokens: the D3 one-shot already needed 26,773 B for one turn. | Count provider requests for a trivial case; if it is 1 with no tool call, the "fast path" is the same session, not a second engine. |
-| 2 | Can small tasks finish without paying for unnecessary read/search loops? | **Structurally established.** `runMainTask` returns as soon as a tool returns `Complete`; nothing forces a tool call before submission, and `EmptyResponseMessage` only fires when the model emits no tool call at all. | Fake provider that submits on turn 1: assert requests = 1, source ops = 0, state = `completed`. |
-| 3 | Can complex tasks investigate relevant unchanged code without scanning the repository? | **Established as a capability, not as a policy.** `code_search` is always constrained: `searchPaths` enumerates `git ls-files --with-tree=<rev>` and batches per-path pathspecs, and `code_search.go` caps at 100 matches with an explicit truncation note. Nothing prevents the *model* from omitting `file_patterns` and spanning the whole tree, so the bound is budget, not relevance. | The 601-match fixture (§11, T5): unscoped search must truncate, scoped search must recover the wiring file, and bytes/unique files must be recorded. |
-| 4 | Is the native reuse seam small enough to maintain across upstream updates? | **Yes for the loop, moderate for tool contracts.** `behaviortask` needs no `llmloop` change; but the newest maintained commit alone rewrote `internal/tool/code_search.go` (+75/−22) and `filereader.go` (+21), and truncation is detected by *string prefix* (`strings.HasPrefix(stripSide(content), "Note: Showing the first ")`). | Seam-equivalence test: run `file_read`/`code_search`/`file_find` through both packages on a fixture and compare truncation flags, locations and error classes. |
-| 5 | Can accepted observations and partial criterion results be persisted safely before submission? | **Observations yes, criteria no.** `observationStore.append` writes and closes before the tool result returns, and a persistence error fails the task (`dispatch` returns `llmloop.Fail`). No criterion-level store exists anywhere in OCR. | Offline test: kill the provider after N findings; assert `findings.jsonl` holds exactly the accepted ones and the final state names the stop. |
-| 6 | Can the existing Gateway/V4 interfaces solve the same problem with fewer code changes? | **No for multi-hop.** The Gateway contract is one bounded structured inference per execution with no tool loop (`LlmTask` in `account-gateway` has `instructions`/`input`/`output`/`deadline` and no tools). V4 has five read tools and durable cursors, but no assessment semantics, no criteria identity and no submission path; it would need a new orchestrator anyway. Fewer OCR changes, more new components. | Implement Option B's second pass against the D3 retained one-shot and measure whether it can answer a case whose decisive evidence was unknown before reading. |
-| 7 | Does native OCR's package-private architecture make reuse disproportionately invasive? | **Refuted for the task API; confirmed for the tool layer.** `codeTools` and `observationStore` are unexported, but they are *ours to re-express* against the exported `internal/tool` providers and `gitcmd`. No `llmloop` edit is required, and no `behaviortask` edit either if we do not lift its internals. | Spike: build the read/search/observation layer for one fixture path and count the shared-file diff. Target: 1–3 lines. |
-| 8 | Can terse task intent be interpreted without silently inventing mandatory requirements? | **Unproven.** Nothing in OCR models requirements at all today; `submit_analysis` is free Markdown with a self-declared `complete|partial|unknown`. The guarantee must come from a typed intent record plus a validator that cannot promote an ambiguous item (`§9`). | Three frozen intents (detailed, terse, ambiguous) replayed through a fake provider; assert the ambiguous item can never be emitted as mandatory. |
-| 9 | Can the design distinguish unavailable evidence, source absence, unsupported claims and execution failure? | **Partially, and only with new fields.** `Observation.ErrorClass` already separates `unavailable`, `tool_error`, `timeout`, `canceled`, `unsupported_encoding`; truncation is a separate flag with a continuation hint. "No match" ≠ "no caller" is prompt guidance only. Nothing counts unassessed criteria or uninspected scope. | Schema test: a run with one failed read and one truncated search must produce distinct coverage fields, and no `satisfied` state for the unassessed criterion. |
-| 10 | Can it remain useful when the budget expires halfway through a complex requirement? | **Structurally yes, semantically new.** `runGraceRound` runs a submission-only round after `StopMaxRounds`/`StopTokenBudget`, and `requestBudget.complete` exempts `FinalSubmission` from the block; `Result.ExecutionStatus` already reports `completed|partial|failed|skipped`. But a partial *criteria* result needs findings persisted before the reserve is spent — that is the main new engineering. | Offline: force `StopMaxRounds` after two of five criteria are adjudicated; assert `partial`, two findings retained with observation IDs, three explicitly `not_assessed`. |
+| C1 | The per-run token budget is a `llmloop.Task` field (`§2.1`, `§7` "New: MaxTokensBudget") | `Task` has `MaxRounds`, `MaxContextTokens`, `MaxCompletionTokens`, `Grace` only (`llmloop/task.go`). The aggregate budget is `Deps.MaxTokensBudget` (`loop.go:29`), checked before each round (`loop.go:378`), counting **input+output only** (`loop.go:174`) | Feasibility unchanged — the budget is native — but it is a **Runner/Deps** property, so the new package must construct a Runner, exactly as `behaviortask` does. The 120,000 figure must be attached to `Deps`, not to `Task` |
+| C2 | "8 requests maximum **including** the grace submission" | The grace round runs **after** the round loop and issues its own request (`loop.go:517–521`, `runGraceRound`). Requests = `MaxRounds + 1` | A request cap of 6 means `MaxRounds = 5`. The D4-P0 text implied 7 |
+| C3 | Round cap bounds requests | Memory compression issues additional LLM requests that are **not** counted by `MaxRounds`; it fires at 60 %/80 % of `MaxContextTokens` (`loop.go:640–690`) | Keep `MaxContextTokens = 200,000` and bound the conversation by tool-result bytes. Lowering `MaxContextTokens` would *add* uncounted spend — the opposite of a saving |
+| C4 | "Reads: page 16 KiB default, 64 KiB max" | `file_read` renders up to **500 lines / 256 KiB per call**, 2,048 B per line, and takes no byte parameter at all (`tool/file_read.go:14–26`, `:117`) | 256 KiB ≈ 73k tokens at the conservative bound — **61 % of a 120k per-case budget in one call**. The requirements package must impose its own per-result byte cap *before* the result reaches the model, or no per-case token bound is real |
+| C5 | "page 16 KiB / max 64 KiB" as a read limit | 16 KiB is `scopedPathBytes`, the Git **argv** batching limit (`behaviortask/search.go:14`); 64 KiB is the observation **page** ceiling (`observation.go` `readPage`, 4–65,536) | Two different limits were merged into one wrong one. The tool-limit table in §9 is corrected |
+| C6 | "search cap from provider (100)" as if equivalent to `behaviortask` | Search is capped **twice**: the provider fetches 101 per file and caps 100 globally with its own note (`tool/code_search.go:18–19`, `:214–249`); `behaviortask/search.go` re-batches per path and caps 100 again with a *different* note | "Use the provider's truncation" is **not** parity with `behaviortask`. A new package must pick one contract and assert it; it must not claim behavioural identity by default |
+| C7 | `internal/tool` can be consumed as-is for search | `tool.CodeSearchProvider` has **no allowed-set**: with empty `file_patterns` it greps every tracked file at the revision, including secret-like committed paths. The authorized set exists only in `behaviortask.searchPaths` | Path scoping is a **security** requirement, not a relevance nicety. Naive composition is unsafe; ~80–90 lines of scoping are mandatory (§2.2) |
+| C8 | Assumption A4: "the managed OCR transport admits a new subcommand" | `--analysis` is explicitly rejected with `--reviewrouter-managed` (`cmd/opencodereview/analysis.go:33–36`): analysis runs a separate concurrent client, managed runs promise serialization and a complete receipt | **Contradicted for the analysis-shaped path.** The adaptive command cannot ride the managed channel without new integration. This is the sharpest remaining product question, and it makes the *funding transport* a P3 gate rather than a config detail |
+| C9 | `github.com/google/jsonschema-go` proposed as an import (dependency risk) | Already a **direct** dependency at `v0.4.3` (`go.mod`) | Risk closed. P1 must still prove `go.mod`/`go.sum` are unchanged |
+| C10 | "~500 lines of duplicated policy" | `behaviortask` policy files total 802 lines (`code.go` 266, `search.go` 171, `observation.go` 217, `budget.go` 100, `validate.go` 48), but revision binding, providers and name matching come from `internal/tool`, and the exclusion *rules* are exported library calls | Re-expression is **260–330 lines**, not 500. Duplication risk is real for scoping, observation storage and prose sniffing; absent for revision binding, providers and exclusion rules (§2.2) |
 
-### Assumptions this plan depends on, stated separately
+Two further facts, confirmed rather than corrected:
 
-- **A1** A model given a compact packet will choose one turn for simple cases (no measurement).
-- **A2** 4–6 requests suffice for a cross-component obligation (owner hypothesis; unmeasured).
-- **A3** Typed per-criterion results reduce reader work versus D3's Markdown brief (D3 measured the brief, not criteria).
-- **A4** The managed OCR transport admits a new subcommand and accounts credits per request (not inspected here; Docker image is available, the channel is not).
-- **A5** An ordinary-OCR baseline on the fixture is affordable and obtainable — D3 never obtained a live OCR comparator, so its cost is unknown, not cheap.
+- `submit_analysis` accepts free Markdown with a self-declared `complete|partial|unknown`; validation
+  checks length, whitespace and citation existence only (`behaviortask/validate.go`). No typed criteria
+  contract exists anywhere in OCR. The new result schema is genuinely new work.
+- `workflow.Run` already runs review and analysis concurrently on separate goroutines
+  (`internal/workflow/run.go:23–35`), so "run requirements alongside review" needs no new concurrency
+  design — but also gives no reason to do it.
 
-### Where I disagree with the selected direction
-
-1. **"Reuse the observation system" is only half true.** Observations are reusable; *criteria* are not modelled anywhere. Roughly half the new code is result semantics, not investigation.
-2. **The 300-round default is the wrong shape for this problem.** `behavior_template.json` sets `MAX_TOOL_REQUEST_TIMES: 300`, `MAX_TOKENS: 200000`. A requirements session needs a *small* round cap (8) and an aggregate token budget, because the bound that matters is cost, not rounds.
-3. **Truncation is detected by parsing English.** Any reuse that copies `behaviortask/code.go`'s prefix checks inherits a brittle coupling to upstream prose. Prefer explicit provider result types where they exist, and assert the string contract in one seam test where they do not.
-4. **A second fixture is not justified yet.** Two purpose-built projects before one measured case is how D3 accumulated controls without a live comparator. Start with one; the trigger for the second is in §10.
+**Feasibility verdict is unchanged by C1–C10.** No correction removes the seam; three (C4, C7, C8) add
+mandatory work or a gate that D4-P0 did not carry.
 
 ---
 
-## 2. The actual native reuse seam
+## 2. The seam, re-verified
 
-### 2.1 What exists (inspected at `8a70944f`)
+### 2.1 What composes directly
 
-| Component | Location | What it provides today |
+| Need | Exported surface at `8a70944f` | Lines to write |
 | --- | --- | --- |
-| Task contract | `internal/llmloop/task.go` | `Task{ToolDefs, ExecuteTool, MaxRounds, MaxContextTokens, MaxCompletionTokens, EmptyResponseMessage, Compression, Grace}`; `ToolExecutor` returns `ToolOutcome{Content, Action}` with `Continue|Complete|Fail`. |
-| Driver | `internal/llmloop/loop.go` | `Run` → `runMainTask`: round budget, aggregate token budget check before dispatch, empty-round guard, three-zone compression at 60 %/80 %, `MainLoopStop` enum, grace round on spent budget, `FinalSubmission` bypass. |
-| Working example | `internal/behaviortask/*` | A complete read-only investigation: preparation, authorized allowed-set, read/search/find/diff tools, append-only observations, a submission tool, budget wrapper, artifacts. |
-| Code access | `internal/tool/{code_access,code_search,file_read,file_find,filereader}.go` | Revision-bound readers, Git-backed search with a 100-match cap and truncation note, name matching with a 100-result cap. |
-| Session trace | `internal/session/history.go:165` `NewAnalysisTrace` | Creates a run-local trace with its own `trace.jsonl`; used by `behaviortask` without touching the review session enum. |
-| Budget bridge | `internal/llm/budget.go` `FinalSubmissionClient`; `internal/behaviortask/budget.go` | Wraps the client so the aggregate budget blocks investigation but never the final submission. |
-| Concurrency | `internal/workflow/run.go` | Runs review and analysis concurrently and joins them; a template for running requirements alongside review without changing review. |
+| Revision-bound readers for both sides | `tool.FileReader{RepoDir, Mode, Ref, Runner}`; `tool.NewComparisonCodeAccess(current, previous)` | ~20 |
+| Read / search / find / diff providers | `tool.NewFileRead`, `tool.NewCodeSearch`, `tool.NewFileFind`, `tool.NewFileReadDiff`, `tool.CodeSearchProvider{Access}`, `tool.FileReadProvider{Access}` | ~15 |
+| Name matching over an explicit path list | `tool.MatchFileNames(ctx, files, query, caseSensitive, limit, allowed)` | ~5 |
+| Tool identity and registry | `tool.Tool`, `tool.NewRegistry`, `Provider`, `Freeze`, `NotAvailableMsg` | ~10 |
+| Session trace | `session.NewAnalysisTrace` (used by `behaviortask` without touching the review enum) | ~5 |
+| Budget interface | `llm.FinalSubmissionClient` (`FinalSubmission(ctx, req) (resp, budgetReached, err)`) | interface only |
+| Loop | `llmloop.Task`, `Deps`, `ToolOutcome{Continue|Complete|Fail}` | 0 |
 
-### 2.2 What actually blocks a Requirements task today
+This is the finding that decides the direction: **no `llmloop` edit, no `behaviortask` edit, no `tool` edit
+is required**, and the newest maintained commit (`5da4f4f9`) that rewrote `code_search.go` and
+`filereader.go` does not touch any of these constructors' signatures.
 
-Four concrete blockers, each with the smallest resolution:
+### 2.2 What genuinely requires requirements-specific code, and what would duplicate
 
-1. **Submission is Markdown-only.** `submit_analysis` accepts `{markdown, declared_completion}` and validation checks only length, whitespace and `[[obs-…]]` citations. → New tool `submit_requirements` with a typed schema; no shared edit.
-2. **The result schema is behaviour-specific.** `ocr.behavior-impact/v2` describes a comparison and a brief. → New `ocr.requirements/v1` alongside it; `workflow.Outcome` is untouched unless we later run both.
-3. **The tool layer is private.** `codeTools`, `observationStore`, `readContext` live in `behaviortask`. → Re-express the ~500-line policy layer in the new package against exported `internal/tool` APIs; do **not** lift `behaviortask` internals.
-4. **No command exists.** `root.go` registers eleven subcommands; `review --analysis` is the only entry to `behaviortask`. → One new command file plus one `AddCommand` line.
+| Responsibility | Where it lives today | Compose? | New work | Duplication risk |
+| --- | --- | --- | --- | --- |
+| Immutable candidate digest | `behaviortask/code.go` (hash of repo/mode/old/head) | no export, but 3 lines | 5 | trivial |
+| Authorized-set enumeration | `code.go` (`git ls-tree -r -z`) | no | ~30 | **real** — tree-format drift is silent |
+| Secret / symlink / unsafe-path rules | `code.go` `safePath` | **rules are exported**: `allowedext.IsSecretPath`, `rules.FileFilter`, `diff.ProviderDirPrefix`, `fs.ValidPath` | ~45 glue | **glue only** — the rules are not duplicated |
+| Scoped search batching | `search.go` `searchPaths`/`pathBatches` | no | 80–90 | **highest** |
+| Search truncation detection | `code.go` (prefix `"Note: Showing the first "`) | no | ~20 + seam test | **real** — prose contract |
+| Tool error classification | `code.go` (substrings `Error:` / `Warning:`) | no | ~10 | **real** — prose contract |
+| Observation record + append-only store | `observation.go` | no | 90–120 | **real** |
+| Location extraction / compaction | `code.go`, `observation.go` | no | ~50 | real |
+| Aggregate budget + submission reserve | `budget.go` + `llm.FinalSubmissionClient` | interface exported, wrapper not | ~60 | medium (mirrors) |
+| Submission validation | `validate.go` (Markdown only) | n/a | new typed | n/a — different semantics |
 
-Nothing in `internal/llmloop` must change. That is the finding that decides the direction.
+**Preferred small adapter, not a copy:** a `scope` type in the new package (~75 lines) built from the
+exported rule helpers, plus a ~90-line `search` that reuses `tool.CodeSearchProvider` per authorized path
+batch. Rejected alternatives, with their honest cost:
 
-### 2.3 Package-level shape
+- *Import `behaviortask` to reuse `codeTools`* — impossible (unexported) and would couple the new task to
+  a package upstream is actively editing. Rejected.
+- *Extract scoping into `internal/tool` as an exported `tool.Scope`* — the cleanest long-term shape, but it
+  is **+150 / −140 in `internal/tool` plus ~60 lines in `behaviortask/code.go`**, i.e. it edits the exact
+  path that must stay byte-identical for the regression test. Not justified for P1; retained as the P2
+  option **if** the seam test fails twice (§2.5 W2).
 
-```
-internal/requirementstask/      NEW   (no import of behaviortask)
-  result.go        typed contract + artifacts
-  prepare.go       candidate binding, requirement bundle, changed inventory
-  code.go          authorized allowed-set + tool registry
-  search.go        scoped path batching
-  observation.go   append-only store + paging
-  budget.go        aggregate budget + submission reserve
-  validate.go      submission schema, coverage, duplicate/stale rules
-  runner.go        prompt assembly + llmloop wiring
-  prompts/         system + task + final-round (embedded)
-cmd/opencodereview/requirements.go  NEW  (flag parsing, artifact location, exit codes)
-cmd/opencodereview/root.go           +1 line in init()
-```
+### 2.3 Shared-file delta
 
-`internal/requirementstask` would import: `internal/llmloop`, `internal/llm`, `internal/tool`,
-`internal/gitcmd`, `internal/diff`, `internal/model`, `internal/session`, `internal/config/allowlist`,
-`internal/config/rules`, `github.com/google/jsonschema-go/jsonschema`. All are exported APIs already consumed
-across package boundaries inside the module; `internal/` visibility is satisfied because the package
-lives in the same module.
+Verified: `cmd/opencodereview/root.go` registers all eleven commands in one `init()` block
+(`root.go:51–66`). One `AddCommand` line there is the only shared change P1 needs. The repository has
+per-command CLI-reference tests (`cli_reference_compare_docs_test.go`) for `session compare` and
+`session export`, so an **undocumented** command does not fail a test — but the convention is 4–5 locale
+docs per public command. Therefore P1 registers the command with `Hidden: true` and P2 flips it when docs
+land. **This is a promise about P1 only, and P1 must confirm it before anyone repeats "one line".**
 
-Deliberately **not** done: no import of `behaviortask` (avoids coupling to a package whose semantics are
-"behaviour and impact" and whose internals upstream is actively editing), no second copy of the loop, no
-plugin system, no separate long-lived fork.
+### 2.4 Size
 
----
-
-## 3. Source-level change map
-
-| Path | Current responsibility | Required change | New/existing | Shared upstream behaviour | Why necessary | Regression exposure | Expected upstream conflict | Size (lines) |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `internal/requirementstask/result.go` | — | Typed result: candidate identity, requirement inventory, per-criterion states, coverage, execution, usage | new | no | No typed criteria contract exists | none | none (new path) | 180–250 |
-| `internal/requirementstask/prepare.go` | — | Bind immutable head/base, task text digest, requirement bundle digest; read changed inventory via `git diff --name-status -z`; apply head `.gitignore` | new | no | Identity binding is the only defence against stale evidence | none | none | 150–220 |
-| `internal/requirementstask/code.go` | — | Authorized allowed-set from `git ls-tree -r -z`, secret/symlink/unsupported exclusions, tool registry, location extraction | new | no | Reads must be revision-bound and authorized | none | low (mirrors `behaviortask/code.go`, actively edited upstream) | 180–240 |
-| `internal/requirementstask/search.go` | — | Pathspec batching for scoped search; explicit truncation from provider contract | new | no | Whole-tree search must be bounded and observable | none | low | 110–160 |
-| `internal/requirementstask/observation.go` | — | Append-only `observations.jsonl`; page replay; compact locations | new | no | Evidence must survive later turns and a partial stop | none | none | 150–200 |
-| `internal/requirementstask/findings.go` | — | Append-only `findings.jsonl`: accepted criterion states bound to observation IDs + candidate digest | new | no | Partial results cannot be reconstructed from a final report | none | none | 120–180 |
-| `internal/requirementstask/budget.go` | — | Aggregate token budget wrapper; submission reserve | new | no | Cost bound is the real limit | none | none | 90–130 |
-| `internal/requirementstask/validate.go` | — | Submission schema, citation existence, duplicate/stale detection, coverage arithmetic | new | no | A valid JSON claim must not become an admitted fact | none | none | 160–230 |
-| `internal/requirementstask/runner.go` | — | Prompt assembly, `llmloop.Task` construction, dispatch, artifact write, exit status | new | no | Composition point | none | none | 260–340 |
-| `internal/requirementstask/prompts/{system,task,final_round}.md` | — | Requirements-specific instructions (evidence protocol, no invented obligations, partial honesty) | new | no | The behaviour prompt is about impact, not criteria | none | none | 90–150 |
-| `cmd/opencodereview/requirements.go` | — | `ocr requirements --commit/--from/--to`, requirement file input, artifact directory, JSON/text output, budgets | new | no | Entry point | none | low (new file in a directory with 70 drifting files) | 180–260 |
-| `cmd/opencodereview/root.go` | Subcommand registration | `rootCmd.AddCommand(requirementsCmd)` | existing | **yes** | Discovery | trivial | **very low** (init block is stable) | 1–3 |
-| `internal/config/template/*` | Review/behaviour prompts and budgets | none — prompts embedded in the new package | — | no | Avoids editing a shared loader | none | none | 0 |
-| `internal/tool/*` | Revision-bound readers and search | none (consume as-is) | existing | no | Reuse | — | **moderate contract drift** (see §4) | 0 |
-| `internal/llmloop/*` | Investigation driver | none | existing | no | Reuse | — | none | 0 |
-
-### Separate estimates
-
-| Category | Handwritten lines (range) |
+| Category | Lines |
 | --- | --- |
-| New Requirements-specific code | 1,150–1,750 |
-| Minimal shared OCR refactoring | 0 (target) — 120 if a typed truncation helper is later exported from `internal/tool` |
-| CLI wiring | 180–260 new + 1–3 shared |
-| Tests and fixture harness | 900–1,400 |
-| Fixture project | 700–1,100 (+250–400 probes) |
-| Transport/budget changes | 0 (budget wrapper is new code, not a transport change) |
-| Documentation | 120–220 |
+| P1 new code | 880–1,180 |
+| P1 tests | 560–750 |
+| Shared in P1 | 1 |
+| P2 additions (contract, validation, intent, fixture, oracle, probes) | 1,600–2,600 |
+| P2 tests | 800–1,200 |
+| Total to a qualified P3 | ≈ 3,840–5,730 |
 
-Unknowns, marked: the exact cost of prompt iteration (typically the largest hidden line count in a task
-of this kind); whether `file_read_diff` alone is sufficient for changed-file context in a large fixture;
-whether `jsonschema-go` handles a nested criteria schema without a hand-written decoder.
+### 2.5 Switch condition to Option B (measured, any one)
+
+- **W1** Shared delta > **100 lines**, or **any** edit to `internal/llmloop`, `internal/behaviortask` or
+  `internal/tool`, measured by `git diff --stat 8a70944f -- <shared paths>`.
+- **W2** The seam test must be edited on **2 consecutive** upstream syncs.
+- **W3** In P2's oracle, the decisive witness for S3 lies **inside the changed inventory** (single-hop), so
+  the fixture cannot discriminate multi-hop — the multi-hop premise is false. This does **not** trigger B;
+  it triggers the second fixture (§12.2), because B also fails that case.
+- **W4** Live: on **≥ 2 of 4** cases the accepted result arrives on request 1 with zero tool calls **and**
+  per-case cost ≥ Option B's two-request cost (**USD 0.097**, from D3's 0.04842 reservation × 2). At that
+  point A costs more and adapts less.
+
+W1 is checkable in P1. W3 is checkable offline in P2. W4 is checkable only with spend, and only after an
+explicit authorization.
 
 ---
 
-## 4. Upstream conflict exposure
+## 3. Minimum implementation slice
 
-Measured, not guessed:
+### 3.1 D4-P1 — Native reuse spike (offline only)
 
-| Datum | Value |
+One tiny deterministic sample: a 6-file synthetic commit (one changed file, one excluded secret-like file,
+one 601-match search surface, one symlink) and a hand-written 2-criterion requirement record. Not the
+quota fixture. Fake provider, real git, real `llmloop`.
+
+### 3.2 Exact files
+
+New (`internal/requirementstask/`):
+
+| File | Contents | Lines |
+| --- | --- | --- |
+| `result.go` | `Result`, `Finding{CriterionID, State, ObservationIDs, ComparisonID}`, `Usage`, JSON encode | 110–140 |
+| `scope.go` | `git ls-tree -r -z` allowed set, `safePath` from exported rule helpers, change inventory | 100–130 |
+| `tools.go` | provider registry, per-result byte cap (8,192 B), `file_read`/`code_search`/`file_find`/`file_read_diff` execution, prose sniffing for truncation and `Error:` | 120–160 |
+| `search.go` | authorized path batching from `file_patterns`, global match cap | 80–110 |
+| `observation.go` | append-only `observations.jsonl`, IDs, compacted locations | 80–110 |
+| `findings.go` | append-only `findings.jsonl`, candidate digest binding, dedupe | 70–100 |
+| `runner.go` | `llmloop.Task` + `Deps` construction, budget wrapper, grace tools, submit tool, artifact write | 170–220 |
+| `prompts/system.md`, `prompts/task.md`, `prompts/grace.md` | embedded | 60–90 |
+| `cmd/opencodereview/requirements.go` | `--commit` / `--from` / `--to`, `--artifacts`, `--max-requests`, `--max-tokens`, `Hidden: true` | 90–120 |
+| `cmd/opencodereview/root.go` | `rootCmd.AddCommand(requirementsCmd)` | **+1** |
+
+Tests (same package unless noted):
+
+| Test file | Asserts | Lines |
+| --- | --- | --- |
+| `scope_test.go` | secret/symlink/dir-prefix excluded through read, search, find; exhausted paths reported as `unavailable`; unscoped search never reaches a secret path | 120–160 |
+| `search_test.go` | 601-match surface truncates at the declared cap with the declared note; scoped pattern recovers the wiring file; no-match / truncated / excluded / read-error are four distinct states | 120–160 |
+| `runner_test.go` | fake provider submitting on turn 1 → exactly 1 request, 0 source ops, `completed`; forced `StopTokenBudget` → `partial`, findings retained, one grace request dispatched | 140–180 |
+| `identity_test.go` | a head other than the bound head is rejected; an observation whose revision ≠ bound head cannot be cited | 80–110 |
+| `regression_test.go` (`cmd/opencodereview`) | `ocr review` and `ocr review --analysis` on a fixed fixture produce byte-identical artifacts and exit codes with the new command registered | 100–140 |
+
+### 3.3 Explicit GO / STOP
+
+**GO to P2 only if all eight pass:**
+
+| ID | Criterion | How |
+| --- | --- | --- |
+| G1 | A new package registers a task and runs it through `llmloop.Run` with a fake provider | test |
+| G2 | The task reads and searches only authorized paths at the pinned revision; excluded paths return `unavailable` through all four tools | test |
+| G3 | Candidate identity is immutable: a different head, or a citation from another revision, is rejected | test |
+| G4 | One evidence-backed finding is **closed on disk before the next LLM request** (assert file state inside the fake provider's next call) | test |
+| G5 | A request-limit stop returns `partial` with retained findings and one dispatched grace submission | test |
+| G6 | `ocr review` and `ocr review --analysis` artifacts and exit codes are unchanged | test |
+| G7 | Shared delta is ≤ 3 lines, all in `root.go` `init()`; no `go.mod`/`go.sum` change | `git diff --stat` |
+| G8 | The tool-result byte cap holds: no single result exceeds 8,192 B, asserted on a 256 KiB file | test |
+
+**STOP** (do not proceed to P2) if G3, G4, G6, G7 or G8 fails. **STOP to Option B** if G7 needs
+> 100 lines or touches a shared package. G1/G2/G5 failing is a defect to fix, not a verdict.
+
+P1 is not allowed to claim: that the model uses turns well, that 5 requests suffice, that typed criteria
+help a reader, or that managed mode accepts the command. Those are P3/§5 questions.
+
+### 3.4 D4-P2 — Minimal requirements implementation (conditional on P1 GO)
+
+Add to the same package: `intent.go` (frozen intent record, `explicit | established_contract |
+necessary_implication | ambiguous | optional`), `validate.go` (schema, coverage arithmetic, citation
+revision match, no implementation-derived requirements), `artifacts.go` (result + findings + intent
+digests). Build `quota-service` and qualify its oracle (§6). No second fixture unless W3 fires. No live
+call. **STOP** if any mandatory criterion cannot be stated model-free by the oracle, or if the oracle
+cannot distinguish `violated` from `inconclusive` on S2/S4.
+
+### 3.5 D4-P3 — Bounded E2E evaluation (conditional on P2 GO **and** separate live authorization)
+
+Four cases (§14), 5 requests each, USD 0.90 worst case. Do not run every mechanism against every case. No
+permanent matrix. **STOP** at the first unsupported `satisfied`, the first `partial` reported as
+`completed`, or an ordinary-OCR regression.
+
+---
+
+## 4. Budget reconciliation
+
+### 4.1 Prices
+
+| Quantity | Value | Status |
+| --- | --- | --- |
+| Input | USD 1.25 / M tokens | Frozen ledger rate (`runs/budget/batch-guard.json`), worst case: every input token at the cache-write rate |
+| Output | USD 5.00 / M tokens | Same |
+| Cache read | USD 0.05 / M | Recorded, **never assumed** when reserving |
+| Model | `openai/gpt-6.1-terra`, effort medium | D3's approved profile |
+
+**Unresolved assumption:** these are the rates D3's guard enforced on 2026-11-25. They were **not**
+re-queried against a provider price page in this phase, and no tokenizer is available offline. If the
+provider repriced after that date, every figure below is wrong by the same ratio. The byte→token
+conversion (1 token ≥ 1 byte, as bytes + 64 special-token allowance) is D3's documented **upper bound**,
+not an estimate; D3 measured 4.4 bytes/token on its actual prompt, which is why reservations run ~2.7×
+settled cost.
+
+### 4.2 Reservation per request (Option A)
+
+| Field | Value |
 | --- | --- |
-| Upstream `alibaba/open-code-review` main | `d4f568f71d3a9d5c5ec972791b1509e40cd31ad1` (2026-11-25) — unchanged since the last inspection |
-| Sync baseline | `39515dca6161fb7fd176d87704b2b10e5f7a0c36` (2026-11-21) |
-| Upstream drift baseline → main | **20 commits, 235 files** |
-| Drift inside our seam (`internal/{llmloop,behaviortask,tool,config/template,llm,session}`, `cmd/opencodereview`) | **70 files** |
-| Maintained `agent-teams-ai/open-code-review` main | `5da4f4f9f2ef08a3a9f0f77a09e7252ab3647a54`, exactly **1 commit** ahead of the pinned `8a70944f` |
-| That commit's files | `internal/tool/code_search.go` (+75/−22), `file_find.go` (+1), `filereader.go` (+21), new `managed_context.go`, `internal/agent/agent.go`, `go.mod/go.sum`, docs, qualification tool |
+| Serialized input ceiling (enforced) | **24,576 B** |
+| Reserved input tokens | 24,640 (= bytes + 64) |
+| Output ceiling | 2,560 tokens (`MaxCompletionTokens`) |
+| Input cost | 24,640 × 1.25/M = 0.030800 |
+| Output cost | 2,560 × 5/M = 0.012800 |
+| **Reserved USD per request** | **0.043600 → reserve 0.044** |
 
-Interpretation:
+### 4.3 Reservation table — cases
 
-- **Merge conflicts on our work: near zero.** Every Requirements file is a new path; the only shared
-  file is a three-line registration block.
-- **Semantic drift: the real risk.** Two coupling points are prose contracts, not types: the search
-  truncation note (`"Note: Showing the first …"`) and the file-read header (`IS_TRUNCATED: true`). Both
-  are parsed by `behaviortask/code.go` today and would be re-parsed by us. Upstream rewrote
-  `code_search.go` last commit.
-- **Mitigation**: (1) one seam test that asserts both contracts on a fixture and fails loudly on sync;
-  (2) prefer counting matches/locations from structured fields where the provider returns them; (3)
-  treat the pinned commit as the qualification baseline and record any sync commit in the attempt.
+`MaxRounds = 4`, so worst case is 4 + 1 grace = **5 requests** per case.
 
----
+| Case | Question | Max req | Max input tok | Max output tok | Cache-write treatment | OCR allowance | Worst USD | Expected USD | Time | Final-submission reserve |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| L1 (S1) | Justified completion; simple-task overhead | 5 | 123,200 | 12,800 | All input at 1.25/M; cache reads not credited | none | 0.22 | 0.03–0.05 | 10 min | 1 request (0.044) |
+| L2 (S2) | Unmet mandatory requirement found and evidenced | 5 | 123,200 | 12,800 | same | none | 0.22 | 0.04–0.08 | 10 min | 1 request |
+| L3 (S3) | Cross-component re-entry (the multi-hop case) | 5 | 123,200 | 12,800 | same | **separate block** | 0.22 | 0.09–0.15 | 12 min | 1 request |
+| L4 (S5) | Terse natural-language task | 5 | 123,200 | 12,800 | same | none | 0.22 | 0.03–0.06 | 10 min | 1 request |
+| **Sum of maxima** | | **20** | 492,800 | 51,200 | | | **0.88** | **0.15–0.28** | 42 min | |
 
-## 5. Option A versus Option B
+- **Aggregate authorization requested: USD 0.90.** Sum of simultaneously authorized maxima 0.88;
+  **0.02 remains unallocated and may not be spent** — it is a rounding margin, not a reserve.
+- **No retry reserve.** A case that needs a 6th request stops as `partial_budget`, and that is recorded as
+  a ceiling finding. Adding a retry for one case costs +0.044 and requires a new ceiling.
+- **L5 (S4, missing evidence) is dropped from the live plan.** It is qualified offline in P2 (§6); if a
+  live case hits `unavailable`, that is reported where it happens. Inflating to five cases costs 1.10 and
+  would be a second overrun of the same kind as D4-P0's.
+- `Deps.MaxTokensBudget = 120,000` **reported** tokens is retained as a runtime backstop. It is a different
+  unit from the reserved 123,200 upper-bound tokens (4.4 bytes/token actual vs 1 byte/token bound), so it
+  will not normally trip; it exists so a runaway context still halts.
+- Per-request timeout 120 s; 5 requests = 10 min exactly. L3 gets 12 min because a 6th attempt is *not*
+  funded and the case must finish or stop cleanly inside its wall clock.
+- Batch wall ceiling 45 min; abort the batch at 0.90 aggregate spend or after a second softened case.
 
-**Option A** — one bounded native task (recommended). **Option B** — a fixed two-pass adapter: bounded
-source collection, then one scoped assessment, reusing the retained D3 one-shot Gateway runner
-(`@agent-teams/account-gateway/llm`, `json_schema`, one request per pass).
+### 4.4 OCR comparator — separate block (not inside 0.90)
 
-| Criterion | A: native adaptive | B: fixed two-pass |
+| Field | Value |
+| --- | --- |
+| Cases | **1** (S3 only — the decisive case) |
+| Per request | 24,576 B body → 24,640 input tokens; 1,500 output |
+| Per request cost | 24,640 × 1.25/M + 1,500 × 5/M = 0.038300 |
+| Requests | 12 maximum (D3 observed 12 at 19,627–23,258 B) |
+| **Worst case** | 12 × 0.0383 = **USD 0.46** |
+| Structural minimum | 8 × 0.0383 = USD 0.306 |
+| Separate authorization | **USD 0.46**, not drawn from the 0.90 |
+
+If both blocks are granted the total live authorization is **USD 1.36**, which must be stated as such
+rather than folded into one number.
+
+### 4.5 Why the D4-P0 figures do not survive
+
+| D4-P0 | Arithmetic | Correction |
 | --- | --- | --- |
-| Total implementation complexity | 1,150–1,750 new lines + tests | 250–450 new lines (assessment already exists) |
-| Shared upstream changes | 1–3 lines | 0–20 lines (reuse `llmloop` or the Gateway SDK directly) |
-| Maintenance / merge exposure | new paths; contract drift on `internal/tool` | new orchestration outside OCR; two prompt stacks |
-| Source-access reliability | `git`-bound readers, authorized allowed-set, revision recorded per observation | whatever the collector fetches; usually a hand-built packet |
-| Multi-hop investigation | yes, budget-bounded | **no** — pass 2 cannot fetch what pass 1 did not anticipate |
-| Evidence provenance | per-observation ID, revision, locations, hash | per-request input digest only |
-| Partial result support | findings persisted per turn; grace submission | only the two fixed passes; a failed pass yields nothing |
-| Budget enforceability | aggregate token budget + round cap + reserve, in one place | two independent budgets; the second is unconditional |
-| Model-call overhead | 1 for simple, 4–6 for complex | always 2 (or 1 if the packet is hand-built) |
-| Repeated prompt/context cost | grows per turn (context re-sent) | one large packet + one packet+evidence prompt (~2× packet) |
-| Testability | real loop, fake provider, real git — deterministic | simpler; but multi-hop behaviour is untestable by construction |
-| Reuse in ReviewRouter later | OCR-native task is a portable notion; tools are Git-bound | Gateway client already lives on the RR side |
-| Requirements contract independence | typed contract owned by this package | same contract, but embedded in prompts |
+| 5 cases × USD 0.20 | = 1.00 > 0.90 | 4 cases × 0.22 = 0.88 |
+| USD 0.20/case at 8 requests | 8 × 0.044 = 0.352 > 0.20 — the two limits are incompatible at any realistic request width | 5 requests/case; 0.22 cap |
+| 8 requests "including grace" | grace is *outside* `MaxRounds` (C2) | `MaxRounds = 4` → 5 requests |
+| 10 min/case at 150 s/request | 6 × 150 s = 15 min > 10 min | 120 s/request, 10–12 min/case |
+| "Worst allowed case ≈ USD 0.19" | assumed 13k input tokens/request; turn 5 alone re-sends the whole conversation | 24,576 B/request ceiling, reserved as bytes |
+| Expected 0.42–0.60 | assumed 6 requests at ~15k input | expected 0.15–0.28 from D3's settled/reserved ratio (0.376) |
 
-**Why A by default**: B cannot satisfy the four requirements that make this research worth doing —
-multi-hop discovery (§6), honest partial coverage after budget exhaustion (§5), per-criterion evidence
-identity, and a single enforceable budget. B's cost advantage is real but it buys a mechanism whose
-ceiling is the packet a human already had to assemble, which is exactly the reader effort D3 failed to
-reduce.
+Sanity check on the direction: Option A's live cost per case (0.22 worst, ~0.07 expected) is **~2.3×**
+Option B's two-request cost (0.097 worst, 0.036 expected). That asymmetry is measured, not assumed, and it
+is the reason W4 exists.
 
-**Concrete switch condition** (any one triggers the fallback, recorded with the evidence):
-1. the seam spike needs **> 600 lines** of shared-file edits (not counting the new package), or
-2. in **two consecutive** fixture cases the accepted result is reached on turn 1 with no tool call, *and*
-   per-case cost is not lower than B's two requests, or
-3. across the planned live subset, adding turns never changes a criterion's state in a case where the
-   frozen expectation required multi-hop evidence, or
-4. ordinary managed OCR regression cannot be kept green with the new command present.
+### 4.6 D3's remainder is not an allowance
+
+Reconciled from the receipts, not re-derived: committed basis `max(settled 0.31639530, conservative
+0.55929) = 0.55929`; D3 settled 4 × criteria attempts = `0.07374375`; aggregate worst case
+`0.55929 + 0.07374375 = 0.63303375`; headroom to the program's USD 1.00 ceiling `0.36696625`. D3's own
+authorized envelope was `0.41368` (4 × 0.04842 + 8 × 0.0275), of which the OCR part was never spent
+because the comparator was `BLOCKED`. The 0.36696625 is unallocated program headroom, **not** a grant: it is
+smaller than D3's own unused envelope, it was never authorized for D4, and using it would silently reopen a
+closed batch guard. D4 therefore requests a new, standalone ceiling.
 
 ---
 
-## 6. Rough LOC and development complexity
+## 5. Ordinary OCR baseline
 
-| Work package | Lines (range) | Complexity |
+### 5.1 What can be reused
+
+Nothing observational. D3's OCR stage ended `BLOCKED`: native findings, post-filter findings, normalized
+comments and publication-eligible comments are all **unobserved**, explicitly not empty. What *is* reusable:
+
+- the qualified binary record (`1.14.0-rr.1`, sha256 `443d7777…`, docker `linux/amd64`, image
+  `m2-ocr-rr7:local` present on this machine);
+- the preparation shapes (`rule-c02.json`, `background-c02.txt`, home config) as templates;
+- the **measured request width** (1,641 B preamble, then 19,627–23,258 B per substantive request) — this is
+  the single most useful D3 artifact for D4 budgeting, because it proves the cost floor.
+
+### 5.2 When an invocation is necessary
+
+Only when the report intends to claim *incremental value over ordinary OCR* on a case. It is **not**
+necessary to describe the adaptive mechanism's internal behaviour, its partial output, or its cost.
+
+### 5.3 Profile and environment availability
+
+Available: model `openai/gpt-6.1-terra`, effort medium, reviewer settings, `1.14.0-rr.1` binary and Docker
+image. **Not established:** the credit line. D3 never obtained a live OCR comparator, so there is no
+qualified account, no per-request price for the managed unit, and no evidence that the managed channel
+accepts the request shape at all (C8).
+
+### 5.4 Its own reservation
+
+Yes — USD 0.46 for one case, separate from the 0.90. The floor is not negotiable: 8 requests × 24,640
+tokens = USD 0.306 merely to complete a structurally minimal run, because OCR's fixed per-request width
+(~19.6 KB of prompt + rule + inventory) does not shrink with the fixture. A smaller fixture does **not**
+make the comparator cheaper, and this is the reason D3 could not afford it inside a 15,936-byte cap.
+
+### 5.5 Partial OCR execution
+
+If an OCR run stops early, its outcome is `incomplete` — the D3 representation — never "OCR found nothing".
+Any table cell for an incomplete comparator run is `not observed`, and an `incomplete` comparator may not
+be used as evidence of a missed defect.
+
+### 5.6 Incremental usefulness, and the claim that cannot be made
+
+Per case, record three numbers, no composite score:
+
+1. confirmed required violations found by A and not by the comparator (and vice versa);
+2. owner-reader bytes needed to reach the same decision;
+3. USD per confirmed required violation.
+
+If no fair OCR baseline is obtained, the report **cannot** claim "the requirements task finds defects that
+ordinary OCR misses". It may claim only "within a fixture where the project's own checks are green, the
+task reached these decisions at this cost, with this evidence" — and the limitation must appear in the
+first paragraph, not a footnote.
+
+---
+
+## 6. Fixture oracle qualification (model-free, before any model input)
+
+`quota-service` is only usable if all of the following are established **without a model** and stored
+under `evaluator/` (never in the packet):
+
+| Evidence | Requirement | Why a green `go test` is not enough |
 | --- | --- | --- |
-| Result contract + artifact writing | 180–250 | medium (schema design, M2-compatible states) |
-| Preparation + identity binding | 150–220 | medium (Git plumbing, digests) |
-| Authorized code access + search policy | 290–400 | **high** (security exclusions, truncation semantics) |
-| Observation + finding persistence | 270–380 | medium (append-only, crash-visible) |
-| Budget + reserve | 90–130 | low |
-| Validation + coverage | 160–230 | **high** (duplicate/stale/absent rules) |
-| Runner + prompts | 350–490 | medium |
-| CLI | 180–260 | low–medium |
-| Tests | 900–1,400 | medium |
-| Fixture + probes | 950–1,500 | medium |
-| **Total** | **≈ 3,500–5,300** | |
+| Declared-complete control (S1) | Every criterion driven through the HTTP API by a separate probe program; boundary values executed (`limit-1`, `limit`, `limit+1`) | D3 called a control complete on a green suite and was wrong about what the suite covered |
+| Negative case (S2) | The missing feature is shown absent by executing the API (404/422/no-op), not by reading code | Absence in source is not absence in behaviour |
+| API and state boundaries | Exact admit/reject and usage-increment rows recorded as probe output | Boundary drift is the most common fixture rot |
+| Worker re-entry (S3) | Worker killed mid-item and restarted; re-arm observed in a probe log | The defect lives only in the re-entry path |
+| Cross-component connection | Show the changed file alone cannot satisfy the criterion: the decisive witness path is outside the changed inventory | Otherwise the case is single-hop and discriminates nothing (W3) |
+| Missing-evidence boundary (S4) | A tree-wide search for the runtime receipt is recorded as an oracle artifact proving it does not exist | "We could not find it" is not evidence of absence |
+| Relevant ambiguity (S6) | Three implementable readings recorded, each with a distinguishable API behaviour | Ambiguity that cannot be resolved into behaviours is not testable |
+| Identity | Full base/head SHAs, requirement-file sha256, per-file digests, and **two independent probe runs diffing empty** | Reproducibility is a property to demonstrate |
 
-Confidence: medium on the code ranges (anchored on `behaviortask`'s actual 1,750 lines for a
-narrower feature set), low on prompt-iteration effort, which is usually 20–40 % of a task like this and
-is excluded above.
+Additionally: expected results live only in `evaluator/`; the model-visible packet is generated from
+`requirements/` + changed source and is mechanically checked for absence of evaluator strings; **S7 is
+never used in prompt tuning** and is first exercised at P3.
+
+The oracle is qualified by P2's own GO/STOP: if a mandatory criterion cannot be stated model-free, or if
+`violated` and `inconclusive` cannot be distinguished on S2/S4, the fixture is not usable and P3 must not
+start.
 
 ---
 
-## 7. Adaptive session lifecycle
+## 7. GO / STOP matrix
 
-One run, one candidate, one requirements revision.
+Engineering correctness and semantic quality are separate columns; a green engineering gate never implies
+a semantic result.
 
-| Stage | What happens | Model call? |
+| Gate | Condition | Kind | If not met |
+| --- | --- | --- | --- |
+| P1 GO | G1–G8 in §3.3 | engineering | fix, or STOP to B on G3/G4/G6/G7/G8 |
+| P1 STOP → B | shared delta > 100 lines or any shared-package edit (W1) | engineering | Option B, recorded with the diff |
+| P1 STOP → B | seam test needs edits on 2 consecutive syncs (W2) | engineering | Option B |
+| P2 GO | Partial results, evidence binding and budget admission pass offline E2E; oracle qualified (§6) | engineering | do not start P3 |
+| P2 STOP | A mandatory criterion cannot be stated model-free; or S3's witness is single-hop (W3) | fixture | build `plugin-cli`, or stop |
+| P3 GO | Explicit live authorization, separately granted, with the §4 numbers | authorization | no spend |
+| P3 STOP | Unsupported `satisfied` on a mandatory requirement, including "complete" while a mandatory clause is unassessed | semantic | end the direction as proposed |
+| P3 STOP | A partial run reported as `completed` | semantic | end the direction |
+| P3 STOP | Ordinary managed OCR regression in artifacts or exit status | engineering | revert the command |
+| P3 STOP | Stale or different candidate accepted as the assessed one | integrity | end the direction |
+| P3 RECOMMEND B | No actionable difference from checks/OCR on the multi-hop case **and** no material reader-work reduction (W4) | semantic | fall back to checks/OCR workflow |
+
+Semantic quality cannot be established by any offline test in this plan. A green P1/P2 says the mechanism
+is *correct*, never that it is *useful*.
+
+---
+
+## 8. Architecture critique retained (condensed)
+
+| # | Question | Verdict | Smallest test |
+| --- | --- | --- | --- |
+| 1 | Is one adaptive session simpler than separate fast/deep engines? | **Partly.** One `Task`, one template. A second engine duplicates the driver. Not proven cheaper in tokens. | Count requests on a trivial case (§3.3 G1) |
+| 2 | Can small tasks skip the loop? | **Structurally yes.** `runMainTask` returns on the first `Complete`; nothing forces a tool call. | Turn-1 submission → 1 request |
+| 3 | Can complex tasks investigate without scanning? | **Capability, not policy.** Search is bounded by 100 matches and by budget, not by relevance. | 601-match surface (§3.3 G2) |
+| 4 | Is the seam maintainable? | **Yes for the loop, moderate for prose contracts.** Two textual contracts (`"Note: Showing the first "`, `IS_TRUNCATED: true`) are parsed by string prefix. | Seam test (§3.3) |
+| 5 | Can findings persist before submission? | **Observations yes, criteria no.** `append` writes and closes before the result returns; no criterion store exists. | G4 |
+| 6 | Can Gateway/V4 replace it? | **No for multi-hop.** No tool loop in the gateway task; V4 has tools but no assessment semantics. | W3/W4 |
+| 7 | Do package privates make reuse invasive? | **Refuted for the task API; confirmed for scoping and observation storage.** | G7 |
+| 8 | Can terse intent avoid invented requirements? | **Unproven.** Nothing models requirements today; the guarantee must be a validator. | Three frozen intents in P2 |
+| 9 | Can it distinguish absent / unavailable / failed? | **Only with new fields.** `Observation.ErrorClass` covers unavailable/tool_error/timeout/canceled/unsupported_encoding; nothing counts unassessed criteria. | Schema test in P2 |
+| 10 | Is a partial result honest? | **Structurally yes, semantically new.** Grace round exists; criteria must be persisted first. | G5 |
+
+**Assumptions, stated separately:** (A1) a compact packet yields a turn-1 submission — unmeasured;
+(A2) 4–6 requests suffice for a cross-component obligation — owner hypothesis, unmeasured, and P3 now funds
+only 4 investigation rounds; (A3) typed criteria reduce reader work — D3 measured the brief, not criteria;
+(A4) **contradicted in part** (C8): the managed channel rejects the analysis-shaped path; (A5) an ordinary
+OCR baseline is obtainable and affordable — cost now measured (§5.4), affordability unresolved.
+
+**Where I disagree with the direction:** roughly half the new code is result semantics, not investigation;
+the 300-round default is the wrong shape (a small round cap plus an aggregate budget is right); truncation
+by English prose is a liability and should be isolated behind one seam test; and a second fixture before
+one measured case repeats D3's pattern of accumulating controls without a comparator.
+
+---
+
+## 9. Adaptive session lifecycle
+
+| Stage | What happens | Model call |
 | --- | --- | --- |
-| 1. Bind candidate | Resolve `--commit` or `--from/--to` to full SHAs; reject short/ambiguous; record `comparison_id` = sha256 of (repo, mode, old, head). | no |
-| 2. Bind requirements | Read task text + bundle; hash `requirements_sha256`; validate the requirement file against `ocr.requirements/v1`; refuse to start if any requirement lacks an authored source. | no |
-| 3. Assemble initial context | Comparison manifest, changed inventory (path, status, excluded reason), requirement bundle, optional captured context with provenance. Oversized inventories become paged `context_read` indexes (as `behaviortask` does). | no |
-| 4. First turn | System + task prompt; tools: `file_read`, `code_search`, `file_find`, `file_read_diff`, `context_read`, `record_finding`, `submit_requirements`. A sufficient packet may submit immediately. | yes (1) |
-| 5. Investigate | Each read/search produces an observation with revision, locations, hash, truncation, error class. Batched: no call per file or per criterion. | yes (+1 per turn) |
-| 6. Optional additional source | Model narrows by `file_patterns` or line range, or replays a paged context/observation. Bounded by source-op count and bytes. | same turn |
-| 7. Persist findings | `record_finding` appends one criterion state to `findings.jsonl` with observation IDs and the candidate digest. Rejected if it cites a failed/absent observation, a different comparison, or an unknown criterion ID. | same turn |
-| 8. Submit | `submit_requirements` is the only completion tool; the first valid submission is frozen. After a spent budget, a submission-only grace round with the reserve. | +1 (grace) |
+| 1. Bind candidate | Resolve `--commit` or `--from/--to` to full SHAs; reject short/ambiguous; `comparison_id` = hash(repo, mode, old, head) | no |
+| 2. Bind requirements | Read task text + bundle; `requirements_sha256`; refuse to start if a requirement lacks an authored source | no |
+| 3. Assemble context | Manifest, changed inventory with excluded reasons, requirement bundle, captured context. Oversized inventories become paged indexes | no |
+| 4. First turn | System + task prompt; tools `file_read`, `code_search`, `file_find`, `file_read_diff`, `context_read`, `record_finding`, `submit_requirements`. A sufficient packet may submit immediately | yes (1) |
+| 5. Investigate | Each read/search yields an observation (revision, locations, hash, truncation, error class). Batched; no call per file or per criterion | +1/turn |
+| 6. Narrow | `file_patterns` or line ranges; replay a paged observation | same turn |
+| 7. Persist finding | `record_finding` appends one criterion state with observation IDs and the candidate digest; rejected on failed/absent observation, different comparison, unknown criterion | same turn |
+| 8. Submit | `submit_requirements` is the only completion tool; first valid submission frozen. After a spent budget, one submission-only grace round | +1 |
 
-Budget mechanics that already exist and are reused verbatim: round cap (`MaxRounds`), aggregate token
-budget checked before each dispatch (`tokenBudgetExceeded`), three-zone compression, `StopMaxRounds` /
-`StopTokenBudget` reporting, and the `FinalSubmission` bypass in `requestBudget.complete`.
-
-New: `MaxRounds = 8` (not 300), `MaxTokensBudget = 120000` per run, reserve = 1 submission-only round,
-source-op cap = 8 beyond the first turn, read page default 16 KiB (max 64 KiB), search cap from provider
-(100).
+**Corrected limits:** `MaxRounds = 4` (+1 grace = 5 requests); `Deps.MaxTokensBudget = 120,000` reported
+tokens; `MaxContextTokens = 200,000` (unchanged, so compression never fires at these sizes); per-request
+input ≤ 24,576 B and output ≤ 2,560 tokens; **per tool result ≤ 8,192 B** (the new cap that makes the input
+ceiling real, C4); per read, line ranges only (the provider's own 500-line/256 KiB render is truncated by
+our wrapper first); search: 100 matches at the provider, **40** returned to the model; findings ≤ 50.
 
 ---
 
-## 8. Partial-result and evidence semantics
-
-### Result states
+## 10. Partial-result and evidence semantics
 
 | State | Meaning | Emitted when |
 | --- | --- | --- |
-| `completed` | Every mandatory criterion has a state, submission accepted, no budget stop, no error | normal completion |
-| `partial_budget` | Submission accepted after `StopMaxRounds`/`StopTokenBudget`; some criteria explicitly `not_assessed` | grace round |
-| `partial_unavailable` | Source needed for a criterion is unavailable (excluded, missing at revision, encoding, permission) | submission with `unavailable` evidence class on that criterion |
-| `failed` | No valid submission; investigation error, provider error, persistence failure | `ExecutionStatus` `failed` |
-| `cancelled` | Context cancelled before/at submission; retained findings are reported, nothing is invented | `context.Canceled` |
-| `invalid_submission` | Model never produced a schema-valid submission inside the budget | submission rejected in grace |
+| `completed` | Every mandatory criterion has a state; submission accepted; no budget stop | normal |
+| `partial_budget` | Accepted submission after `StopMaxRounds`/`StopTokenBudget`; some criteria `not_assessed` | grace round |
+| `partial_unavailable` | A criterion's source is unavailable (excluded, missing, encoding, permission) | submission with `unavailable` evidence |
+| `failed` | No valid submission: investigation, provider or persistence error | `ExecutionStatus failed` |
+| `cancelled` | Cancelled before/at submission; retained findings reported | `context.Canceled` |
+| `invalid_submission` | No schema-valid submission inside the budget | grace rejected |
 
-Rules carried over deliberately from `behaviortask`: a self-declared `complete` never overrides a
-program-recorded budget stop, a cancellation, a provider error or an artifact write failure; `completed`
-means the loop accepted a submission, not that the investigation was complete.
-
-### Failure matrix
-
-| Event | Behaviour | Recorded as |
-| --- | --- | --- |
-| Context/tokens exhausted | Stop before dispatch; grace submission; unassessed criteria stay `not_assessed` | `partial_budget` + stop reason |
-| Source read fails | Observation stored with `error_class`; model may retry once with a narrower range; the criterion cannot be `satisfied` from a failed read | `unavailable` observation, `inconclusive` criterion |
-| Search truncated | Stored with `truncated: true` and the provider's continuation hint; model must narrow; the criterion may be `inconclusive` but never `absent` | coverage: `search_truncated` |
-| Malformed model final output | Rejected with the validator's message; repairable inside the remaining rounds; grace invalid is not retried | `invalid_submission` if unrepaired |
-| Final request cannot be dispatched | Findings retained; no assessment invented | `failed` with reason, findings still written |
-| Cancellation after a saved finding | Findings file intact; result `cancelled`; no completion claim | `cancelled` |
-| Same observation submitted twice | Deduplicated by content hash; the second citation is ignored, not counted twice | provenance count = unique IDs |
-| Same criterion recorded twice with different states | Both retained in `findings.jsonl`; final submission must resolve, else criterion is emitted `conflicting` and the run is `partial` | `conflicting` |
-| Stale candidate/source revision observed | Observation carries its revision; a citation whose revision ≠ bound head is rejected | validation error, criterion `inconclusive` |
-
-If no valid incremental finding exists at stop, the result is `failed` or `partial` with an explicit
-`not_assessed` inventory — never a manufactured partial completion.
+Failure matrix (unchanged in substance from D4-P0): tokens exhausted → stop before dispatch → grace →
+`partial_budget`; failed read → `unavailable` observation, criterion `inconclusive`, never `satisfied`;
+truncated search → `search_truncated` coverage, never `absent`; malformed output → validator message,
+repairable inside remaining rounds; final request undispatchable → `failed`, findings retained; duplicate
+citation → deduped, not double-counted; conflicting states → both retained, criterion `conflicting`;
+stale revision → rejected. If no valid finding exists at stop, the result is `failed`/`partial` with an
+explicit `not_assessed` inventory — never a manufactured partial completion.
 
 ---
 
-## 9. Terse-input interpretation policy
+## 11. Terse-input interpretation policy
 
-`ocr requirements` accepts an ordinary sentence. The run produces an **intent record** that is frozen
-before implementation results are read and is not editable afterwards:
+The run emits an intent record frozen before implementation results are read:
 
 ```json
 {
@@ -347,250 +570,145 @@ before implementation results are read and is not editable afterwards:
 }
 ```
 
-Rules enforced by the validator, not by prompt text:
+Enforced by the validator, not by prompt text: `ambiguous`/`optional` can never be mandatory or blocking;
+`necessary_implication` requires a non-empty `whyNecessary` naming an outcome or contract, and a design
+choice without a behavioural obligation is rejected; exactly one state per criterion from
+`satisfied | violated | inconclusive | not_assessed | conflicting | unavailable`; `satisfied` requires a
+cited observation without an error class; **a requirement whose provenance is the changed files is
+rejected** (the implementation cannot define its own acceptance); an owner clarification is a **new
+requirement revision** with a new sha256, re-evaluated, never silently weakened.
 
-- `ambiguous` and `optional` can never carry `mandatory: true` or a blocking decision; they are emitted
-  as an owner question or a suggestion.
-- `necessary_implication` requires a non-empty `whyNecessary` naming the requested outcome or an
-  existing contract; a design choice ("use a transaction") without a behavioural obligation is rejected.
-- Every criterion has exactly one state from `satisfied | violated | inconclusive | not_assessed |
-  conflicting | unavailable`, and `satisfied` requires at least one cited observation without an error.
-- The candidate cannot contribute requirements: any requirement whose provenance is the changed files is
-  rejected at validation (the implementation does not define its own acceptance).
-- An owner clarification arrives as a **new requirement revision** with a new sha256; applicability is
-  re-evaluated; nothing is silently weakened or expanded.
-
-No extra model call is introduced. The intent record is produced in turn 1 by the same session that
-investigates, and its digest is recorded before findings. The owner's expected meaning used for
-evaluation is frozen separately in evaluator-only files and never enters model input.
-
-Evaluation of this policy is offline first (three frozen intents), then observed live on one terse case.
+No extra model call: the intent record is produced in turn 1 by the same session, digested before findings.
+The owner's expected meaning is frozen separately in `evaluator/` and never enters model input.
 
 ---
 
-## 10. Fixtures
+## 12. Fixtures
 
-### Preferred first fixture — `quota-service` (workflow/budget service)
+### 12.1 `quota-service` (one, purpose-built)
 
-Purpose-built, runnable, product-like; not a clone of Agent Teams or UAP; not a mock of the verifier.
-
-- HTTP API: `POST /v1/admit`, `POST /v1/usage`, `GET /v1/policy`, `GET /healthz`.
-- Persisted policy and usage state (SQLite via `database/sql`, migration file).
-- Admission + authorization (subject, scope, limit).
-- Background worker with recovery of interrupted work on start.
-- Usage/limit enforcement with an explicit boundary (limit reached, limit exceeded).
-- Tests with the project's own command (`go test ./...`).
-- ~700–1,100 lines, single toolchain already required by the research environment.
-
-Fixture specification to freeze before any model input:
-
-| Item | Content |
-| --- | --- |
-| Base commit | recorded full SHA |
-| Ordinary task description | one paragraph, natural, no checklist |
-| Owner-authored requirements | separate frozen file + sha256, evaluator-only copy of expected meaning |
-| Candidate variants | see below |
-| Normal test command | `go test ./...` |
-| Independent probes | separate small program invoking the HTTP API directly (no verifier coupling) |
-| Source-selection rules | which files a correct investigation must touch at minimum, and which are irrelevant |
-| Evidence boundaries | one criterion intentionally requires a runtime receipt the repository does not contain |
-| Version/digest policy | base, head, requirement revision, prompt revision |
-| Recurring maintenance | ~1 h per variant when the fixture's own behaviour changes |
-
-Variants (smallest discriminating subset, seven scenarios):
+HTTP API (`POST /v1/admit`, `POST /v1/usage`, `GET /v1/policy`, `GET /healthz`), persisted policy and usage
+(SQLite), admission with subject/scope/limit, a background worker with recovery of interrupted work, limit
+enforcement with an explicit boundary, `go test ./...`. ~700–1,100 lines. Not a clone of Agent Teams or UAP.
 
 | ID | Scenario | Purpose |
 | --- | --- | --- |
-| S1 | Fully correct, boundary cases verified | justified completion |
+| S1 | Fully correct, boundary cases executed | justified completion |
 | S2 | Missing feature despite green tests | confirmed mandatory violation |
-| S3 | Cross-component wiring defect (worker never re-arms after recovery) | **multi-hop discovery** |
-| S4 | Genuine unavailable evidence (needs an execution receipt) | missing-evidence request |
-| S5 | Short natural task ("make quota accounting reliable") | terse intent |
-| S6 | Material ambiguity ("keep over-limit requests fast" — reject vs queue vs cap) | owner clarification |
-| S7 | Equivalent behaviour under a moved/renamed path + irrelevant diff | context-selection fragility (**held out of prompt tuning**) |
+| S3 | Worker never re-arms after recovery | **multi-hop discovery** |
+| S4 | Evidence genuinely absent (needs a runtime receipt) | missing-evidence request |
+| S5 | Short natural task | terse intent |
+| S6 | Material ambiguity (reject vs queue vs cap) | owner clarification |
+| S7 | Equivalent behaviour at a moved path + irrelevant diff | context-selection fragility (**held out**) |
 
-Controls: S1 must be *independently* verified with the probes — D3's mistake was calling a control
-complete on a green suite alone.
+### 12.2 Conditional second fixture
 
-### Conditional second fixture — `plugin-cli` (only if triggered)
-
-Justified only if `quota-service` cannot exercise all of: manifest parsing, compatibility/adapter
-selection, filesystem state, retry/recovery across projects, and genuinely irrelevant modules that a
-naive search would return. Trigger: if S3 and S7 in the first fixture are answered by single-hop reads
-(i.e. the changed file already contains the decisive evidence), the first fixture has not qualified
-multi-hop discovery and a second topology (CLI + adapter registry) is worth building. Otherwise skip it.
+`plugin-cli` only if W3 fires: S3's decisive witness turns out to be inside the changed inventory, so
+`quota-service` cannot discriminate multi-hop. Cost: 0.5–1 week, no measured benefit yet. Otherwise skip.
 
 ---
 
-## 11. Model-free E2E qualification tests
+## 13. Model-free E2E qualification tests (P2)
 
-Deterministic fake provider replies; real `llmloop`, real `internal/tool`, real git revisions; no
-network, no credentials, no spend. Each test is engineering qualification only — it can never show
-semantic quality.
+Deterministic fake provider; real loop, real tools, real git; no network, no credentials.
 
 | ID | Test | Assertion |
 | --- | --- | --- |
-| T1 | Ordinary managed OCR regression | `ocr review` and `ocr review --analysis` on a fixture produce byte-identical artifacts/exit codes versus the pinned baseline |
-| T2 | Immutable candidate binding | submitting a head other than the bound head is rejected; observation revision ≠ bound head is rejected |
-| T3 | Authorized source access | excluded, secret-like, symlink and unsupported paths are `unavailable` through read, search, find and enumeration |
-| T4 | Observation identity and provenance | every observation has ID, revision, locations, content hash; citations resolve; uncited reports allowed but flagged |
-| T5 | 601-match truncation regression | unscoped search of the fixture returns exactly 100 matches with the truncation note and matching-file count; the relevant `src/core/wiring.ts` is outside that page; `file_patterns: ["src/core/**"]` returns it; no-match, truncated, excluded and read-error remain four distinct states |
-| T6 | Incomplete coverage | a run with two unread criteria emits `not_assessed` + `partial_*`; no `satisfied` |
-| T7 | Typed final submission | invalid schema, unknown criterion ID, ambiguous marked mandatory, and implementation-derived requirement are each rejected with a distinct message |
-| T8 | Incremental persistence | after N `record_finding` calls the file contains exactly N accepted entries; a rejected call appends nothing |
-| T9 | Duplicate/stale handling | duplicate citation deduped; conflicting states preserved and reported; stale revision rejected |
-| T10 | Hard limits | round cap, token budget, source-op cap and page size each stop the run at the declared point with the right stop reason |
-| T11 | Submission reservation | with the budget already exhausted, one submission-only request still dispatches and is accepted |
-| T12 | Cancellation and timeout | cancel after a saved finding → `cancelled`, findings intact; timeout → distinct reason |
-| T13 | Invalid/missing final response | malformed JSON, then repair, then unrepaired → `invalid_submission`, no completion claim |
-| T14 | Error and refusal accounting | provider HTTP error, refusal text, empty tool rounds → recorded, never counted as assessment |
-| T15 | Baseline preservation | review path unchanged when the new command is present (no shared-state coupling) |
-| T16 | Seam equivalence | `file_read`/`code_search`/`file_find` truncation flags, locations and error classes match between the new package and `behaviortask` on the same fixture |
-
-If any shared extraction is ever proposed, add a disposable-worktree merge/rebase smoke test against the
-then-current upstream main. Not performed in this phase: no upstream sync, no branch change.
+| T1 | Ordinary OCR regression | `ocr review` and `ocr review --analysis` byte-identical artifacts/exit codes vs pinned baseline |
+| T2 | Immutable candidate | other head rejected; observation revision ≠ bound head rejected |
+| T3 | Authorized access | excluded/secret/symlink/unsupported paths `unavailable` through read, search, find |
+| T4 | Observation provenance | ID, revision, locations, hash; citations resolve |
+| T5 | Truncation regression | 601 matches truncate at the declared cap; scoped search recovers the witness; four distinct states |
+| T6 | Incomplete coverage | two unread criteria → `not_assessed` + `partial_*`, no `satisfied` |
+| T7 | Typed submission | bad schema, unknown criterion, ambiguous-as-mandatory, implementation-derived requirement each rejected distinctly |
+| T8 | Incremental persistence | N accepted findings on disk; a rejected call appends nothing |
+| T9 | Duplicate/stale | dedupe, conflict preserved, stale rejected |
+| T10 | Hard limits | round cap, token backstop, tool-result byte cap and result cap each stop at the declared point |
+| T11 | Submission reserve | with the budget spent, one submission-only request still dispatches and is accepted |
+| T12 | Cancellation/timeout | after a saved finding → `cancelled`, findings intact |
+| T13 | Invalid final | malformed → repaired → unrepaired → `invalid_submission` |
+| T14 | Error accounting | provider error, refusal, empty rounds recorded, never counted as assessment |
+| T15 | Baseline preservation | review path unchanged with the command present |
+| T16 | Seam equivalence | truncation flags, locations and error classes match the declared contract on the same fixture |
 
 ---
 
-## 12. Minimal planned live semantic evaluation (planning only)
+## 14. Minimal planned live evaluation
 
-Five fixed cases, one run each, predeclared expectations frozen before dispatch. Ordinary OCR plus the
-project's own checks is the baseline; the D3 one-shot is used only where the packet genuinely applies.
+Four cases, one run each, expectations frozen before dispatch. Ordinary OCR plus the project's own checks
+is the baseline; the D3 one-shot is used only where its packet genuinely applies.
 
-| Case | Fixture | Mechanism(s) | Decision it resolves |
+| Case | Fixture | Mechanism | Question |
 | --- | --- | --- | --- |
-| L1 | S1 | adaptive + ordinary OCR | justified completion: does it avoid inventing defects? |
-| L2 | S2 | adaptive + ordinary OCR | confirmed missing requirement: is it found and evidenced? |
-| L3 | S3 | adaptive + ordinary OCR (**the multi-hop case**) | disconnected cross-component behaviour |
-| L4 | S5 | adaptive only | terse natural request |
-| L5 | S4 | adaptive only | honest insufficient evidence / partial under budget |
+| L1 | S1 | adaptive | Does it avoid inventing defects on a correct candidate, at what cost? |
+| L2 | S2 | adaptive | Is the unmet mandatory requirement found and evidenced? |
+| L3 | S3 | adaptive (+ OCR **only if funded**) | Is disconnected cross-component behaviour found? |
+| L4 | S5 | adaptive | Is a terse request interpreted without inventing obligations? |
 
-Not every mechanism on every case. S6 (ambiguity) is evaluated offline against the intent record first;
-it goes live only if L1–L5 leave the ambiguity policy unexercised. S7 stays held out.
+Offline-only by design: S6 (ambiguity, via the intent record), S4 (missing evidence, via the oracle),
+partial-budget behaviour (T10/T11), and S7 (held out entirely). Not every mechanism on every case; no
+permanent matrix.
 
-Capture per case: owner action expected vs produced; confirmed and missed violations; unsupported
+Per case record: expected vs produced owner action; confirmed and missed violations; unsupported
 satisfactions; unnecessary required corrections; missing-evidence requests; observation IDs and coverage;
-false absence due to truncation; actual provider requests; repeated input bytes/tokens; usage and
-reasoning tokens; wall time; manual setup and reader time; incremental cost over baseline.
-
-No model result is its own ground truth. A small sample cannot establish population accuracy.
-
----
-
-## 13. Numerical limits (planning envelope)
-
-**Verified measured values** (from the retained D3 receipts):
-
-| Quantity | Value |
-| --- | --- |
-| One-shot request body | 26,773 B (packet 24,078 B) |
-| Tokens per one-shot request | 6,045 input / 2,127 output (1,204 reasoning) |
-| Wall time | 35 s |
-| Charged cost | USD 0.01819125 at input USD 1.25/M, output USD 5.00/M |
-| D3-R2 average per reply | ≈ USD 0.0139 (4 replies, USD 0.05555250) |
-| OCR default budgets | `MAX_TOKENS 200000`, `MAX_COMPLETION_TOKENS 16384`, `MAX_TOOL_REQUEST_TIMES 300` |
-| OCR search cap / page size | 100 matches; 16 KiB default page, 64 KiB max |
-
-**Conservative estimates** (stated assumptions: each turn re-sends context, +4–8 KB per turn, 1.5 k
-output tokens per turn, no prompt-cache discount assumed):
-
-| Shape | Requests | Input tokens | Output tokens | Cost (USD) |
-| --- | --- | --- | --- | --- |
-| Simple, turn-1 submission | 1 | 6,000 | 1,500 | 0.015–0.020 |
-| Moderate | 2–3 | 12,000–26,000 | 3,000–4,500 | 0.045–0.070 |
-| Complex | 4–6 | 44,000–66,000 | 6,000–9,000 | 0.09–0.15 |
-| Worst allowed case (cap) | 8 | ≈104,000 | ≈12,000 | ≈0.19 |
-
-**Proposed limits for the D4 live phase**
-
-| Limit | Value |
-| --- | --- |
-| Requests per case | 8 maximum including the grace submission |
-| Aggregate tokens per case | 120,000 |
-| Context window | OCR default 200,000 (unchanged); prompt is ~10–20 % of it |
-| Source operations | 8 beyond the first turn |
-| Reads | page 16 KiB default, 64 KiB max; search 100 matches |
-| Findings | ≤ 50 per run (fixture scale); 1 record per accepted criterion state |
-| Wall time | 10 min per case, 60 min total |
-| Per-case cost cap | USD 0.20 |
-| **Total live ceiling** | **USD 0.90** (expected actual 0.42–0.60) |
-| Abort | stop the batch if aggregate spend reaches USD 0.90 or any case fails twice |
-
-D3's remaining USD 0.36696625 is **not** an allowance and is not drawn on. These figures are conservative
-ledger estimates, not settled provider billing.
-
-**Unknowns requiring preflight (no spend)**: the ordinary-OCR managed credit unit and per-request charge
-(D3 never obtained a live comparator); whether the managed channel accepts a new subcommand; prompt-cache
-read pricing; fixture test runtime.
+false absence due to truncation; actual requests; repeated input bytes/tokens; usage and reasoning tokens;
+wall time; manual setup and reader time; incremental cost over baseline. **No model result is its own ground
+truth, and four cases cannot establish population accuracy.**
 
 ---
 
-## 14. Stop and fallback criteria
+## 15. Stop, fallback and scope
 
-*Material failure* — any one ends the direction as proposed:
+*Material failure* — any one ends the direction: unsupported `satisfied` on a mandatory requirement; a
+partial run reported as `completed`; a stale or different candidate accepted; ordinary managed OCR
+regression; no actionable difference from checks/OCR on the multi-hop case with no material reader-work
+reduction.
 
-1. an unsupported `satisfied` on a mandatory requirement (including "complete" while a mandatory clause is unassessed);
-2. a partial run reported as `completed`;
-3. a stale or different candidate accepted as the assessed one;
-4. ordinary managed OCR regression (`ocr review`, `ocr review --analysis`) in artifacts or exit status;
-5. no actionable difference from ordinary OCR/checks on the multi-hop case, *and* no material reduction in reader work.
+*Proportionate maintenance*: > 100 shared-file lines (W1) or a seam test broken on two consecutive syncs
+(W2) → Option B.
 
-*Proportionate maintenance*: if the new package needs more than ~600 shared-file lines, or every upstream
-sync breaks the seam test, the value does not justify the coupling → Option B.
+*Cost*: a complex case exceeding USD 0.22 with no demonstrated decision difference → stop; re-scope, do not
+raise the ceiling.
 
-*Cost*: if measured cost per complex case exceeds 2× the estimate in §13 without a demonstrated decision
-difference, stop and re-scope to two cases.
-
-*Scope*: the plan does not start the genuine-team-task phase, does not merge M2 PR #2, does not publish
-anything, and does not change the OCR policy or reviewer context.
+*Scope*: this plan does not start the genuine-team-task phase, does not merge M2 PR #2, does not sync
+upstream, does not modify maintained OCR source, and does not claim managed-mode compatibility.
 
 ---
 
-## 15. Recommendation and the decisions Iliya must make
+## 16. Decisions Iliya must make
 
-**Recommendation**: approve **Option A scoped to one package and one fixture**, with the live envelope in
-§13, and treat Option B as the recorded fallback with the switch condition in §5.
-
-Exact decisions requested:
-
-1. **Scope approval** — `internal/requirementstask` + `ocr requirements` + one fixture (`quota-service`), as mapped in §3, with a 1–3 line shared-file delta. Approve, or require the fallback first.
-2. **Fixture scope** — one project now, second only on the §10 trigger. Approve, or require both up front (cost: +0.5–1 week, no measured benefit yet).
-3. **Live authorization** — a *new* ceiling of USD 0.90 for five cases (expected 0.42–0.60), per-case 0.20, 8 requests, 120 k tokens, 10 min. D3's remainder is not reused.
-4. **Baseline credential line** — confirm which account/credit line may run the ordinary-OCR comparator, or accept that L1–L3 run without an OCR column and say so in the report.
-5. **Bookkeeping** — accept the D3 index residue in Appendix A as documented-and-closed rather than corrected in place.
+1. **Scope** — approve P1 exactly as §3.2/§3.3, or require Option B first.
+2. **Live ceiling** — authorize USD 0.90 (4 cases × 0.22, 5 requests, 24,576 B input, 2,560 output,
+   10–12 min) as a **new standalone** ceiling. If you want 5 cases, the arithmetic is 1.10; if you want a
+   6th request per case, 1.06; if you want 8 requests, 1.41. Say the number you want, not the shape.
+3. **OCR baseline** — authorize a separate USD 0.46 for one comparator case, or accept **no OCR column**
+   and the limitation in §5.6.
+4. **Transport/credential line** — which credential may run the adaptive cases, given that `--analysis` is
+   barred from `--reviewrouter-managed` and the adaptive command would need its own provider access.
+5. **Bookkeeping** — accept Appendix A as documented-and-closed.
 
 Until 1–4 are answered: no implementation, no provider request, no fixture build against a live key, no
-commit to a production repository.
+commit to a production repository, no D4-P1 start.
 
 ---
 
 ## Appendix A — Bounded D3 bookkeeping item (documented, not corrected)
 
-`synthetic/next-family/runs/D3-R3-INDEX.json` still reports:
-
-```
-"counts": { "confirmedRequiredViolations": 8, "confirmedMechanisms": 5, ... }
-```
-
-The corrected values, already published in `D3-R3-REPORT.md` (§ summary, erratum §14) and
-`adjudication/ADJUDICATION.md`, are **7 confirmed required violations** and **2 mechanisms**; the `5`
-referred to matrix claim rows, and `8` came from adding the clause-level `INSUFFICIENT_EVIDENCE` entry to
-the seven violation rows.
-
-This is a machine-index field left stale by the authorized erratum. It is recorded here as a bounded
-bookkeeping residue. No D3 record is edited, no raw output is regenerated, and D3 is not reopened. The
-next person who reads the index should read the report's 7/2.
+`synthetic/next-family/runs/D3-R3-INDEX.json` still reports
+`"counts": {"confirmedRequiredViolations": 8, "confirmedMechanisms": 5, …}`.
+The published values (`D3-R3-REPORT.md` summary and erratum, `adjudication/ADJUDICATION.md`) are **7**
+confirmed required violations and **2** mechanisms; the `5` counted matrix claim rows, and `8` added the
+clause-level `INSUFFICIENT_EVIDENCE` entry to the seven violation rows. This is a machine-index field left
+stale by the authorized erratum. It is recorded here as a bounded residue; no D3 record is edited and D3 is
+not reopened. Read the report's 7/2.
 
 ## Appendix B — Repositories and exact commits examined
 
 | Repository | Commit / state | How examined |
 | --- | --- | --- |
-| `agent-teams-ai/open-code-review` | `8a70944f567beba9ffc12d1153e33ef5fd60967d` (qualification baseline); main `5da4f4f9f2ef08a3a9f0f77a09e7252ab3647a54` (1 commit ahead) | GitHub tree/raw at the pinned commit; no local clone present; no branch change, no sync |
-| `alibaba/open-code-review` (upstream) | main `d4f568f71d3a9d5c5ec972791b1509e40cd31ad1`; sync baseline `39515dca6161fb7fd176d87704b2b10e5f7a0c36` | GitHub API compare (20 commits, 235 files) |
-| `agent-teams-ai/task-verification` | `9c21a7b00c53243315fd86a7a921c76c6d6c69d4` on `exp/synthetic-live-pilot-01`; M2 worktree `996cdcb` | local worktree, clean |
-| `agent-teams-ai/account-gateway` | `c6d73002ac28bb11c3d2e88d135a05c7f2f06bd6` (`llm/domain/task.ts`) | raw file read; no local clone |
-| `777genius/review-router` | `e3788de2ada1f33ca51db37426a5704a78efeb9b` (V4 contract + 5 read tools) | local clone, source read |
-| Docker image | `m2-ocr-rr7:local` (binary `443d7777…`, 87,356,967 B, `open-code-review 1.14.0-rr.1 linux/amd64`) | retained D3 artifact record |
-
-Reproduction note: the OCR source was read from the pinned commit because no local checkout exists on
-this machine; the D3 binary image is local and was not exercised in this phase.
+| `agent-teams-ai/open-code-review` | `8a70944f567beba9ffc12d1153e33ef5fd60967d` (qualification baseline); maintained main `5da4f4f9f2ef08a3a9f0f77a09e7252ab3647a54` (1 commit ahead) | Raw files + contents API at the pinned commit: `internal/llmloop/{task,loop}.go`, `internal/behaviortask/{code,search,observation,budget,validate,result,runner}.go`, `internal/tool/{definitions,code_access,code_search,file_read,file_find,file_read_diff,filereader,stub}.go`, `internal/llm/budget.go`, `internal/workflow/run.go`, `cmd/opencodereview/{root,analysis}.go`, `go.mod`. No local clone, no branch change, no sync |
+| `alibaba/open-code-review` (upstream) | main `d4f568f71d3a9d5c5ec972791b1509e40cd31ad1`; sync baseline `39515dca6161fb7fd176d87704b2b10e5f7a0c36` | GitHub API compare: 20 commits, 235 files; 70 in the seam directories |
+| `agent-teams-ai/task-verification` | `349c034770636682cd7a34969c60b035eca2a483` on `exp/synthetic-live-pilot-01`; M2 worktree `996cdcb` | Local worktree; receipts re-read (`runs/budget/batch-guard.json`, `runs/attempts/att-c03r…/result.json`, `D3-R3-REPORT.md` §4) |
+| `agent-teams-ai/account-gateway` | `c6d73002ac28bb11c3d2e88d135a05c7f2f06bd6` (`llm/domain/task.ts`) | Raw file read; no local clone |
+| `777genius/review-router` | `e3788de2ada1f33ca51db37426a5704a78efeb9b` (V4 contract, 5 read tools) | Local clone |
+| Docker image | `m2-ocr-rr7:local` (binary `443d7777…`, 87,356,967 B, `open-code-review 1.14.0-rr.1 linux/amd64`) | Retained D3 artifact record; not exercised in this phase |
